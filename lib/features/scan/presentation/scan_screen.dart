@@ -24,38 +24,43 @@ class ScanScreen extends ConsumerWidget {
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          children: [
-            const _SafetyNotice(),
-            const SizedBox(height: 12),
-            _ScanStatusCard(state: scanState),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: scanState.isBusy
-                  ? controller.cancelScan
-                  : controller.startScan,
-              icon: Icon(scanState.isBusy ? Icons.stop : Icons.radar),
-              label: Text(
-                scanState.isBusy ? 'Taramayı durdur' : 'Yerel ağı tara',
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Gözlemlenen cihazlar (${scanState.devices.length})',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 10),
-            if (scanState.devices.isEmpty)
-              _EmptyDevices(state: scanState)
-            else
-              ...scanState.devices.map(
-                (device) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _DeviceCard(device: device),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 840),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              children: [
+                const _SafetyNotice(),
+                const SizedBox(height: 12),
+                _ScanStatusCard(state: scanState),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: scanState.isBusy
+                      ? controller.cancelScan
+                      : controller.startScan,
+                  icon: Icon(scanState.isBusy ? Icons.stop : Icons.radar),
+                  label: Text(
+                    scanState.isBusy ? 'Taramayı durdur' : 'Yerel ağı tara',
+                  ),
                 ),
-              ),
-          ],
+                const SizedBox(height: 20),
+                Text(
+                  'Gözlemlenen cihazlar (${scanState.devices.length})',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 10),
+                if (scanState.devices.isEmpty)
+                  _EmptyDevices(state: scanState)
+                else
+                  ...scanState.devices.map(
+                    (device) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _DeviceCard(device: device),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -68,9 +73,10 @@ class ScanScreen extends ConsumerWidget {
       applicationVersion: '1.1.0',
       children: const [
         Text(
-          'Uygulama yalnızca etkin Wi-Fi ağındaki özel IPv4 adreslerinde '
-          'seçili TCP portlarını kontrol eder. Sonuçlar bir cihazın casus '
-          'olduğunu kanıtlamaz ve tüm cihazların bulunacağını garanti etmez.',
+          'Uygulama yalnızca etkin yerel ağ bağlantısındaki özel IPv4 '
+          'adreslerinde seçili TCP portlarını kontrol eder. Sonuçlar bir '
+          'cihazın casus olduğunu kanıtlamaz ve tüm cihazların bulunacağını '
+          'garanti etmez.',
         ),
       ],
     );
@@ -93,9 +99,9 @@ class _SafetyNotice extends StatelessWidget {
             SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Yalnızca sahibi olduğun veya tarama izni aldığın Wi-Fi '
-                'ağlarında kullan. Tarama en fazla 254 özel IPv4 adresiyle '
-                've sekiz yaygın TCP portuyla sınırlıdır.',
+                'Yalnızca sahibi olduğun veya tarama izni aldığın yerel '
+                'ağlarda kullan. Tarama en fazla 254 özel IPv4 adresiyle ve '
+                'sekiz yaygın TCP portuyla sınırlıdır.',
               ),
             ),
           ],
@@ -128,6 +134,12 @@ class _ScanStatusCard extends StatelessWidget {
             if (network != null) ...[
               const SizedBox(height: 12),
               _StatusLine(label: 'Yerel IP', value: network.cidr),
+              _StatusLine(
+                label: 'Bağlantı',
+                value: network.isWifi
+                    ? 'Wi-Fi (${network.interfaceName})'
+                    : 'Ethernet (${network.interfaceName})',
+              ),
               _StatusLine(
                 label: 'Ağ geçidi',
                 value: network.gatewayIpv4 ?? 'Bilinmiyor',

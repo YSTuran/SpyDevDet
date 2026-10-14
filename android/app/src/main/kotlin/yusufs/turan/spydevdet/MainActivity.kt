@@ -79,6 +79,7 @@ class MainActivity : FlutterActivity() {
                 "interfaceName" to (linkProperties.interfaceName ?: "bilinmiyor"),
                 "gatewayIpv4" to gateway?.hostAddress,
                 "isWifi" to true,
+                "isEthernet" to false,
                 "isVpn" to false,
             ),
         )

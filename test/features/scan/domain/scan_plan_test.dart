@@ -45,7 +45,7 @@ void main() {
       );
     });
 
-    test('VPN ve mobil ağ üzerinden taramayı reddeder', () {
+    test('VPN ve desteklenmeyen ağ üzerinden taramayı reddeder', () {
       expect(
         () => ScanPlan.fromNetwork(_network('192.168.1.5', 24, isVpn: true)),
         throwsA(
@@ -62,10 +62,19 @@ void main() {
           isA<ScanPlanningException>().having(
             (error) => error.code,
             'code',
-            'WIFI_REQUIRED',
+            'LOCAL_NETWORK_REQUIRED',
           ),
         ),
       );
+    });
+
+    test('Ethernet bağlantısını yerel ağ olarak kabul eder', () {
+      final plan = ScanPlan.fromNetwork(
+        _network('192.168.1.24', 24, isWifi: false, isEthernet: true),
+      );
+
+      expect(plan.targets, isNotEmpty);
+      expect(plan.network.isEthernet, isTrue);
     });
 
     test('özel aralığın dışına taşan geniş prefix değerini reddeder', () {
@@ -87,6 +96,7 @@ NetworkSnapshot _network(
   String address,
   int prefix, {
   bool isWifi = true,
+  bool isEthernet = false,
   bool isVpn = false,
 }) {
   return NetworkSnapshot(
@@ -95,6 +105,7 @@ NetworkSnapshot _network(
     interfaceName: 'wlan0',
     gatewayIpv4: '192.168.1.1',
     isWifi: isWifi,
+    isEthernet: isEthernet,
     isVpn: isVpn,
   );
 }

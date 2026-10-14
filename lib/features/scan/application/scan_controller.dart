@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:spy_dev_det/features/network/data/android_network_info_repository.dart';
+import 'package:spy_dev_det/features/network/data/native_network_info_repository.dart';
 import 'package:spy_dev_det/features/network/domain/ipv4_address.dart';
 import 'package:spy_dev_det/features/network/domain/network_info_repository.dart';
 import 'package:spy_dev_det/features/scan/application/scan_state.dart';
@@ -11,7 +11,7 @@ import 'package:spy_dev_det/features/scan/domain/scan_event.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
 
 final networkInfoRepositoryProvider = Provider<NetworkInfoRepository>(
-  (ref) => const AndroidNetworkInfoRepository(),
+  (ref) => const NativeNetworkInfoRepository(),
 );
 
 final deviceScannerProvider = Provider<DeviceScanner>(
@@ -47,7 +47,7 @@ class ScanController extends Notifier<ScanState> {
       phase: ScanPhase.preparing,
       progress: 0,
       devices: [],
-      statusMessage: 'Etkin Wi-Fi ağı kontrol ediliyor',
+      statusMessage: 'Etkin yerel ağ bağlantısı kontrol ediliyor',
       scannedTargets: 0,
       totalTargets: 0,
       rangeTruncated: false,

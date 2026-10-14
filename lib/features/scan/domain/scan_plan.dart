@@ -25,10 +25,10 @@ class ScanPlan {
         'VPN açıkken yanlış ağın taranmasını önlemek için tarama durduruldu.',
       );
     }
-    if (!network.isWifi) {
+    if (!network.isWifi && !network.isEthernet) {
       throw const ScanPlanningException(
-        'WIFI_REQUIRED',
-        'Yerel ağ taraması için Wi-Fi bağlantısı gereklidir.',
+        'LOCAL_NETWORK_REQUIRED',
+        'Yerel ağ taraması için Wi-Fi veya Ethernet bağlantısı gereklidir.',
       );
     }
     if (network.prefixLength < 1 || network.prefixLength > 30) {
@@ -108,7 +108,7 @@ class ScanPlan {
     } on FormatException {
       throw const ScanPlanningException(
         'INVALID_IPV4',
-        'Telefonun geçerli bir IPv4 adresi bulunamadı.',
+        'Cihazın geçerli bir IPv4 adresi bulunamadı.',
       );
     }
   }

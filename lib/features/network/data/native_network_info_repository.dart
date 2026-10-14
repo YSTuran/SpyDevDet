@@ -2,8 +2,8 @@ import 'package:flutter/services.dart';
 import 'package:spy_dev_det/features/network/domain/network_info_repository.dart';
 import 'package:spy_dev_det/features/network/domain/network_snapshot.dart';
 
-class AndroidNetworkInfoRepository implements NetworkInfoRepository {
-  const AndroidNetworkInfoRepository();
+class NativeNetworkInfoRepository implements NetworkInfoRepository {
+  const NativeNetworkInfoRepository();
 
   static const _channel = MethodChannel('yusufs.turan.spydevdet/network_info');
 
@@ -16,7 +16,7 @@ class AndroidNetworkInfoRepository implements NetworkInfoRepository {
       if (result == null) {
         throw const NetworkInfoException(
           'EMPTY_RESPONSE',
-          'Android ağ bilgisi döndürmedi.',
+          'İşletim sistemi ağ bilgisi döndürmedi.',
         );
       }
 
@@ -25,6 +25,7 @@ class AndroidNetworkInfoRepository implements NetworkInfoRepository {
         prefixLength: _requiredInt(result, 'prefixLength'),
         interfaceName: _requiredString(result, 'interfaceName'),
         isWifi: _requiredBool(result, 'isWifi'),
+        isEthernet: _optionalBool(result, 'isEthernet'),
         isVpn: _requiredBool(result, 'isVpn'),
         gatewayIpv4: result['gatewayIpv4'] as String?,
       );
@@ -43,7 +44,7 @@ class AndroidNetworkInfoRepository implements NetworkInfoRepository {
     } on Object {
       throw const NetworkInfoException(
         'INVALID_RESPONSE',
-        'Android geçersiz bir ağ bilgisi döndürdü.',
+        'İşletim sistemi geçersiz bir ağ bilgisi döndürdü.',
       );
     }
   }
@@ -79,5 +80,10 @@ class AndroidNetworkInfoRepository implements NetworkInfoRepository {
       'INVALID_RESPONSE',
       'Ağ bilgisinde $key alanı eksik.',
     );
+  }
+
+  static bool _optionalBool(Map<String, dynamic> map, String key) {
+    final value = map[key];
+    return value is bool ? value : false;
   }
 }

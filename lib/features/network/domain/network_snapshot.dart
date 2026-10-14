@@ -4,6 +4,7 @@ class NetworkSnapshot {
     required this.prefixLength,
     required this.interfaceName,
     required this.isWifi,
+    this.isEthernet = false,
     required this.isVpn,
     this.gatewayIpv4,
   });
@@ -12,6 +13,7 @@ class NetworkSnapshot {
   final int prefixLength;
   final String interfaceName;
   final bool isWifi;
+  final bool isEthernet;
   final bool isVpn;
   final String? gatewayIpv4;
 
