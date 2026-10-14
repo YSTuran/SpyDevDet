@@ -17,6 +17,7 @@ class DeviceObservation {
     required this.displayName,
     required this.macStatus,
     required this.services,
+    this.discoveryMethod = 'Bilinmiyor',
     this.macAddress,
     this.vendor,
   });
@@ -28,6 +29,7 @@ class DeviceObservation {
   final MacStatus macStatus;
   final String? vendor;
   final List<String> services;
+  final String discoveryMethod;
 
   bool get hasKnownVendor => vendor != null && vendor!.trim().isNotEmpty;
 }

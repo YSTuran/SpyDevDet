@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:spy_dev_det/features/scan/application/fake_scan_controller.dart';
+import 'package:spy_dev_det/features/scan/application/scan_controller.dart';
 import 'package:spy_dev_det/features/scan/application/scan_state.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 
@@ -9,8 +9,8 @@ class ScanScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final scanState = ref.watch(fakeScanControllerProvider);
-    final controller = ref.read(fakeScanControllerProvider.notifier);
+    final scanState = ref.watch(scanControllerProvider);
+    final controller = ref.read(scanControllerProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(
@@ -27,29 +27,27 @@ class ScanScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
-            const _DemoNotice(),
+            const _SafetyNotice(),
             const SizedBox(height: 12),
             _ScanStatusCard(state: scanState),
             const SizedBox(height: 12),
             FilledButton.icon(
-              onPressed: scanState.isScanning
+              onPressed: scanState.isBusy
                   ? controller.cancelScan
                   : controller.startScan,
-              icon: Icon(scanState.isScanning ? Icons.stop : Icons.radar),
+              icon: Icon(scanState.isBusy ? Icons.stop : Icons.radar),
               label: Text(
-                scanState.isScanning
-                    ? 'Taramayı durdur'
-                    : 'Demo taramayı başlat',
+                scanState.isBusy ? 'Taramayı durdur' : 'Yerel ağı tara',
               ),
             ),
             const SizedBox(height: 20),
             Text(
-              'Bulunan cihazlar (${scanState.devices.length})',
+              'Gözlemlenen cihazlar (${scanState.devices.length})',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 10),
             if (scanState.devices.isEmpty)
-              const _EmptyDevices()
+              _EmptyDevices(state: scanState)
             else
               ...scanState.devices.map(
                 (device) => Padding(
@@ -67,19 +65,20 @@ class ScanScreen extends ConsumerWidget {
     showAboutDialog(
       context: context,
       applicationName: 'SpyDevDet',
-      applicationVersion: '0.1.0-dev',
+      applicationVersion: '1.1.0',
       children: const [
         Text(
-          'Bu ilk iskelet gerçek ağı taramaz. Ağ keşfi bir sonraki adımda '
-          'eklenecektir.',
+          'Uygulama yalnızca etkin Wi-Fi ağındaki özel IPv4 adreslerinde '
+          'seçili TCP portlarını kontrol eder. Sonuçlar bir cihazın casus '
+          'olduğunu kanıtlamaz ve tüm cihazların bulunacağını garanti etmez.',
         ),
       ],
     );
   }
 }
 
-class _DemoNotice extends StatelessWidget {
-  const _DemoNotice();
+class _SafetyNotice extends StatelessWidget {
+  const _SafetyNotice();
 
   @override
   Widget build(BuildContext context) {
@@ -90,12 +89,13 @@ class _DemoNotice extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.science_outlined),
+            Icon(Icons.security_outlined),
             SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Demo modu: Sonuçlar uygulama akışını sınamak için '
-                'üretilmektedir. Henüz gerçek ağ taraması yapılmaz.',
+                'Yalnızca sahibi olduğun veya tarama izni aldığın Wi-Fi '
+                'ağlarında kullan. Tarama en fazla 254 özel IPv4 adresiyle '
+                've sekiz yaygın TCP portuyla sınırlıdır.',
               ),
             ),
           ],
@@ -112,6 +112,7 @@ class _ScanStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final network = state.network;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -124,12 +125,37 @@ class _ScanStatusCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(state.statusMessage),
+            if (network != null) ...[
+              const SizedBox(height: 12),
+              _StatusLine(label: 'Yerel IP', value: network.cidr),
+              _StatusLine(
+                label: 'Ağ geçidi',
+                value: network.gatewayIpv4 ?? 'Bilinmiyor',
+              ),
+              if (state.scanRange != null)
+                _StatusLine(label: 'Tarama aralığı', value: state.scanRange!),
+              if (state.rangeTruncated)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    'Büyük ağ güvenlik ve performans için 254 hedefle sınırlandı.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              if (state.elapsed != null)
+                _StatusLine(
+                  label: 'Süre',
+                  value: '${state.elapsed!.inMilliseconds / 1000} sn',
+                ),
+            ],
             const SizedBox(height: 12),
             Semantics(
               label:
                   'Tarama ilerlemesi yüzde ${(state.progress * 100).round()}',
               child: LinearProgressIndicator(
-                value: state.phase == ScanPhase.idle ? 0 : state.progress,
+                value: state.phase == ScanPhase.preparing
+                    ? null
+                    : state.progress,
               ),
             ),
           ],
@@ -139,11 +165,39 @@ class _ScanStatusCard extends StatelessWidget {
   }
 }
 
-class _EmptyDevices extends StatelessWidget {
-  const _EmptyDevices();
+class _StatusLine extends StatelessWidget {
+  const _StatusLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Text('$label: $value'),
+    );
+  }
+}
+
+class _EmptyDevices extends StatelessWidget {
+  const _EmptyDevices({required this.state});
+
+  final ScanState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final message = switch (state.phase) {
+      ScanPhase.scanning || ScanPhase.preparing =>
+        'Tarama sürüyor. Yanıt veren cihazlar burada görünecek.',
+      ScanPhase.completed =>
+        'Seçili TCP portlarında yanıt veren cihaz bulunamadı. Bu sonuç ağda '
+            'başka cihaz olmadığı anlamına gelmez.',
+      ScanPhase.failed =>
+        'Tarama başlatılamadı. Yukarıdaki açıklamayı kontrol et.',
+      _ => 'Henüz gözlemlenen cihaz yok. Yerel ağ taramasını başlatabilirsin.',
+    };
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -155,10 +209,7 @@ class _EmptyDevices extends StatelessWidget {
               color: Theme.of(context).colorScheme.outline,
             ),
             const SizedBox(height: 12),
-            const Text(
-              'Henüz cihaz yok. Demo taramayı başlatarak akışı sınayabilirsin.',
-              textAlign: TextAlign.center,
-            ),
+            Text(message, textAlign: TextAlign.center),
           ],
         ),
       ),
@@ -235,6 +286,16 @@ class _DeviceCard extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               _DetailRow(label: 'IP adresi', value: device.ipAddress),
+              _DetailRow(
+                label: 'Bulunma yöntemi',
+                value: device.discoveryMethod,
+              ),
+              _DetailRow(
+                label: 'Gözlemlenen servisler',
+                value: device.services.isEmpty
+                    ? 'Bilinmiyor'
+                    : device.services.join(', '),
+              ),
               _DetailRow(label: 'MAC durumu', value: device.macStatus.label),
               _DetailRow(
                 label: 'MAC adresi',
@@ -266,7 +327,7 @@ class _DetailRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 100,
+            width: 120,
             child: Text(
               label,
               style: const TextStyle(fontWeight: FontWeight.w600),
