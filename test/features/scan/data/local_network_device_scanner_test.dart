@@ -10,6 +10,7 @@ import 'package:spy_dev_det/features/scan/domain/neighbor_snapshot.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_cancellation_token.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_event.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
 void main() {
   test(
@@ -27,6 +28,7 @@ void main() {
       );
       final scanner = LocalNetworkDeviceScanner(
         tcpScanner: const _TcpScanner(),
+        reachabilityDiscovery: const _ReachabilityDiscovery(),
         mdnsDiscovery: const _MdnsDiscovery(),
         ssdpDiscovery: const _EmptyDiscovery(),
         neighborRepository: const _NeighborRepository(),
@@ -35,9 +37,33 @@ void main() {
 
       final events = await scanner.scan(plan, ScanCancellationToken()).toList();
       final observations = events.whereType<DeviceObserved>().toList();
-      final device = observations.last.device;
+      final device = observations
+          .lastWhere((event) => event.device.ipAddress == '192.168.1.3')
+          .device;
+      final methodResults = <DiscoveryMethod, DiscoveryMethodResult>{
+        for (final event in events.whereType<ScanMethodStatusChanged>())
+          event.result.method: event.result,
+      };
 
       expect(events.whereType<ScanCompleted>(), hasLength(1));
+      expect(events.whereType<ScanCancelled>(), isEmpty);
+      expect(
+        observations.any(
+          (event) =>
+              event.device.ipAddress == '192.168.1.2' &&
+              event.device.displayName == 'Bu cihaz',
+        ),
+        isTrue,
+      );
+      expect(
+        observations.any((event) => event.device.ipAddress == '192.168.1.4'),
+        isTrue,
+      );
+      expect(
+        methodResults.values.map((result) => result.phase),
+        everyElement(DiscoveryMethodPhase.completed),
+      );
+      expect(methodResults.keys, containsAll(DiscoveryMethod.values));
       expect(device.ipAddress, '192.168.1.3');
       expect(device.displayName, 'Ofis yazıcısı');
       expect(device.discoveryMethod, contains('TCP'));
@@ -48,6 +74,31 @@ void main() {
       expect(device.vendor, 'Raspberry Pi Foundation');
     },
   );
+}
+
+class _ReachabilityDiscovery implements DeviceDiscovery {
+  const _ReachabilityDiscovery();
+
+  @override
+  Future<List<DeviceObservation>> discover(
+    ScanPlan plan,
+    ScanCancellationToken cancellationToken,
+  ) async => const [
+    DeviceObservation(
+      id: 'device-192.168.1.4',
+      ipAddress: '192.168.1.4',
+      displayName: 'Erişilebilir ağ cihazı',
+      macStatus: MacStatus.notObserved,
+      services: [],
+      discoveryMethod: 'Ağ erişilebilirlik kontrolü',
+      evidence: [
+        DeviceEvidence(
+          source: DeviceEvidenceSource.reachability,
+          description: 'Cihaz erişilebilirlik kontrolüne yanıt verdi',
+        ),
+      ],
+    ),
+  ];
 }
 
 class _TcpScanner implements DeviceScanner {

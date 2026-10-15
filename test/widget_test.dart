@@ -59,6 +59,8 @@ void main() {
 
     await tester.tap(find.text('Yerel ağı tara'));
     await tester.pump();
+    await tester.drag(find.byType(ListView), const Offset(0, -160));
+    await tester.pump();
     await tester.tap(find.text('Taramayı durdur'));
     await tester.pump();
 

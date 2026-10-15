@@ -6,6 +6,27 @@ import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 void main() {
   const classifier = DeviceClassifier();
 
+  test('taramayı çalıştıran cihaz yüksek güvenle telefon olarak tanınır', () {
+    const device = DeviceObservation(
+      id: 'device-local',
+      ipAddress: '192.168.1.2',
+      displayName: 'Bu cihaz',
+      macStatus: MacStatus.notObserved,
+      services: [],
+      evidence: [
+        DeviceEvidence(
+          source: DeviceEvidenceSource.network,
+          description: 'Taramanın çalıştığı cihaz',
+        ),
+      ],
+    );
+
+    final result = classifier.classify(device, gatewayIpv4: '192.168.1.1');
+
+    expect(result.category, DeviceCategory.computerOrPhone);
+    expect(result.confidence, ConfidenceLevel.high);
+  });
+
   test('ağ geçidi yüksek güvenle yönlendirici olarak sınıflandırılır', () {
     const device = DeviceObservation(
       id: 'device-1',

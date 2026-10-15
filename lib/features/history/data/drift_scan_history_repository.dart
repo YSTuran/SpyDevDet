@@ -303,6 +303,13 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
       for (final method in DiscoveryMethod.values) {
         final value = decoded[method.name];
         if (value is! Map<String, dynamic>) {
+          if (method == DiscoveryMethod.reachability) {
+            methods[method] = const DiscoveryMethodResult(
+              method: DiscoveryMethod.reachability,
+              phase: DiscoveryMethodPhase.unavailable,
+              userMessage: 'Bu yöntem eski uygulama sürümünde mevcut değildi.',
+            );
+          }
           continue;
         }
         methods[method] = DiscoveryMethodResult(

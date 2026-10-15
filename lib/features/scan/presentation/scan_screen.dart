@@ -89,10 +89,10 @@ class ScanScreen extends ConsumerWidget {
     showAboutDialog(
       context: context,
       applicationName: 'SpyDevDet',
-      applicationVersion: '1.2.0',
+      applicationVersion: '1.2.1',
       children: const [
         Text(
-          'Uygulama etkin yerel ağdaki özel IPv4 adreslerinde seçili TCP '
+          'Uygulama etkin yerel ağdaki özel IPv4 adreslerinde erişilebilirliği ve seçili TCP '
           'portlarını kontrol eder; mDNS ve SSDP servis duyurularını dinler. Sonuçlar bir '
           'cihazın casus olduğunu kanıtlamaz ve tüm cihazların bulunacağını '
           'garanti etmez.',

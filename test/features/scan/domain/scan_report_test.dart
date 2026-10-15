@@ -33,4 +33,34 @@ void main() {
       DiscoveryMethodPhase.cancelled,
     );
   });
+
+  test(
+    'karşılaştırma için erişilebilirlik dahil keşiflerin bitmesini ister',
+    () {
+      var report = ScanReport.started(DateTime(2026, 10, 15));
+      for (final method in const [
+        DiscoveryMethod.tcp,
+        DiscoveryMethod.mdns,
+        DiscoveryMethod.ssdp,
+      ]) {
+        report = report.withMethod(
+          DiscoveryMethodResult(
+            method: method,
+            phase: DiscoveryMethodPhase.completed,
+          ),
+        );
+      }
+
+      expect(report.canComparePresence, isFalse);
+
+      report = report.withMethod(
+        const DiscoveryMethodResult(
+          method: DiscoveryMethod.reachability,
+          phase: DiscoveryMethodPhase.completed,
+        ),
+      );
+
+      expect(report.canComparePresence, isTrue);
+    },
+  );
 }

@@ -21,20 +21,25 @@ keşfi ilk MVP'nin dışındadır.
   yerel API'lerinden alınır.
 - Yalnızca RFC1918 özel adres aralıkları taranır.
 - Tarama en fazla 254 uzak adres ve sekiz yaygın TCP portuyla sınırlıdır.
+- Android'de yerel adreslere işletim sisteminin ICMP/TCP tabanlı erişilebilirlik
+  kontrolü uygulanır. Açık bir servis portu olmasa da yanıt veren cihazlar
+  gözlemlenebilir; taramayı çalıştıran telefon ayrıca "Bu cihaz" olarak gösterilir.
 - Mobil ağ ve algılanan VPN bağlantıları üzerinden tarama engellenir.
 - TCP bağlantısı kurulduğunda socket hemen kapatılır; kimlik doğrulama veya veri
   gönderme işlemi yapılmaz.
 - mDNS ve SSDP üzerinden yaygın yerel servis duyuruları dinlenir. SSDP'nin
   bildirdiği konum adreslerinden içerik indirilmez.
-- Android ARP ve Windows IP komşu tabloları yalnızca keşfedilmiş cihazların MAC
-  adreslerini zenginleştirmek için okunur. Platform erişimi engellerse MAC
-  durumu açıkça "edinilemedi" olarak gösterilir.
+- Erişilebildiği platformlarda IP komşu tablosundaki geçerli kayıtlar hem cihaz
+  keşfi hem de MAC zenginleştirmesi için kullanılır. Android 10 ve üzerinin
+  `/proc/net` kısıtı nedeniyle MAC tablosu okunamazsa durum açıkça
+  "edinilemedi" olarak gösterilir.
 - Küçük ve çevrimdışı bir OUI eşlemesi bilinen birkaç üreticiyi gösterebilir;
   eşleşme yoksa üretici tahmin edilmez ve "Bilinmiyor" kalır.
 - Yönlendirici, yazıcı, medya cihazı ve kamera adayı sınıfları gözlemlenen ağ
   kanıtlarıyla ve güven seviyesiyle birlikte gösterilir.
-- TCP, mDNS, SSDP ve MAC zenginleştirme aşamalarının başarı, hata, süre ve cihaz
-  sayıları ayrı ayrı raporlanır; tek yöntemin kullanılamaması taramayı çökertmez.
+- Erişilebilirlik, TCP, mDNS, SSDP ve MAC zenginleştirme aşamalarının başarı,
+  hata, süre ve cihaz sayıları ayrı ayrı raporlanır; tek yöntemin
+  kullanılamaması taramayı çökertmez.
 - Tamamlanan taramalar Android ve Windows'ta yerel SQLite veritabanına kaydedilir.
   Veriler bir sunucuya veya bulut hesabına gönderilmez.
 - Cihaz kimliği için IP yerine öncelikle genel MAC, ardından SSDP ve mDNS

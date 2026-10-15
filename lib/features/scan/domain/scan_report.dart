@@ -1,7 +1,8 @@
-enum DiscoveryMethod { tcp, mdns, ssdp, neighbor }
+enum DiscoveryMethod { reachability, tcp, mdns, ssdp, neighbor }
 
 extension DiscoveryMethodText on DiscoveryMethod {
   String get label => switch (this) {
+    DiscoveryMethod.reachability => 'Cihaz erişilebilirliği',
     DiscoveryMethod.tcp => 'TCP port kontrolü',
     DiscoveryMethod.mdns => 'mDNS servis keşfi',
     DiscoveryMethod.ssdp => 'SSDP/UPnP keşfi',
@@ -92,6 +93,7 @@ class ScanReport {
   bool get isPartial => methods.values.any((result) => result.isProblem);
 
   bool get canComparePresence => const [
+    DiscoveryMethod.reachability,
     DiscoveryMethod.tcp,
     DiscoveryMethod.mdns,
     DiscoveryMethod.ssdp,

@@ -1,7 +1,8 @@
-enum DeviceEvidenceSource { tcp, mdns, ssdp, network, neighbor }
+enum DeviceEvidenceSource { reachability, tcp, mdns, ssdp, network, neighbor }
 
 extension DeviceEvidenceSourceText on DeviceEvidenceSource {
   String get label => switch (this) {
+    DeviceEvidenceSource.reachability => 'Erişilebilirlik',
     DeviceEvidenceSource.tcp => 'TCP',
     DeviceEvidenceSource.mdns => 'mDNS',
     DeviceEvidenceSource.ssdp => 'SSDP',

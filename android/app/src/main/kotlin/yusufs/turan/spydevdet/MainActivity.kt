@@ -4,11 +4,16 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
+import android.os.Handler
+import android.os.Looper
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import java.net.Inet4Address
 import java.io.File
+import java.net.Inet4Address
+import java.net.InetAddress
+import java.util.concurrent.Executors
 
 class MainActivity : FlutterActivity() {
     private var multicastLock: WifiManager.MulticastLock? = null
@@ -25,6 +30,7 @@ class MainActivity : FlutterActivity() {
                 "acquireMulticastLock" -> acquireMulticastLock(result)
                 "releaseMulticastLock" -> releaseMulticastLock(result)
                 "getNeighborSnapshot" -> readNeighborSnapshot(result)
+                "discoverReachableHosts" -> discoverReachableHosts(call, result)
                 else -> result.notImplemented()
             }
         }
@@ -82,6 +88,77 @@ class MainActivity : FlutterActivity() {
         } catch (_: Exception) {
             result.success(mapOf("available" to false, "entries" to emptyList<Any>()))
         }
+    }
+
+    private fun discoverReachableHosts(call: MethodCall, result: MethodChannel.Result) {
+        val rawTargets = call.argument<List<*>>("targets")
+        if (rawTargets == null || rawTargets.size > MAX_REACHABILITY_TARGETS) {
+            result.error(
+                "INVALID_REACHABILITY_TARGETS",
+                "Erişilebilirlik hedefleri geçersiz.",
+                null,
+            )
+            return
+        }
+        val timeoutMillis =
+            (call.argument<Number>("timeoutMillis")?.toInt() ?: DEFAULT_REACHABILITY_TIMEOUT_MS)
+                .coerceIn(MIN_REACHABILITY_TIMEOUT_MS, MAX_REACHABILITY_TIMEOUT_MS)
+        val targets = rawTargets
+            .mapNotNull { it as? String }
+            .distinct()
+            .filter { target ->
+                if (!IPV4_PATTERN.matches(target)) {
+                    false
+                } else {
+                    try {
+                        val address = InetAddress.getByName(target)
+                        address is Inet4Address && address.isSiteLocalAddress
+                    } catch (_: Exception) {
+                        false
+                    }
+                }
+            }
+
+        if (targets.isEmpty()) {
+            result.success(emptyList<String>())
+            return
+        }
+
+        val mainHandler = Handler(Looper.getMainLooper())
+        Thread({
+            val executor = Executors.newFixedThreadPool(
+                minOf(REACHABILITY_WORKERS, targets.size),
+            )
+            try {
+                val checks = targets.associateWith { target ->
+                    executor.submit<Boolean> {
+                        try {
+                            InetAddress.getByName(target).isReachable(
+                                null,
+                                REACHABILITY_TTL,
+                                timeoutMillis,
+                            )
+                        } catch (_: Exception) {
+                            false
+                        }
+                    }
+                }
+                val reachable = checks.mapNotNull { (target, check) ->
+                    if (check.get()) target else null
+                }
+                mainHandler.post { result.success(reachable) }
+            } catch (_: Exception) {
+                mainHandler.post {
+                    result.error(
+                        "REACHABILITY_FAILED",
+                        "Yerel ağ erişilebilirlik kontrolü tamamlanamadı.",
+                        null,
+                    )
+                }
+            } finally {
+                executor.shutdownNow()
+            }
+        }, "SpyDevDet-Reachability").start()
     }
 
     private fun readNetworkSnapshot(result: MethodChannel.Result) {
@@ -147,6 +224,12 @@ class MainActivity : FlutterActivity() {
 
     private companion object {
         const val NETWORK_INFO_CHANNEL = "yusufs.turan.spydevdet/network_info"
+        const val MAX_REACHABILITY_TARGETS = 254
+        const val REACHABILITY_WORKERS = 32
+        const val REACHABILITY_TTL = 1
+        const val DEFAULT_REACHABILITY_TIMEOUT_MS = 500
+        const val MIN_REACHABILITY_TIMEOUT_MS = 100
+        const val MAX_REACHABILITY_TIMEOUT_MS = 2_000
         val IPV4_PATTERN = Regex("^(?:\\d{1,3}\\.){3}\\d{1,3}$")
         val MAC_PATTERN = Regex("^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
     }

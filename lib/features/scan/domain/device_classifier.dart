@@ -8,6 +8,18 @@ class DeviceClassifier {
     DeviceObservation device, {
     required String? gatewayIpv4,
   }) {
+    final isLocalDevice = device.evidence.any(
+      (item) =>
+          item.source == DeviceEvidenceSource.network &&
+          item.description == 'Taramanın çalıştığı cihaz',
+    );
+    if (isLocalDevice) {
+      return device.copyWith(
+        category: DeviceCategory.computerOrPhone,
+        confidence: ConfidenceLevel.high,
+      );
+    }
+
     final searchable = [
       ...device.services,
       ...device.evidence.map(

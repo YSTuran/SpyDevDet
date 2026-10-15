@@ -4,13 +4,16 @@ import 'dart:io';
 import 'package:spy_dev_det/features/scan/data/mdns_device_discovery.dart';
 import 'package:spy_dev_det/features/scan/data/native_multicast_lock.dart';
 import 'package:spy_dev_det/features/scan/data/native_neighbor_repository.dart';
+import 'package:spy_dev_det/features/scan/data/native_reachability_discovery.dart';
 import 'package:spy_dev_det/features/scan/data/ssdp_device_discovery.dart';
 import 'package:spy_dev_det/features/scan/data/tcp_device_scanner.dart';
 import 'package:spy_dev_det/features/scan/domain/device_classifier.dart';
 import 'package:spy_dev_det/features/scan/domain/device_discovery.dart';
+import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation_merger.dart';
 import 'package:spy_dev_det/features/scan/domain/device_scanner.dart';
+import 'package:spy_dev_det/features/scan/domain/mac_address.dart';
 import 'package:spy_dev_det/features/scan/domain/neighbor_enricher.dart';
 import 'package:spy_dev_det/features/scan/domain/neighbor_snapshot.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_cancellation_token.dart';
@@ -21,6 +24,7 @@ import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 class LocalNetworkDeviceScanner implements DeviceScanner {
   const LocalNetworkDeviceScanner({
     this.tcpScanner = const TcpDeviceScanner(),
+    this.reachabilityDiscovery = const NativeReachabilityDiscovery(),
     this.mdnsDiscovery = const MdnsDeviceDiscovery(),
     this.ssdpDiscovery = const SsdpDeviceDiscovery(),
     this.neighborRepository = const NativeNeighborRepository(),
@@ -31,6 +35,7 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
   });
 
   final DeviceScanner tcpScanner;
+  final DeviceDiscovery reachabilityDiscovery;
   final DeviceDiscovery mdnsDiscovery;
   final DeviceDiscovery ssdpDiscovery;
   final NeighborRepository neighborRepository;
@@ -46,7 +51,11 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
   ) {
     late final StreamController<ScanEvent> controller;
     controller = StreamController<ScanEvent>(
-      onCancel: cancellationToken.cancel,
+      onCancel: () {
+        if (!controller.isClosed) {
+          cancellationToken.cancel();
+        }
+      },
     );
     unawaited(
       _run(plan, cancellationToken, controller)
@@ -74,6 +83,7 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
     final tcpAddresses = <String>{};
     var completedTargets = 0;
     controller.add(ScanStarted(totalTargets: plan.targets.length));
+    _storeAndEmit(observations, _selfObservation(plan), plan, controller);
     final tcpStopwatch = Stopwatch()..start();
     controller.add(
       const ScanMethodStatusChanged(
@@ -149,6 +159,25 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
     }
 
     controller.add(
+      const ScanStageChanged('Ağdaki cihazların erişilebilirliği doğrulanıyor'),
+    );
+    final reachableDevices = await _runDiscovery(
+      method: DiscoveryMethod.reachability,
+      discovery: reachabilityDiscovery,
+      plan: plan,
+      cancellationToken: cancellationToken,
+      controller: controller,
+    );
+    for (final device in reachableDevices) {
+      _storeAndEmit(observations, device, plan, controller);
+    }
+
+    if (cancellationToken.isCancelled) {
+      controller.add(const ScanCancelled());
+      return;
+    }
+
+    controller.add(
       const ScanStageChanged('mDNS ve SSDP servis duyuruları dinleniyor'),
     );
     var lockAcquired = false;
@@ -215,6 +244,22 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
     );
     final neighborStopwatch = Stopwatch()..start();
     final neighborSnapshot = await neighborRepository.getSnapshot();
+    if (neighborSnapshot.available) {
+      for (final entry in neighborSnapshot.entries) {
+        if (entry.ipAddress == plan.network.localIpv4 ||
+            (!plan.targets.contains(entry.ipAddress) &&
+                entry.ipAddress != plan.network.gatewayIpv4) ||
+            MacAddress.tryParse(entry.macAddress) == null) {
+          continue;
+        }
+        _storeAndEmit(
+          observations,
+          _neighborObservation(entry, plan),
+          plan,
+          controller,
+        );
+      }
+    }
     var enrichedDeviceCount = 0;
     for (final entry in observations.entries.toList()) {
       final enriched = classifier.classify(
@@ -288,6 +333,19 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
         ),
       );
       return devices;
+    } on ReachabilityUnavailableException {
+      stopwatch.stop();
+      controller.add(
+        ScanMethodStatusChanged(
+          DiscoveryMethodResult(
+            method: method,
+            phase: DiscoveryMethodPhase.unavailable,
+            elapsed: stopwatch.elapsed,
+            userMessage: _discoveryErrorMessage(method, null),
+          ),
+        ),
+      );
+      return const [];
     } on SocketException catch (error) {
       stopwatch.stop();
       controller.add(
@@ -318,8 +376,50 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
   }
 
   String _discoveryErrorMessage(DiscoveryMethod method, String? detail) {
-    final prefix = method == DiscoveryMethod.mdns ? 'mDNS' : 'SSDP';
+    final prefix = switch (method) {
+      DiscoveryMethod.reachability => 'Cihaz erişilebilirlik',
+      DiscoveryMethod.mdns => 'mDNS',
+      DiscoveryMethod.ssdp => 'SSDP',
+      DiscoveryMethod.tcp => 'TCP',
+      DiscoveryMethod.neighbor => 'Komşu tablosu',
+    };
     return '$prefix keşfi bu ağda kullanılamadı.';
+  }
+
+  DeviceObservation _selfObservation(ScanPlan plan) {
+    return DeviceObservation(
+      id: 'device-${plan.network.localIpv4}',
+      ipAddress: plan.network.localIpv4,
+      displayName: 'Bu cihaz',
+      macStatus: MacStatus.notObserved,
+      services: const [],
+      discoveryMethod: 'Ağ bilgisi',
+      evidence: const [
+        DeviceEvidence(
+          source: DeviceEvidenceSource.network,
+          description: 'Taramanın çalıştığı cihaz',
+        ),
+      ],
+    );
+  }
+
+  DeviceObservation _neighborObservation(NeighborEntry entry, ScanPlan plan) {
+    return DeviceObservation(
+      id: 'device-${entry.ipAddress}',
+      ipAddress: entry.ipAddress,
+      displayName: entry.ipAddress == plan.network.gatewayIpv4
+          ? 'Yönlendirici adayı'
+          : 'Ağ komşusu',
+      macStatus: MacStatus.notObserved,
+      services: const [],
+      discoveryMethod: 'Komşu tablosu',
+      evidence: const [
+        DeviceEvidence(
+          source: DeviceEvidenceSource.neighbor,
+          description: 'Cihaz yerel ağ komşu tablosunda görüldü',
+        ),
+      ],
+    );
   }
 
   void _storeAndEmit(

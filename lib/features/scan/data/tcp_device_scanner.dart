@@ -36,7 +36,11 @@ class TcpDeviceScanner implements DeviceScanner {
   ) {
     late final StreamController<ScanEvent> controller;
     controller = StreamController<ScanEvent>(
-      onCancel: cancellationToken.cancel,
+      onCancel: () {
+        if (!controller.isClosed) {
+          cancellationToken.cancel();
+        }
+      },
     );
 
     unawaited(
@@ -73,6 +77,8 @@ class TcpDeviceScanner implements DeviceScanner {
     controller.add(ScanStarted(totalTargets: plan.targets.length));
 
     final openPortsByHost = <String, Set<int>>{};
+    final rejectedPortByHost = <String, int>{};
+    final responsiveHosts = <String>{};
     final remainingProbesByHost = <String, int>{
       for (final target in plan.targets) target: _ports.length,
     };
@@ -91,7 +97,7 @@ class TcpDeviceScanner implements DeviceScanner {
         final portIndex = jobIndex % _ports.length;
         final host = plan.targets[hostIndex];
         final probePort = _ports[portIndex];
-        final isOpen = await _probe(
+        final probeResult = await _probe(
           host: host,
           port: probePort.number,
           sourceAddress: plan.network.localIpv4,
@@ -102,18 +108,26 @@ class TcpDeviceScanner implements DeviceScanner {
           return;
         }
 
-        if (isOpen) {
+        if (probeResult != _ProbeResult.noResponse) {
+          final firstResponse = responsiveHosts.add(host);
           final openPorts = openPortsByHost.putIfAbsent(host, () => <int>{});
-          openPorts.add(probePort.number);
-          controller.add(
-            DeviceObserved(
-              _observationFor(
-                host: host,
-                gateway: plan.network.gatewayIpv4,
-                openPorts: openPorts,
+          if (probeResult == _ProbeResult.open) {
+            openPorts.add(probePort.number);
+          } else {
+            rejectedPortByHost.putIfAbsent(host, () => probePort.number);
+          }
+          if (firstResponse || probeResult == _ProbeResult.open) {
+            controller.add(
+              DeviceObserved(
+                _observationFor(
+                  host: host,
+                  gateway: plan.network.gatewayIpv4,
+                  openPorts: openPorts,
+                  rejectedPort: rejectedPortByHost[host],
+                ),
               ),
-            ),
-          );
+            );
+          }
         }
 
         final remaining = remainingProbesByHost[host]! - 1;
@@ -146,7 +160,7 @@ class TcpDeviceScanner implements DeviceScanner {
     );
   }
 
-  Future<bool> _probe({
+  Future<_ProbeResult> _probe({
     required String host,
     required int port,
     required String sourceAddress,
@@ -159,7 +173,7 @@ class TcpDeviceScanner implements DeviceScanner {
 
     try {
       if (cancellationToken.isCancelled) {
-        return false;
+        return _ProbeResult.noResponse;
       }
       connectionTask = await Socket.startConnect(
         InternetAddress(host, type: InternetAddressType.IPv4),
@@ -171,7 +185,7 @@ class TcpDeviceScanner implements DeviceScanner {
       );
       if (cancellationToken.isCancelled) {
         connectionTask.cancel();
-        return false;
+        return _ProbeResult.noResponse;
       }
 
       final socket = await connectionTask.socket.timeout(
@@ -182,11 +196,13 @@ class TcpDeviceScanner implements DeviceScanner {
         },
       );
       socket.destroy();
-      return true;
-    } on SocketException {
-      return false;
+      return _ProbeResult.open;
+    } on SocketException catch (error) {
+      return _isActiveRefusal(error)
+          ? _ProbeResult.rejected
+          : _ProbeResult.noResponse;
     } on TimeoutException {
-      return false;
+      return _ProbeResult.noResponse;
     } finally {
       removeCancelListener();
     }
@@ -196,6 +212,7 @@ class TcpDeviceScanner implements DeviceScanner {
     required String host,
     required String? gateway,
     required Set<int> openPorts,
+    required int? rejectedPort,
   }) {
     final sortedPorts = openPorts.toList()..sort();
     final services = sortedPorts
@@ -225,10 +242,31 @@ class TcpDeviceScanner implements DeviceScanner {
             port: port,
           ),
         ),
+        if (rejectedPort != null)
+          DeviceEvidence(
+            source: DeviceEvidenceSource.tcp,
+            description:
+                'TCP $rejectedPort portu bağlantıyı reddetti; cihaz yanıt verdi',
+            port: rejectedPort,
+          ),
       ],
     );
   }
+
+  bool _isActiveRefusal(SocketException error) {
+    const activeResponseCodes = {111, 104, 10054, 10061};
+    final code = error.osError?.errorCode;
+    if (code != null && activeResponseCodes.contains(code)) {
+      return true;
+    }
+    final message = '${error.message} ${error.osError?.message ?? ''}'
+        .toLowerCase();
+    return message.contains('connection refused') ||
+        message.contains('connection reset');
+  }
 }
+
+enum _ProbeResult { open, rejected, noResponse }
 
 class _ProbePort {
   const _ProbePort(this.number, this.service);
