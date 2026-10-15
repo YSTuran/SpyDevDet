@@ -24,6 +24,28 @@ keşfi ilk MVP'nin dışındadır.
 - Mobil ağ ve algılanan VPN bağlantıları üzerinden tarama engellenir.
 - TCP bağlantısı kurulduğunda socket hemen kapatılır; kimlik doğrulama veya veri
   gönderme işlemi yapılmaz.
+- mDNS ve SSDP üzerinden yaygın yerel servis duyuruları dinlenir. SSDP'nin
+  bildirdiği konum adreslerinden içerik indirilmez.
+- Android ARP ve Windows IP komşu tabloları yalnızca keşfedilmiş cihazların MAC
+  adreslerini zenginleştirmek için okunur. Platform erişimi engellerse MAC
+  durumu açıkça "edinilemedi" olarak gösterilir.
+- Küçük ve çevrimdışı bir OUI eşlemesi bilinen birkaç üreticiyi gösterebilir;
+  eşleşme yoksa üretici tahmin edilmez ve "Bilinmiyor" kalır.
+- Yönlendirici, yazıcı, medya cihazı ve kamera adayı sınıfları gözlemlenen ağ
+  kanıtlarıyla ve güven seviyesiyle birlikte gösterilir.
+- TCP, mDNS, SSDP ve MAC zenginleştirme aşamalarının başarı, hata, süre ve cihaz
+  sayıları ayrı ayrı raporlanır; tek yöntemin kullanılamaması taramayı çökertmez.
+- Tamamlanan taramalar Android ve Windows'ta yerel SQLite veritabanına kaydedilir.
+  Veriler bir sunucuya veya bulut hesabına gönderilmez.
+- Cihaz kimliği için IP yerine öncelikle genel MAC, ardından SSDP ve mDNS
+  kimlikleri kullanılır. Güçlü kimlik yoksa ağ ve IP tabanlı düşük güvenli
+  eşleştirmeye dönülür.
+- Kullanıcı cihazı bilinen olarak işaretleyebilir, özel ad ve not ekleyebilir.
+  Sonraki taramalarda yeni, daha önce görülen ve bilinen cihazlar ayrılır.
+- Yalnızca keşif yöntemleri eksiksiz tamamlandığında önceki taramada olup bu
+  taramada görülmeyen cihazlar listelenir. Tarama geçmişi kullanıcı tarafından
+  tek tek veya topluca silinebilir; bilinen cihaz profilleri korunur.
 
-Bu temel TCP taraması bütün cihazları bulmayı garanti etmez. mDNS ve SSDP keşfi
-sonraki geliştirme aşamalarında eklenecektir.
+Bu yöntemlerin hiçbiri bütün cihazları bulmayı veya bir cihazın amacını kesin
+olarak belirlemeyi garanti etmez. Özellikle "kamera adayı" etiketi, cihazın
+gizli ya da kötü amaçlı olduğu anlamına gelmez.

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
+import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/device_scanner.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_cancellation_token.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_event.dart';
@@ -205,12 +206,26 @@ class TcpDeviceScanner implements DeviceScanner {
         .toList(growable: false);
 
     return DeviceObservation(
-      id: 'tcp-$host',
+      id: 'device-$host',
       ipAddress: host,
       displayName: host == gateway ? 'Yönlendirici adayı' : 'Ağ cihazı',
       macStatus: MacStatus.notObserved,
       services: services,
       discoveryMethod: 'TCP bağlantı denemesi',
+      evidence: [
+        if (host == gateway)
+          const DeviceEvidence(
+            source: DeviceEvidenceSource.network,
+            description: 'İşletim sistemi bu adresi ağ geçidi olarak bildirdi',
+          ),
+        ...sortedPorts.map(
+          (port) => DeviceEvidence(
+            source: DeviceEvidenceSource.tcp,
+            description: 'TCP $port portu bağlantı kabul etti',
+            port: port,
+          ),
+        ),
+      ],
     );
   }
 }

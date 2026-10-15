@@ -9,7 +9,9 @@
 #include <cstdint>
 #include <cwctype>
 #include <limits>
+#include <iomanip>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -21,6 +23,7 @@ namespace {
 
 constexpr char kChannelName[] = "yusufs.turan.spydevdet/network_info";
 constexpr char kGetNetworkSnapshot[] = "getNetworkSnapshot";
+constexpr char kGetNeighborSnapshot[] = "getNeighborSnapshot";
 
 struct NetworkCandidate {
   std::string local_ipv4;
@@ -240,6 +243,72 @@ flutter::EncodableMap EncodeSnapshot(const NetworkCandidate& snapshot) {
   return result;
 }
 
+flutter::EncodableMap ReadNeighborSnapshot() {
+  ULONG buffer_size = 0;
+  DWORD status = GetIpNetTable(nullptr, &buffer_size, FALSE);
+  if (status != ERROR_INSUFFICIENT_BUFFER || buffer_size == 0) {
+    return {{flutter::EncodableValue("available"),
+             flutter::EncodableValue(false)},
+            {flutter::EncodableValue("entries"),
+             flutter::EncodableValue(flutter::EncodableList())}};
+  }
+
+  std::vector<unsigned char> buffer(buffer_size);
+  auto* table = reinterpret_cast<MIB_IPNETTABLE*>(buffer.data());
+  status = GetIpNetTable(table, &buffer_size, FALSE);
+  if (status != NO_ERROR) {
+    return {{flutter::EncodableValue("available"),
+             flutter::EncodableValue(false)},
+            {flutter::EncodableValue("entries"),
+             flutter::EncodableValue(flutter::EncodableList())}};
+  }
+
+  flutter::EncodableList entries;
+  for (DWORD index = 0; index < table->dwNumEntries; ++index) {
+    const MIB_IPNETROW& row = table->table[index];
+    if (row.dwPhysAddrLen != 6) {
+      continue;
+    }
+    bool all_zero = true;
+    bool all_broadcast = true;
+    for (DWORD byte = 0; byte < 6; ++byte) {
+      all_zero = all_zero && row.bPhysAddr[byte] == 0;
+      all_broadcast = all_broadcast && row.bPhysAddr[byte] == 0xff;
+    }
+    if (all_zero || all_broadcast) {
+      continue;
+    }
+
+    IN_ADDR address = {};
+    address.S_un.S_addr = row.dwAddr;
+    char address_buffer[INET_ADDRSTRLEN] = {};
+    if (InetNtopA(AF_INET, &address, address_buffer, INET_ADDRSTRLEN) ==
+        nullptr) {
+      continue;
+    }
+
+    std::ostringstream mac;
+    mac << std::uppercase << std::hex << std::setfill('0');
+    for (DWORD byte = 0; byte < 6; ++byte) {
+      if (byte > 0) {
+        mac << ':';
+      }
+      mac << std::setw(2) << static_cast<int>(row.bPhysAddr[byte]);
+    }
+    entries.push_back(flutter::EncodableValue(flutter::EncodableMap{
+        {flutter::EncodableValue("ipAddress"),
+         flutter::EncodableValue(std::string(address_buffer))},
+        {flutter::EncodableValue("macAddress"),
+         flutter::EncodableValue(mac.str())},
+    }));
+  }
+
+  return {{flutter::EncodableValue("available"),
+           flutter::EncodableValue(true)},
+          {flutter::EncodableValue("entries"),
+           flutter::EncodableValue(entries)}};
+}
+
 }  // namespace
 
 std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
@@ -252,6 +321,10 @@ RegisterNetworkInfoChannel(flutter::BinaryMessenger* messenger) {
   channel->SetMethodCallHandler(
       [](const flutter::MethodCall<flutter::EncodableValue>& call,
          std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+        if (call.method_name() == kGetNeighborSnapshot) {
+          result->Success(flutter::EncodableValue(ReadNeighborSnapshot()));
+          return;
+        }
         if (call.method_name() != kGetNetworkSnapshot) {
           result->NotImplemented();
           return;

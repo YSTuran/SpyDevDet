@@ -1,4 +1,5 @@
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
 sealed class ScanEvent {
   const ScanEvent();
@@ -18,6 +19,18 @@ class ScanProgress extends ScanEvent {
 
   final int completedTargets;
   final int totalTargets;
+}
+
+class ScanStageChanged extends ScanEvent {
+  const ScanStageChanged(this.userMessage);
+
+  final String userMessage;
+}
+
+class ScanMethodStatusChanged extends ScanEvent {
+  const ScanMethodStatusChanged(this.result);
+
+  final DiscoveryMethodResult result;
 }
 
 class DeviceObserved extends ScanEvent {

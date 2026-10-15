@@ -1,5 +1,6 @@
 import 'package:spy_dev_det/features/network/domain/network_snapshot.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
 enum ScanPhase { idle, preparing, scanning, completed, cancelled, failed }
 
@@ -15,6 +16,7 @@ class ScanState {
     this.network,
     this.scanRange,
     this.elapsed,
+    this.report,
   });
 
   const ScanState.idle()
@@ -27,7 +29,8 @@ class ScanState {
       rangeTruncated = false,
       network = null,
       scanRange = null,
-      elapsed = null;
+      elapsed = null,
+      report = null;
 
   final ScanPhase phase;
   final double progress;
@@ -39,6 +42,7 @@ class ScanState {
   final NetworkSnapshot? network;
   final String? scanRange;
   final Duration? elapsed;
+  final ScanReport? report;
 
   bool get isBusy =>
       phase == ScanPhase.preparing || phase == ScanPhase.scanning;
@@ -54,6 +58,7 @@ class ScanState {
     NetworkSnapshot? network,
     String? scanRange,
     Duration? elapsed,
+    ScanReport? report,
   }) {
     return ScanState(
       phase: phase ?? this.phase,
@@ -66,6 +71,7 @@ class ScanState {
       network: network ?? this.network,
       scanRange: scanRange ?? this.scanRange,
       elapsed: elapsed ?? this.elapsed,
+      report: report ?? this.report,
     );
   }
 }

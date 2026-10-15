@@ -3,12 +3,16 @@ package yusufs.turan.spydevdet
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.wifi.WifiManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.net.Inet4Address
+import java.io.File
 
 class MainActivity : FlutterActivity() {
+    private var multicastLock: WifiManager.MulticastLock? = null
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
@@ -16,11 +20,67 @@ class MainActivity : FlutterActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             NETWORK_INFO_CHANNEL,
         ).setMethodCallHandler { call, result ->
-            if (call.method != "getNetworkSnapshot") {
-                result.notImplemented()
-                return@setMethodCallHandler
+            when (call.method) {
+                "getNetworkSnapshot" -> readNetworkSnapshot(result)
+                "acquireMulticastLock" -> acquireMulticastLock(result)
+                "releaseMulticastLock" -> releaseMulticastLock(result)
+                "getNeighborSnapshot" -> readNeighborSnapshot(result)
+                else -> result.notImplemented()
             }
-            readNetworkSnapshot(result)
+        }
+    }
+
+    override fun onDestroy() {
+        releaseMulticastLock(null)
+        super.onDestroy()
+    }
+
+    private fun acquireMulticastLock(result: MethodChannel.Result) {
+        try {
+            val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            val lock = multicastLock ?: wifiManager.createMulticastLock("SpyDevDet-mDNS-SSDP").also {
+                it.setReferenceCounted(false)
+                multicastLock = it
+            }
+            if (!lock.isHeld) {
+                lock.acquire()
+            }
+            result.success(null)
+        } catch (error: SecurityException) {
+            result.error("MULTICAST_LOCK_DENIED", "Çok noktaya yayın kilidi alınamadı.", null)
+        }
+    }
+
+    private fun releaseMulticastLock(result: MethodChannel.Result?) {
+        val lock = multicastLock
+        if (lock?.isHeld == true) {
+            lock.release()
+        }
+        result?.success(null)
+    }
+
+    private fun readNeighborSnapshot(result: MethodChannel.Result) {
+        val entries = mutableListOf<Map<String, String>>()
+        try {
+            File("/proc/net/arp").useLines { lines ->
+                lines.drop(1).take(512).forEach { line ->
+                    val columns = line.trim().split(Regex("\\s+"))
+                    if (columns.size >= 4 &&
+                        IPV4_PATTERN.matches(columns[0]) &&
+                        MAC_PATTERN.matches(columns[3])
+                    ) {
+                        entries.add(
+                            mapOf(
+                                "ipAddress" to columns[0],
+                                "macAddress" to columns[3].uppercase(),
+                            ),
+                        )
+                    }
+                }
+            }
+            result.success(mapOf("available" to true, "entries" to entries))
+        } catch (_: Exception) {
+            result.success(mapOf("available" to false, "entries" to emptyList<Any>()))
         }
     }
 
@@ -87,5 +147,7 @@ class MainActivity : FlutterActivity() {
 
     private companion object {
         const val NETWORK_INFO_CHANNEL = "yusufs.turan.spydevdet/network_info"
+        val IPV4_PATTERN = Regex("^(?:\\d{1,3}\\.){3}\\d{1,3}$")
+        val MAC_PATTERN = Regex("^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
     }
 }

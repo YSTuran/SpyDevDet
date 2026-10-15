@@ -4,8 +4,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:spy_dev_det/app/spy_dev_det_app.dart';
 import 'package:spy_dev_det/features/network/domain/network_info_repository.dart';
 import 'package:spy_dev_det/features/network/domain/network_snapshot.dart';
+import 'package:spy_dev_det/features/history/application/history_providers.dart';
+import 'package:spy_dev_det/features/history/domain/scan_history_repository.dart';
 import 'package:spy_dev_det/features/scan/application/scan_controller.dart';
 import 'package:spy_dev_det/features/scan/data/fake_device_scanner.dart';
+import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 
 void main() {
   testWidgets('tarama cihazları aşamalı olarak gösterir', (tester) async {
@@ -24,12 +27,19 @@ void main() {
       await tester.pump(const Duration(milliseconds: 310));
     }
 
-    expect(find.text('Demo yönlendirici'), findsOneWidget);
-    expect(find.text('Gözlemlenen cihazlar (3)'), findsOneWidget);
-    expect(
-      find.text('Tarama tamamlandı • 3 cihaz gözlemlendi'),
-      findsOneWidget,
+    expect(find.text('Tarama tamamlandı • 3 cihaz • 3 yeni'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Gözlemlenen cihazlar (3)'),
+      200,
+      scrollable: find.byType(Scrollable).first,
     );
+    expect(find.text('Gözlemlenen cihazlar (3)'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Demo yönlendirici'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Demo yönlendirici'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('Demo bilgisayar'),
       200,
@@ -81,9 +91,55 @@ Widget _testApp({NetworkInfoRepository? repository}) {
         repository ?? const _TestNetworkRepository(),
       ),
       deviceScannerProvider.overrideWithValue(const FakeDeviceScanner()),
+      scanHistoryRepositoryProvider.overrideWithValue(_TestHistoryRepository()),
     ],
     child: const SpyDevDetApp(),
   );
+}
+
+class _TestHistoryRepository implements ScanHistoryRepository {
+  final Set<String> _seen = {};
+
+  @override
+  Future<List<DeviceObservation>> recordCompletedScan(
+    CompletedScanRecord record,
+  ) async {
+    return record.devices
+        .map((device) {
+          final stableKey = 'test:${device.ipAddress}';
+          final isNew = _seen.add(stableKey);
+          return device.copyWith(
+            stableKey: stableKey,
+            familiarity: isNew
+                ? DeviceFamiliarity.newDevice
+                : DeviceFamiliarity.seenBefore,
+            firstSeenAt: record.report.completedAt,
+            lastSeenAt: record.report.completedAt,
+          );
+        })
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> clearHistory() async {}
+
+  @override
+  Future<void> deleteSession(int sessionId) async {}
+
+  @override
+  Future<List<ScanHistorySummary>> getHistory({int limit = 50}) async =>
+      const [];
+
+  @override
+  Future<ScanHistoryDetails?> getDetails(int sessionId) async => null;
+
+  @override
+  Future<void> updateDeviceProfile({
+    required String stableKey,
+    required bool isKnown,
+    required String? customName,
+    required String? note,
+  }) async {}
 }
 
 class _TestNetworkRepository implements NetworkInfoRepository {
