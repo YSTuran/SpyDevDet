@@ -5,6 +5,8 @@ import 'package:spy_dev_det/features/scan/domain/neighbor_enricher.dart';
 import 'package:spy_dev_det/features/scan/domain/neighbor_snapshot.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('MacAddress', () {
     test('geçerli adresi standart biçime getirip üreticiyi bulur', () {
       final address = MacAddress.tryParse('b8-27-eb-12-34-56');
@@ -28,6 +30,26 @@ void main() {
       expect(MacAddress.tryParse('FF:FF:FF:FF:FF:FF'), isNull);
       expect(MacAddress.tryParse('01:00:5E:00:00:01'), isNull);
     });
+  });
+
+  test('çevrimdışı IEEE asset en uzun prefix eşleşmesini kullanır', () async {
+    const repository = AssetMacVendorRepository();
+    final status = await repository.load();
+
+    expect(status.loaded, isTrue);
+    expect(status.entryCount, greaterThan(50000));
+    expect(
+      repository.lookup(MacAddress.tryParse('00:55:DA:01:23:45')!),
+      'Shinko Technos co.,ltd.',
+    );
+    expect(
+      repository.lookup(MacAddress.tryParse('00:1B:C5:00:01:23')!),
+      'Converging Systems Inc.',
+    );
+    expect(
+      repository.lookup(MacAddress.tryParse('02:11:22:33:44:55')!),
+      isNull,
+    );
   });
 
   test('komşu tablosu cihazı MAC ve üreticiyle zenginleştirir', () {

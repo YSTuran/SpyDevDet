@@ -1,8 +1,11 @@
 import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
+import 'package:spy_dev_det/features/scan/domain/service_catalog.dart';
 
 class DeviceClassifier {
-  const DeviceClassifier();
+  const DeviceClassifier({this.serviceCatalog = const ServiceCatalog()});
+
+  final ServiceCatalog serviceCatalog;
 
   DeviceObservation classify(
     DeviceObservation device, {
@@ -26,6 +29,7 @@ class DeviceClassifier {
         (item) => '${item.description} ${item.serviceType ?? ''}',
       ),
     ].join(' ').toLowerCase();
+    final serviceInsights = serviceCatalog.inspect(device);
 
     if (gatewayIpv4 != null && device.ipAddress == gatewayIpv4) {
       final hasGatewayEvidence = device.evidence.any(
@@ -47,12 +51,14 @@ class DeviceClassifier {
       );
     }
 
-    final isPrinter = _containsAny(searchable, const [
-      '_ipp._tcp',
-      '_printer._tcp',
-      'yazıcı servisi',
-      'printer',
-    ]);
+    final isPrinter =
+        serviceInsights.any((insight) => insight.kind == ServiceKind.printer) ||
+        _containsAny(searchable, const [
+          '_ipp._tcp',
+          '_printer._tcp',
+          'yazıcı servisi',
+          'printer',
+        ]);
     if (isPrinter) {
       return device.copyWith(
         category: DeviceCategory.printer,
@@ -64,29 +70,32 @@ class DeviceClassifier {
       );
     }
 
-    final hasRtsp = _containsAny(searchable, const ['rtsp', '_rtsp._tcp']);
+    final hasRtsp =
+        serviceInsights.any(
+          (insight) => insight.kind == ServiceKind.mediaStream,
+        ) ||
+        _containsAny(searchable, const ['rtsp', '_rtsp._tcp']);
+    final hasOnvifVideo = serviceInsights.any(
+      (insight) => insight.kind == ServiceKind.onvifVideo,
+    );
     final hasCameraIdentity = _containsAny(searchable, const [
-      'onvif',
       'ipcamera',
       'networkcamera',
       'camera',
     ]);
-    if (hasRtsp || hasCameraIdentity) {
+    if (hasRtsp || hasCameraIdentity || hasOnvifVideo) {
       return device.copyWith(
         category: DeviceCategory.cameraCandidate,
-        confidence: hasRtsp && hasCameraIdentity
+        confidence: hasOnvifVideo || (hasRtsp && hasCameraIdentity)
             ? ConfidenceLevel.high
             : ConfidenceLevel.low,
       );
     }
 
-    if (_containsAny(searchable, const [
-      '_googlecast._tcp',
-      '_airplay._tcp',
-      '_hap._tcp',
-      'mediarenderer',
-      'dial receiver',
-    ])) {
+    if (serviceInsights.any(
+          (insight) => insight.kind == ServiceKind.mediaDevice,
+        ) ||
+        _containsAny(searchable, const ['mediarenderer', 'dial receiver'])) {
       return device.copyWith(
         category: DeviceCategory.mediaDevice,
         confidence: ConfidenceLevel.high,

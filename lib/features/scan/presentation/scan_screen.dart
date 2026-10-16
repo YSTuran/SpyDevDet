@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:spy_dev_det/features/scan/application/scan_controller.dart';
 import 'package:spy_dev_det/features/scan/application/scan_state.dart';
+import 'package:spy_dev_det/features/scan/domain/device_attention.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
+import 'package:spy_dev_det/features/scan/domain/service_catalog.dart';
+import 'package:spy_dev_det/features/scan/presentation/scan_diagnostics_screen.dart';
 import 'package:spy_dev_det/features/history/presentation/history_screen.dart';
 
 class ScanScreen extends ConsumerWidget {
@@ -47,15 +51,32 @@ class ScanScreen extends ConsumerWidget {
                 _ScanStatusCard(state: scanState),
                 const SizedBox(height: 12),
                 FilledButton.icon(
-                  onPressed: scanState.isBusy
+                  onPressed: scanState.phase == ScanPhase.saving
+                      ? null
+                      : scanState.isBusy
                       ? controller.cancelScan
                       : controller.startScan,
-                  icon: Icon(scanState.isBusy ? Icons.stop : Icons.radar),
+                  icon: Icon(
+                    scanState.phase == ScanPhase.saving
+                        ? Icons.save_outlined
+                        : scanState.isBusy
+                        ? Icons.stop
+                        : Icons.radar,
+                  ),
                   label: Text(
-                    scanState.isBusy ? 'Taramayı durdur' : 'Yerel ağı tara',
+                    scanState.phase == ScanPhase.saving
+                        ? 'Geçmişe kaydediliyor'
+                        : scanState.isBusy
+                        ? 'Taramayı durdur'
+                        : 'Yerel ağı tara',
                   ),
                 ),
                 const SizedBox(height: 20),
+                if (scanState.phase == ScanPhase.completed &&
+                    scanState.devices.isNotEmpty) ...[
+                  _ResultSummary(devices: scanState.devices),
+                  const SizedBox(height: 20),
+                ],
                 Text(
                   'Gözlemlenen cihazlar (${scanState.devices.length})',
                   style: Theme.of(context).textTheme.titleLarge,
@@ -85,15 +106,28 @@ class ScanScreen extends ConsumerWidget {
     );
   }
 
-  void _showAppInfo(BuildContext context) {
+  Future<void> _showAppInfo(BuildContext context) async {
+    var version = 'Bilinmiyor';
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      version = packageInfo.buildNumber.isEmpty
+          ? packageInfo.version
+          : '${packageInfo.version} (${packageInfo.buildNumber})';
+    } on Object {
+      // Application metadata is informational; the dialog can still open if
+      // the platform does not provide it.
+    }
+    if (!context.mounted) {
+      return;
+    }
     showAboutDialog(
       context: context,
       applicationName: 'SpyDevDet',
-      applicationVersion: '1.2.1',
+      applicationVersion: version,
       children: const [
         Text(
           'Uygulama etkin yerel ağdaki özel IPv4 adreslerinde erişilebilirliği ve seçili TCP '
-          'portlarını kontrol eder; mDNS ve SSDP servis duyurularını dinler. Sonuçlar bir '
+          'portlarını kontrol eder; mDNS, SSDP ve ONVIF servis duyurularını dinler. Sonuçlar bir '
           'cihazın casus olduğunu kanıtlamaz ve tüm cihazların bulunacağını '
           'garanti etmez.',
         ),
@@ -188,6 +222,58 @@ class ScanScreen extends ConsumerWidget {
   }
 }
 
+class _ResultSummary extends StatelessWidget {
+  const _ResultSummary({required this.devices});
+
+  final List<DeviceObservation> devices;
+
+  @override
+  Widget build(BuildContext context) {
+    const evaluator = DeviceAttentionEvaluator();
+    final newCount = devices
+        .where((device) => device.familiarity == DeviceFamiliarity.newDevice)
+        .length;
+    final knownCount = devices.where((device) => device.isKnown).length;
+    final cameraCount = devices
+        .where((device) => device.category == DeviceCategory.cameraCandidate)
+        .length;
+    final reviewCount = devices
+        .where(
+          (device) => evaluator.evaluate(device).level == AttentionLevel.review,
+        )
+        .length;
+    return Card(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Sonuç özeti', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                Chip(label: Text('$newCount yeni')),
+                Chip(label: Text('$knownCount bilinen')),
+                Chip(label: Text('$cameraCount kamera adayı')),
+                Chip(label: Text('$reviewCount incelenmesi önerilen')),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'İnceleme durumu yalnız gözlemlenen ağ kanıtlarını özetler; '
+              'bir cihazın gizli veya kötü amaçlı olduğunu kanıtlamaz.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SafetyNotice extends StatelessWidget {
   const _SafetyNotice();
 
@@ -268,27 +354,43 @@ class _ScanStatusCard extends StatelessWidget {
             if (state.report case final report?) ...[
               const SizedBox(height: 10),
               const Divider(),
-              const SizedBox(height: 6),
-              Text(
-                'Keşif yöntemleri',
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 6),
-              ...DiscoveryMethod.values.map(
-                (method) => _MethodResultRow(
-                  result:
-                      report.methods[method] ??
-                      DiscoveryMethodResult.waiting(method),
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 4),
+                title: Text(
+                  'Keşif yöntemleri',
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
-              ),
-              if (report.completedAt != null && report.isPartial)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    'Tarama kısmi tamamlandı; kullanılamayan yöntemler olabilir.',
-                    style: Theme.of(context).textTheme.bodySmall,
+                children: [
+                  ...DiscoveryMethod.values.map(
+                    (method) => _MethodResultRow(
+                      result:
+                          report.methods[method] ??
+                          DiscoveryMethodResult.waiting(method),
+                    ),
                   ),
-                ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (context) => const ScanDiagnosticsScreen(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.monitor_heart_outlined),
+                      label: const Text('Tanılama ayrıntıları'),
+                    ),
+                  ),
+                  if (report.completedAt != null && report.isPartial)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        'Tarama kısmi tamamlandı; kullanılamayan yöntemler olabilir.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                ],
+              ),
             ],
             const SizedBox(height: 12),
             Semantics(
@@ -377,6 +479,7 @@ class _EmptyDevices extends StatelessWidget {
     final message = switch (state.phase) {
       ScanPhase.scanning || ScanPhase.preparing =>
         'Tarama sürüyor. Yanıt veren cihazlar burada görünecek.',
+      ScanPhase.saving => 'Tarama sonucu yerel geçmişe kaydediliyor.',
       ScanPhase.completed =>
         'Kullanılan keşif yöntemlerinde cihaz gözlemlenmedi. Bu sonuç ağda '
             'başka cihaz olmadığı anlamına gelmez.',
@@ -412,6 +515,7 @@ class _DeviceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final attention = const DeviceAttentionEvaluator().evaluate(device);
     return Card(
       child: InkWell(
         onTap: () => _showDetails(context),
@@ -445,6 +549,17 @@ class _DeviceCard extends StatelessWidget {
                     label: Text(device.category.label),
                   ),
                   Chip(label: Text(device.confidence.label)),
+                  Chip(
+                    avatar: Icon(
+                      attention.level == AttentionLevel.review
+                          ? Icons.manage_search_outlined
+                          : attention.level == AttentionLevel.informational
+                          ? Icons.info_outline
+                          : Icons.check_circle_outline,
+                      size: 18,
+                    ),
+                    label: Text(attention.level.label),
+                  ),
                   if (device.familiarity != DeviceFamiliarity.unclassified)
                     Chip(
                       avatar: Icon(
@@ -482,6 +597,8 @@ class _DeviceCard extends StatelessWidget {
   }
 
   void _showDetails(BuildContext context) {
+    final attention = const DeviceAttentionEvaluator().evaluate(device);
+    final serviceInsights = const ServiceCatalog().inspect(device);
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -510,11 +627,27 @@ class _DeviceCard extends StatelessWidget {
                       '${device.category.label} • ${device.confidence.label}',
                 ),
                 _DetailRow(
+                  label: 'İnceleme durumu',
+                  value:
+                      '${attention.level.label}\n${attention.reasons.join('\n')}',
+                ),
+                _DetailRow(
                   label: 'Gözlemlenen servisler',
                   value: device.services.isEmpty
                       ? 'Bilinmiyor'
                       : device.services.join(', '),
                 ),
+                if (serviceInsights.isNotEmpty)
+                  _DetailRow(
+                    label: 'Servis yorumları',
+                    value: serviceInsights
+                        .map(
+                          (insight) =>
+                              '${insight.title}: ${insight.explanation}'
+                              '${insight.caution == null ? '' : ' ${insight.caution}'}',
+                        )
+                        .join('\n\n'),
+                  ),
                 _DetailRow(label: 'MAC durumu', value: device.macStatus.label),
                 _DetailRow(
                   label: 'MAC adresi',
@@ -548,7 +681,7 @@ class _DeviceCard extends StatelessWidget {
                     'cihazın gizli veya kötü amaçlı olduğunu kanıtlamaz.',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
-                if (device.stableKey != null) ...[
+                if (device.stableKey != null && !_isLocalDevice(device)) ...[
                   const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
@@ -578,6 +711,12 @@ class _DeviceCard extends StatelessWidget {
     DeviceCategory.computerOrPhone => Icons.devices_outlined,
     DeviceCategory.unknown => Icons.help_outline,
   };
+
+  bool _isLocalDevice(DeviceObservation value) => value.evidence.any(
+    (item) =>
+        item.source == DeviceEvidenceSource.network &&
+        item.description == 'Taramanın çalıştığı cihaz',
+  );
 }
 
 class _DetailRow extends StatelessWidget {

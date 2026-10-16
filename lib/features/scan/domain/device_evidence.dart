@@ -1,4 +1,12 @@
-enum DeviceEvidenceSource { reachability, tcp, mdns, ssdp, network, neighbor }
+enum DeviceEvidenceSource {
+  reachability,
+  tcp,
+  mdns,
+  ssdp,
+  onvif,
+  network,
+  neighbor,
+}
 
 extension DeviceEvidenceSourceText on DeviceEvidenceSource {
   String get label => switch (this) {
@@ -6,6 +14,7 @@ extension DeviceEvidenceSourceText on DeviceEvidenceSource {
     DeviceEvidenceSource.tcp => 'TCP',
     DeviceEvidenceSource.mdns => 'mDNS',
     DeviceEvidenceSource.ssdp => 'SSDP',
+    DeviceEvidenceSource.onvif => 'ONVIF',
     DeviceEvidenceSource.network => 'Ağ bilgisi',
     DeviceEvidenceSource.neighbor => 'Komşu tablosu',
   };

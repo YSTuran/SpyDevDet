@@ -5,6 +5,7 @@ import 'package:spy_dev_det/features/scan/data/mdns_device_discovery.dart';
 import 'package:spy_dev_det/features/scan/data/native_multicast_lock.dart';
 import 'package:spy_dev_det/features/scan/data/native_neighbor_repository.dart';
 import 'package:spy_dev_det/features/scan/data/native_reachability_discovery.dart';
+import 'package:spy_dev_det/features/scan/data/onvif_device_discovery.dart';
 import 'package:spy_dev_det/features/scan/data/ssdp_device_discovery.dart';
 import 'package:spy_dev_det/features/scan/data/tcp_device_scanner.dart';
 import 'package:spy_dev_det/features/scan/domain/device_classifier.dart';
@@ -27,6 +28,7 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
     this.reachabilityDiscovery = const NativeReachabilityDiscovery(),
     this.mdnsDiscovery = const MdnsDeviceDiscovery(),
     this.ssdpDiscovery = const SsdpDeviceDiscovery(),
+    this.onvifDiscovery = const OnvifDeviceDiscovery(),
     this.neighborRepository = const NativeNeighborRepository(),
     this.multicastLock = const NativeMulticastLock(),
     this.classifier = const DeviceClassifier(),
@@ -38,6 +40,7 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
   final DeviceDiscovery reachabilityDiscovery;
   final DeviceDiscovery mdnsDiscovery;
   final DeviceDiscovery ssdpDiscovery;
+  final DeviceDiscovery onvifDiscovery;
   final NeighborRepository neighborRepository;
   final NativeMulticastLock multicastLock;
   final DeviceClassifier classifier;
@@ -79,152 +82,42 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
     StreamController<ScanEvent> controller,
   ) async {
     final stopwatch = Stopwatch()..start();
+    final vendorDatabaseStatusFuture = enricher.prepare();
     final observations = <String, DeviceObservation>{};
-    final tcpAddresses = <String>{};
     var completedTargets = 0;
     controller.add(ScanStarted(totalTargets: plan.targets.length));
     _storeAndEmit(observations, _selfObservation(plan), plan, controller);
-    final tcpStopwatch = Stopwatch()..start();
     controller.add(
-      const ScanMethodStatusChanged(
-        DiscoveryMethodResult(
-          method: DiscoveryMethod.tcp,
-          phase: DiscoveryMethodPhase.running,
-        ),
+      const ScanStageChanged(
+        'TCP, erişilebilirlik ve servis keşifleri paralel çalışıyor',
       ),
     );
 
-    await for (final event in tcpScanner.scan(plan, cancellationToken)) {
-      switch (event) {
-        case ScanStarted():
-          break;
-        case ScanProgress():
-          completedTargets = event.completedTargets;
-          controller.add(event);
-        case ScanStageChanged():
-          controller.add(event);
-        case ScanMethodStatusChanged():
-          controller.add(event);
-        case DeviceObserved():
-          tcpAddresses.add(event.device.ipAddress);
-          _storeAndEmit(observations, event.device, plan, controller);
-        case ScanCompleted():
-          completedTargets = event.completedTargets;
-          tcpStopwatch.stop();
-          controller.add(
-            ScanMethodStatusChanged(
-              DiscoveryMethodResult(
-                method: DiscoveryMethod.tcp,
-                phase: DiscoveryMethodPhase.completed,
-                deviceCount: tcpAddresses.length,
-                elapsed: tcpStopwatch.elapsed,
-              ),
-            ),
-          );
-        case ScanCancelled():
-          tcpStopwatch.stop();
-          controller.add(
-            ScanMethodStatusChanged(
-              DiscoveryMethodResult(
-                method: DiscoveryMethod.tcp,
-                phase: DiscoveryMethodPhase.cancelled,
-                deviceCount: tcpAddresses.length,
-                elapsed: tcpStopwatch.elapsed,
-              ),
-            ),
-          );
-          controller.add(const ScanCancelled());
-          return;
-        case ScanFailed():
-          tcpStopwatch.stop();
-          controller.add(
-            ScanMethodStatusChanged(
-              DiscoveryMethodResult(
-                method: DiscoveryMethod.tcp,
-                phase: DiscoveryMethodPhase.failed,
-                deviceCount: tcpAddresses.length,
-                elapsed: tcpStopwatch.elapsed,
-                userMessage: event.userMessage,
-              ),
-            ),
-          );
-          controller.add(event);
-          return;
-      }
-    }
-
-    if (cancellationToken.isCancelled) {
-      controller.add(const ScanCancelled());
-      return;
-    }
-
-    controller.add(
-      const ScanStageChanged('Ağdaki cihazların erişilebilirliği doğrulanıyor'),
-    );
-    final reachableDevices = await _runDiscovery(
-      method: DiscoveryMethod.reachability,
-      discovery: reachabilityDiscovery,
-      plan: plan,
-      cancellationToken: cancellationToken,
-      controller: controller,
-    );
-    for (final device in reachableDevices) {
-      _storeAndEmit(observations, device, plan, controller);
-    }
-
-    if (cancellationToken.isCancelled) {
-      controller.add(const ScanCancelled());
-      return;
-    }
-
-    controller.add(
-      const ScanStageChanged('mDNS ve SSDP servis duyuruları dinleniyor'),
-    );
-    var lockAcquired = false;
-    try {
-      await multicastLock.acquire();
-      lockAcquired = true;
-    } on Object {
-      lockAcquired = false;
-    }
-    try {
-      final discoveries = await Future.wait([
-        _runDiscovery(
-          method: DiscoveryMethod.mdns,
-          discovery: mdnsDiscovery,
+    final discoveryTasks = <Future<void>>[
+      () async {
+        completedTargets = await _runTcpDiscovery(
           plan: plan,
           cancellationToken: cancellationToken,
+          observations: observations,
           controller: controller,
-          warning: lockAcquired
-              ? null
-              : 'Çok noktaya yayın kilidi alınamadı; sonuçlar eksik olabilir.',
-        ),
-        _runDiscovery(
-          method: DiscoveryMethod.ssdp,
-          discovery: ssdpDiscovery,
-          plan: plan,
-          cancellationToken: cancellationToken,
-          controller: controller,
-          warning: lockAcquired
-              ? null
-              : 'Çok noktaya yayın kilidi alınamadı; sonuçlar eksik olabilir.',
-        ),
-      ]);
-      for (final discovery in discoveries) {
-        for (final device in discovery) {
-          _storeAndEmit(observations, device, plan, controller);
-        }
-      }
-    } finally {
-      if (lockAcquired) {
-        try {
-          await multicastLock.release();
-        } on Object {
-          // The scan can still complete when the operating system has already
-          // released the process-scoped multicast lock.
-        }
-      }
-    }
+        );
+      }(),
+      _runAndEmitDiscovery(
+        method: DiscoveryMethod.reachability,
+        discovery: reachabilityDiscovery,
+        plan: plan,
+        cancellationToken: cancellationToken,
+        observations: observations,
+        controller: controller,
+      ),
+      _runMulticastDiscoveries(
+        plan: plan,
+        cancellationToken: cancellationToken,
+        observations: observations,
+        controller: controller,
+      ),
+    ];
+    await Future.wait(discoveryTasks);
 
     if (cancellationToken.isCancelled) {
       controller.add(const ScanCancelled());
@@ -243,6 +136,7 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
       ),
     );
     final neighborStopwatch = Stopwatch()..start();
+    final vendorDatabaseStatus = await vendorDatabaseStatusFuture;
     final neighborSnapshot = await neighborRepository.getSnapshot();
     if (neighborSnapshot.available) {
       for (final entry in neighborSnapshot.entries) {
@@ -285,6 +179,17 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
           userMessage: neighborSnapshot.available
               ? null
               : 'İşletim sistemi MAC komşu tablosuna erişim sağlamadı.',
+          metrics: DiscoveryMetrics(
+            attemptedTargets: plan.targets.length,
+            receivedResponses: neighborSnapshot.entries.length,
+            acceptedResponses: enrichedDeviceCount,
+            ignoredResponses:
+                neighborSnapshot.entries.length - enrichedDeviceCount,
+            detail:
+                'Etkin ağ bağdaştırıcısının komşu tablosu • '
+                '${vendorDatabaseStatus.description} '
+                '(${vendorDatabaseStatus.entryCount} kayıt)',
+          ),
         ),
       ),
     );
@@ -296,6 +201,217 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
         elapsed: stopwatch.elapsed,
       ),
     );
+  }
+
+  Future<int> _runTcpDiscovery({
+    required ScanPlan plan,
+    required ScanCancellationToken cancellationToken,
+    required Map<String, DeviceObservation> observations,
+    required StreamController<ScanEvent> controller,
+  }) async {
+    final stopwatch = Stopwatch()..start();
+    final addresses = <String>{};
+    var completedTargets = 0;
+    var terminalEventReceived = false;
+    controller.add(
+      const ScanMethodStatusChanged(
+        DiscoveryMethodResult(
+          method: DiscoveryMethod.tcp,
+          phase: DiscoveryMethodPhase.running,
+        ),
+      ),
+    );
+
+    try {
+      await for (final event in tcpScanner.scan(plan, cancellationToken)) {
+        switch (event) {
+          case ScanStarted():
+            break;
+          case ScanProgress():
+            completedTargets = event.completedTargets;
+            controller.add(event);
+          case ScanStageChanged():
+            controller.add(event);
+          case ScanMethodStatusChanged():
+            controller.add(event);
+          case DeviceObserved():
+            addresses.add(event.device.ipAddress);
+            _storeAndEmit(observations, event.device, plan, controller);
+          case ScanCompleted():
+            terminalEventReceived = true;
+            completedTargets = event.completedTargets;
+            _emitTcpResult(
+              controller: controller,
+              phase: DiscoveryMethodPhase.completed,
+              deviceCount: addresses.length,
+              elapsed: stopwatch.elapsed,
+              metrics: _tcpMetrics(plan, addresses.length, completedTargets),
+            );
+          case ScanCancelled():
+            terminalEventReceived = true;
+            _emitTcpResult(
+              controller: controller,
+              phase: DiscoveryMethodPhase.cancelled,
+              deviceCount: addresses.length,
+              elapsed: stopwatch.elapsed,
+              metrics: _tcpMetrics(plan, addresses.length, completedTargets),
+            );
+          case ScanFailed():
+            terminalEventReceived = true;
+            _emitTcpResult(
+              controller: controller,
+              phase: DiscoveryMethodPhase.failed,
+              deviceCount: addresses.length,
+              elapsed: stopwatch.elapsed,
+              userMessage: event.userMessage,
+              metrics: _tcpMetrics(plan, addresses.length, completedTargets),
+            );
+        }
+      }
+    } on Object {
+      terminalEventReceived = true;
+      _emitTcpResult(
+        controller: controller,
+        phase: DiscoveryMethodPhase.failed,
+        deviceCount: addresses.length,
+        elapsed: stopwatch.elapsed,
+        userMessage: 'TCP port kontrolü tamamlanamadı.',
+        metrics: _tcpMetrics(plan, addresses.length, completedTargets),
+      );
+    } finally {
+      stopwatch.stop();
+    }
+
+    if (!terminalEventReceived) {
+      _emitTcpResult(
+        controller: controller,
+        phase: cancellationToken.isCancelled
+            ? DiscoveryMethodPhase.cancelled
+            : DiscoveryMethodPhase.failed,
+        deviceCount: addresses.length,
+        elapsed: stopwatch.elapsed,
+        userMessage: cancellationToken.isCancelled
+            ? null
+            : 'TCP port kontrolü beklenmedik biçimde durdu.',
+        metrics: _tcpMetrics(plan, addresses.length, completedTargets),
+      );
+    }
+    return completedTargets;
+  }
+
+  void _emitTcpResult({
+    required StreamController<ScanEvent> controller,
+    required DiscoveryMethodPhase phase,
+    required int deviceCount,
+    required Duration elapsed,
+    String? userMessage,
+    DiscoveryMetrics metrics = const DiscoveryMetrics(),
+  }) {
+    controller.add(
+      ScanMethodStatusChanged(
+        DiscoveryMethodResult(
+          method: DiscoveryMethod.tcp,
+          phase: phase,
+          deviceCount: deviceCount,
+          elapsed: elapsed,
+          userMessage: userMessage,
+          metrics: metrics,
+        ),
+      ),
+    );
+  }
+
+  DiscoveryMetrics _tcpMetrics(
+    ScanPlan plan,
+    int responsiveDevices,
+    int completedTargets,
+  ) => DiscoveryMetrics(
+    attemptedTargets: completedTargets,
+    sentRequests: completedTargets * 8,
+    acceptedResponses: responsiveDevices,
+    detail:
+        'Planlanan ${plan.targets.length} hedef; tamamlanan her hedefte '
+        'sekiz sınırlı TCP bağlantı denemesi',
+  );
+
+  Future<void> _runAndEmitDiscovery({
+    required DiscoveryMethod method,
+    required DeviceDiscovery discovery,
+    required ScanPlan plan,
+    required ScanCancellationToken cancellationToken,
+    required Map<String, DeviceObservation> observations,
+    required StreamController<ScanEvent> controller,
+    String? warning,
+  }) async {
+    final devices = await _runDiscovery(
+      method: method,
+      discovery: discovery,
+      plan: plan,
+      cancellationToken: cancellationToken,
+      controller: controller,
+      warning: warning,
+    );
+    for (final device in devices) {
+      _storeAndEmit(observations, device, plan, controller);
+    }
+  }
+
+  Future<void> _runMulticastDiscoveries({
+    required ScanPlan plan,
+    required ScanCancellationToken cancellationToken,
+    required Map<String, DeviceObservation> observations,
+    required StreamController<ScanEvent> controller,
+  }) async {
+    var lockAcquired = false;
+    try {
+      await multicastLock.acquire();
+      lockAcquired = true;
+    } on Object {
+      lockAcquired = false;
+    }
+    final warning = lockAcquired
+        ? null
+        : 'Çok noktaya yayın kilidi alınamadı; sonuçlar eksik olabilir.';
+    try {
+      await Future.wait([
+        _runAndEmitDiscovery(
+          method: DiscoveryMethod.mdns,
+          discovery: mdnsDiscovery,
+          plan: plan,
+          cancellationToken: cancellationToken,
+          observations: observations,
+          controller: controller,
+          warning: warning,
+        ),
+        _runAndEmitDiscovery(
+          method: DiscoveryMethod.ssdp,
+          discovery: ssdpDiscovery,
+          plan: plan,
+          cancellationToken: cancellationToken,
+          observations: observations,
+          controller: controller,
+          warning: warning,
+        ),
+        _runAndEmitDiscovery(
+          method: DiscoveryMethod.onvif,
+          discovery: onvifDiscovery,
+          plan: plan,
+          cancellationToken: cancellationToken,
+          observations: observations,
+          controller: controller,
+          warning: warning,
+        ),
+      ]);
+    } finally {
+      if (lockAcquired) {
+        try {
+          await multicastLock.release();
+        } on Object {
+          // The scan can still complete when the operating system has already
+          // released the process-scoped multicast lock.
+        }
+      }
+    }
   }
 
   Future<List<DeviceObservation>> _runDiscovery({
@@ -317,7 +433,7 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
       ),
     );
     try {
-      final devices = await discovery.discover(plan, cancellationToken);
+      final result = await discovery.discover(plan, cancellationToken);
       stopwatch.stop();
       controller.add(
         ScanMethodStatusChanged(
@@ -326,13 +442,21 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
             phase: cancellationToken.isCancelled
                 ? DiscoveryMethodPhase.cancelled
                 : DiscoveryMethodPhase.completed,
-            deviceCount: devices.length,
+            deviceCount: result.devices.length,
             elapsed: stopwatch.elapsed,
             userMessage: warning,
+            metrics: result.metrics.copyWith(
+              multicastLockAcquired:
+                  method == DiscoveryMethod.reachability || !Platform.isAndroid
+                  ? null
+                  : warning == null,
+              clearMulticastLockAcquired:
+                  method == DiscoveryMethod.reachability || !Platform.isAndroid,
+            ),
           ),
         ),
       );
-      return devices;
+      return result.devices;
     } on ReachabilityUnavailableException {
       stopwatch.stop();
       controller.add(
@@ -380,6 +504,7 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
       DiscoveryMethod.reachability => 'Cihaz erişilebilirlik',
       DiscoveryMethod.mdns => 'mDNS',
       DiscoveryMethod.ssdp => 'SSDP',
+      DiscoveryMethod.onvif => 'ONVIF/WS-Discovery',
       DiscoveryMethod.tcp => 'TCP',
       DiscoveryMethod.neighbor => 'Komşu tablosu',
     };

@@ -79,4 +79,6 @@ abstract interface class ScanHistoryRepository {
   Future<void> deleteSession(int sessionId);
 
   Future<void> clearHistory();
+
+  Future<void> clearAllData();
 }

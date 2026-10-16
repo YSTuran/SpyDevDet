@@ -6,6 +6,7 @@ import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_cancellation_token.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
 class NativeReachabilityDiscovery implements DeviceDiscovery {
   const NativeReachabilityDiscovery({
@@ -17,7 +18,7 @@ class NativeReachabilityDiscovery implements DeviceDiscovery {
   final Duration timeout;
 
   @override
-  Future<List<DeviceObservation>> discover(
+  Future<DeviceDiscoveryResult> discover(
     ScanPlan plan,
     ScanCancellationToken cancellationToken,
   ) async {
@@ -25,7 +26,7 @@ class NativeReachabilityDiscovery implements DeviceDiscovery {
       throw ArgumentError.value(timeout, 'timeout', 'Pozitif olmalıdır.');
     }
     if (cancellationToken.isCancelled) {
-      return const [];
+      return const DeviceDiscoveryResult.empty();
     }
     if (!Platform.isAndroid) {
       throw const ReachabilityUnavailableException();
@@ -43,11 +44,11 @@ class NativeReachabilityDiscovery implements DeviceDiscovery {
       throw const ReachabilityUnavailableException();
     }
     if (cancellationToken.isCancelled) {
-      return const [];
+      return const DeviceDiscoveryResult.empty();
     }
 
     final allowed = plan.targets.toSet();
-    return List.unmodifiable(
+    final devices = List<DeviceObservation>.unmodifiable(
       (addresses ?? const <String>[])
           .where(allowed.contains)
           .toSet()
@@ -70,6 +71,16 @@ class NativeReachabilityDiscovery implements DeviceDiscovery {
               ],
             ),
           ),
+    );
+    return DeviceDiscoveryResult(
+      devices: devices,
+      metrics: DiscoveryMetrics(
+        attemptedTargets: plan.targets.length,
+        receivedResponses: addresses?.length ?? 0,
+        acceptedResponses: devices.length,
+        ignoredResponses: (addresses?.length ?? 0) - devices.length,
+        detail: 'İşletim sistemi erişilebilirlik kontrolü',
+      ),
     );
   }
 }

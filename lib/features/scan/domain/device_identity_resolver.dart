@@ -7,6 +7,17 @@ class DeviceIdentityResolver {
   const DeviceIdentityResolver();
 
   String resolve(DeviceObservation device, {required String networkKey}) {
+    final isLocalDevice = device.evidence.any(
+      (item) =>
+          item.source == DeviceEvidenceSource.network &&
+          item.description == 'Taramanın çalıştığı cihaz',
+    );
+    if (isLocalDevice) {
+      // The database is local to this installation, so this reserved key stays
+      // stable when DHCP changes the phone or computer's local IP address.
+      return 'local:this-installation';
+    }
+
     final rawMac = device.macAddress;
     if (rawMac != null) {
       final mac = MacAddress.tryParse(rawMac);
@@ -16,13 +27,19 @@ class DeviceIdentityResolver {
     }
 
     final ssdpIdentifier = _identifierFor(device, DeviceEvidenceSource.ssdp);
+    final onvifIdentifier = _identifierFor(device, DeviceEvidenceSource.onvif);
+    if (onvifIdentifier != null) {
+      return 'onvif:$onvifIdentifier';
+    }
     if (ssdpIdentifier != null) {
       return 'ssdp:$ssdpIdentifier';
     }
 
     final mdnsIdentifier = _identifierFor(device, DeviceEvidenceSource.mdns);
     if (mdnsIdentifier != null) {
-      return 'mdns:$mdnsIdentifier';
+      // mDNS instance names are not globally unique and can repeat on another
+      // home network, so keep this weaker identity scoped to the network.
+      return 'mdns:$networkKey|$mdnsIdentifier';
     }
 
     return 'network:$networkKey|ip:${device.ipAddress}';

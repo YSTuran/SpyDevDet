@@ -9,18 +9,22 @@ class SpyDevDetApp extends StatelessWidget {
     return MaterialApp(
       title: 'SpyDevDet',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF155E75),
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        cardTheme: const CardThemeData(
-          clipBehavior: Clip.antiAlias,
-          margin: EdgeInsets.zero,
-        ),
-      ),
+      theme: _theme(Brightness.light),
+      darkTheme: _theme(Brightness.dark),
+      themeMode: ThemeMode.system,
       home: const ScanScreen(),
     );
   }
+
+  ThemeData _theme(Brightness brightness) => ThemeData(
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: const Color(0xFF155E75),
+      brightness: brightness,
+    ),
+    useMaterial3: true,
+    cardTheme: const CardThemeData(
+      clipBehavior: Clip.antiAlias,
+      margin: EdgeInsets.zero,
+    ),
+  );
 }

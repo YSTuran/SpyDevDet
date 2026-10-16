@@ -111,7 +111,7 @@ class ScanController extends Notifier<ScanState> {
   }
 
   void cancelScan() {
-    if (!state.isBusy) {
+    if (!state.canCancel) {
       return;
     }
 
@@ -133,11 +133,12 @@ class ScanController extends Notifier<ScanState> {
           statusMessage: '${event.totalTargets} yerel adres taranıyor',
         );
       case ScanProgress():
-        final progress = event.totalTargets == 0
-            ? 0.0
-            : event.completedTargets / event.totalTargets;
         state = state.copyWith(
-          progress: progress.clamp(0, 1),
+          progress: _scanProgress(
+            report: state.report,
+            scannedTargets: event.completedTargets,
+            totalTargets: event.totalTargets,
+          ),
           scannedTargets: event.completedTargets,
           totalTargets: event.totalTargets,
           statusMessage:
@@ -149,7 +150,15 @@ class ScanController extends Notifier<ScanState> {
       case ScanMethodStatusChanged():
         final report = state.report;
         if (report != null) {
-          state = state.copyWith(report: report.withMethod(event.result));
+          final updatedReport = report.withMethod(event.result);
+          state = state.copyWith(
+            report: updatedReport,
+            progress: _scanProgress(
+              report: updatedReport,
+              scannedTargets: state.scannedTargets,
+              totalTargets: state.totalTargets,
+            ),
+          );
         }
       case DeviceObserved():
         final devices = _upsertDevice(state.devices, event.device);
@@ -161,14 +170,12 @@ class ScanController extends Notifier<ScanState> {
         );
       case ScanCompleted():
         state = state.copyWith(
-          phase: ScanPhase.completed,
+          phase: ScanPhase.saving,
           progress: 1,
           scannedTargets: event.completedTargets,
           elapsed: event.elapsed,
           report: state.report?.complete(DateTime.now()),
-          statusMessage: state.devices.isEmpty
-              ? 'Kullanılan keşif yöntemlerinde cihaz gözlemlenmedi'
-              : 'Tarama tamamlandı • ${state.devices.length} cihaz gözlemlendi',
+          statusMessage: 'Tarama tamamlandı • geçmişe kaydediliyor',
         );
       case ScanCancelled():
         state = state.copyWith(
@@ -185,6 +192,46 @@ class ScanController extends Notifier<ScanState> {
     state = state.copyWith(phase: ScanPhase.failed, statusMessage: message);
   }
 
+  double _scanProgress({
+    required ScanReport? report,
+    required int scannedTargets,
+    required int totalTargets,
+  }) {
+    if (report == null) {
+      return 0;
+    }
+    const weights = <DiscoveryMethod, double>{
+      DiscoveryMethod.tcp: 0.60,
+      DiscoveryMethod.reachability: 0.15,
+      DiscoveryMethod.mdns: 0.075,
+      DiscoveryMethod.ssdp: 0.075,
+      DiscoveryMethod.onvif: 0.05,
+      DiscoveryMethod.neighbor: 0.05,
+    };
+    var value = 0.0;
+    for (final entry in weights.entries) {
+      final result = report.methods[entry.key];
+      if (entry.key == DiscoveryMethod.tcp &&
+          result?.phase == DiscoveryMethodPhase.running) {
+        final fraction = totalTargets == 0
+            ? 0.0
+            : scannedTargets / totalTargets;
+        value += entry.value * fraction.clamp(0, 1);
+      } else if (result != null && _isTerminal(result.phase)) {
+        value += entry.value;
+      }
+    }
+    return value.clamp(0, 0.99);
+  }
+
+  bool _isTerminal(DiscoveryMethodPhase phase) => switch (phase) {
+    DiscoveryMethodPhase.completed ||
+    DiscoveryMethodPhase.unavailable ||
+    DiscoveryMethodPhase.failed ||
+    DiscoveryMethodPhase.cancelled => true,
+    DiscoveryMethodPhase.waiting || DiscoveryMethodPhase.running => false,
+  };
+
   Future<void> _persistCompletedScan({
     required ScanPlan plan,
     required ScanCompleted event,
@@ -192,6 +239,12 @@ class ScanController extends Notifier<ScanState> {
   }) async {
     final report = state.report;
     if (report == null) {
+      if (runId == _runId) {
+        state = state.copyWith(
+          phase: ScanPhase.completed,
+          statusMessage: 'Tarama tamamlandı; rapor kaydedilemedi',
+        );
+      }
       return;
     }
     try {
@@ -211,6 +264,7 @@ class ScanController extends Notifier<ScanState> {
           .where((device) => device.familiarity == DeviceFamiliarity.newDevice)
           .length;
       state = state.copyWith(
+        phase: ScanPhase.completed,
         devices: List.unmodifiable(devices),
         statusMessage: devices.isEmpty
             ? 'Tarama tamamlandı • geçmişe kaydedildi'
@@ -221,6 +275,7 @@ class ScanController extends Notifier<ScanState> {
     } on Object {
       if (runId == _runId) {
         state = state.copyWith(
+          phase: ScanPhase.completed,
           statusMessage: 'Tarama tamamlandı; geçmiş kaydedilemedi',
         );
       }

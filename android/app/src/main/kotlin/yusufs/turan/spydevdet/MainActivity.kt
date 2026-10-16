@@ -44,7 +44,7 @@ class MainActivity : FlutterActivity() {
     private fun acquireMulticastLock(result: MethodChannel.Result) {
         try {
             val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            val lock = multicastLock ?: wifiManager.createMulticastLock("SpyDevDet-mDNS-SSDP").also {
+            val lock = multicastLock ?: wifiManager.createMulticastLock("SpyDevDet-MulticastDiscovery").also {
                 it.setReferenceCounted(false)
                 multicastLock = it
             }

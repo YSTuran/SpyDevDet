@@ -7,6 +7,7 @@ import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation_merger.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_cancellation_token.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
 class MdnsDeviceDiscovery implements DeviceDiscovery {
   const MdnsDeviceDiscovery({
@@ -29,12 +30,12 @@ class MdnsDeviceDiscovery implements DeviceDiscovery {
   final Duration queryTimeout;
 
   @override
-  Future<List<DeviceObservation>> discover(
+  Future<DeviceDiscoveryResult> discover(
     ScanPlan plan,
     ScanCancellationToken cancellationToken,
   ) async {
     if (cancellationToken.isCancelled) {
-      return const [];
+      return const DeviceDiscoveryResult.empty();
     }
 
     final client = MDnsClient();
@@ -47,7 +48,7 @@ class MdnsDeviceDiscovery implements DeviceDiscovery {
       );
       started = true;
       if (cancellationToken.isCancelled) {
-        return const [];
+        return const DeviceDiscoveryResult.empty();
       }
 
       final pointerGroups = await Future.wait(
@@ -98,14 +99,18 @@ class MdnsDeviceDiscovery implements DeviceDiscovery {
       );
 
       final observations = <String, DeviceObservation>{};
+      var ignoredResponses = 0;
+      var addressRecordCount = 0;
       for (var index = 0; index < services.length; index++) {
         if (cancellationToken.isCancelled) {
           break;
         }
         final service = services[index];
         for (final addressRecord in addressGroups[index]) {
+          addressRecordCount++;
           final ipAddress = addressRecord.address.address;
           if (!_isAllowed(ipAddress, plan)) {
+            ignoredResponses++;
             continue;
           }
           final observation = _observation(
@@ -119,7 +124,21 @@ class MdnsDeviceDiscovery implements DeviceDiscovery {
               : const DeviceObservationMerger().merge(existing, observation);
         }
       }
-      return List.unmodifiable(observations.values);
+      final devices = List<DeviceObservation>.unmodifiable(observations.values);
+      return DeviceDiscoveryResult(
+        devices: devices,
+        metrics: DiscoveryMetrics(
+          sentRequests:
+              _serviceTypes.length +
+              pointers.length.clamp(0, 48) +
+              services.length,
+          receivedResponses:
+              pointers.length + services.length + addressRecordCount,
+          acceptedResponses: devices.length,
+          ignoredResponses: ignoredResponses,
+          detail: '${pointers.length} servis duyurusu çözümlendi',
+        ),
+      );
     } finally {
       if (started) {
         client.stop();

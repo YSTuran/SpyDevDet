@@ -2,7 +2,15 @@ import 'package:spy_dev_det/features/network/domain/network_snapshot.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
-enum ScanPhase { idle, preparing, scanning, completed, cancelled, failed }
+enum ScanPhase {
+  idle,
+  preparing,
+  scanning,
+  saving,
+  completed,
+  cancelled,
+  failed,
+}
 
 class ScanState {
   const ScanState({
@@ -45,6 +53,11 @@ class ScanState {
   final ScanReport? report;
 
   bool get isBusy =>
+      phase == ScanPhase.preparing ||
+      phase == ScanPhase.scanning ||
+      phase == ScanPhase.saving;
+
+  bool get canCancel =>
       phase == ScanPhase.preparing || phase == ScanPhase.scanning;
 
   ScanState copyWith({

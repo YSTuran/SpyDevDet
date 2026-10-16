@@ -244,6 +244,17 @@ flutter::EncodableMap EncodeSnapshot(const NetworkCandidate& snapshot) {
 }
 
 flutter::EncodableMap ReadNeighborSnapshot() {
+  std::string error_code;
+  std::string error_message;
+  const auto active_network =
+      ReadNetworkSnapshot(&error_code, &error_message);
+  if (!active_network.has_value()) {
+    return {{flutter::EncodableValue("available"),
+             flutter::EncodableValue(false)},
+            {flutter::EncodableValue("entries"),
+             flutter::EncodableValue(flutter::EncodableList())}};
+  }
+
   ULONG buffer_size = 0;
   DWORD status = GetIpNetTable(nullptr, &buffer_size, FALSE);
   if (status != ERROR_INSUFFICIENT_BUFFER || buffer_size == 0) {
@@ -266,7 +277,10 @@ flutter::EncodableMap ReadNeighborSnapshot() {
   flutter::EncodableList entries;
   for (DWORD index = 0; index < table->dwNumEntries; ++index) {
     const MIB_IPNETROW& row = table->table[index];
-    if (row.dwPhysAddrLen != 6) {
+    if (row.dwIndex != active_network->interface_index ||
+        row.dwPhysAddrLen != 6 ||
+        (row.dwType != MIB_IPNET_TYPE_DYNAMIC &&
+         row.dwType != MIB_IPNET_TYPE_STATIC)) {
       continue;
     }
     bool all_zero = true;

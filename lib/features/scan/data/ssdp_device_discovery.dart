@@ -8,6 +8,7 @@ import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation_merger.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_cancellation_token.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
 class SsdpDeviceDiscovery implements DeviceDiscovery {
   const SsdpDeviceDiscovery({
@@ -24,12 +25,12 @@ class SsdpDeviceDiscovery implements DeviceDiscovery {
   final Duration listenDuration;
 
   @override
-  Future<List<DeviceObservation>> discover(
+  Future<DeviceDiscoveryResult> discover(
     ScanPlan plan,
     ScanCancellationToken cancellationToken,
   ) async {
     if (cancellationToken.isCancelled) {
-      return const [];
+      return const DeviceDiscoveryResult.empty();
     }
 
     RawDatagramSocket? socket;
@@ -37,6 +38,10 @@ class SsdpDeviceDiscovery implements DeviceDiscovery {
     Timer? timer;
     final done = Completer<void>();
     final observations = <String, DeviceObservation>{};
+    var receivedResponses = 0;
+    var acceptedResponses = 0;
+    var ignoredResponses = 0;
+    var sentRequests = 0;
 
     void finish() {
       if (!done.isCompleted) {
@@ -57,17 +62,25 @@ class SsdpDeviceDiscovery implements DeviceDiscovery {
           return;
         }
         final datagram = socket?.receive();
-        if (datagram == null || datagram.data.length > 16384) {
+        if (datagram == null) {
+          return;
+        }
+        receivedResponses++;
+        if (datagram.data.length > 16384) {
+          ignoredResponses++;
           return;
         }
         final ipAddress = datagram.address.address;
         if (!_isAllowed(ipAddress, plan)) {
+          ignoredResponses++;
           return;
         }
         final response = SsdpResponse.tryParse(datagram.data);
         if (response == null) {
+          ignoredResponses++;
           return;
         }
+        acceptedResponses++;
         final observation = _observation(ipAddress, response);
         final existing = observations[ipAddress];
         observations[ipAddress] = existing == null
@@ -75,14 +88,26 @@ class SsdpDeviceDiscovery implements DeviceDiscovery {
             : const DeviceObservationMerger().merge(existing, observation);
       }, onError: (_) => finish());
 
-      socket.send(
-        ascii.encode(_request),
-        InternetAddress('239.255.255.250'),
-        1900,
-      );
+      if (socket.send(
+            ascii.encode(_request),
+            InternetAddress('239.255.255.250'),
+            1900,
+          ) >
+          0) {
+        sentRequests++;
+      }
       timer = Timer(listenDuration, finish);
       await done.future;
-      return List.unmodifiable(observations.values);
+      return DeviceDiscoveryResult(
+        devices: List.unmodifiable(observations.values),
+        metrics: DiscoveryMetrics(
+          sentRequests: sentRequests,
+          receivedResponses: receivedResponses,
+          acceptedResponses: acceptedResponses,
+          ignoredResponses: ignoredResponses,
+          detail: 'SSDP M-SEARCH yanıtları',
+        ),
+      );
     } finally {
       removeCancelListener();
       timer?.cancel();

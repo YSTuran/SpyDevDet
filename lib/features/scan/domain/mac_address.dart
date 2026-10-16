@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+
 class MacAddress {
   const MacAddress._(this.value, this.isLocallyAdministered);
 
@@ -5,6 +7,7 @@ class MacAddress {
   final bool isLocallyAdministered;
 
   String get oui => value.substring(0, 8);
+  String get compact => value.replaceAll(':', '');
 
   static MacAddress? tryParse(String input) {
     final compact = input.replaceAll(RegExp(r'[-:.\s]'), '').toUpperCase();
@@ -25,7 +28,25 @@ class MacAddress {
   }
 }
 
-class MacVendorRepository {
+class MacVendorDatabaseStatus {
+  const MacVendorDatabaseStatus({
+    required this.loaded,
+    required this.entryCount,
+    required this.description,
+  });
+
+  final bool loaded;
+  final int entryCount;
+  final String description;
+}
+
+abstract interface class MacVendorLookup {
+  Future<MacVendorDatabaseStatus> load();
+
+  String? lookup(MacAddress address);
+}
+
+class MacVendorRepository implements MacVendorLookup {
   const MacVendorRepository();
 
   static const _knownVendors = <String, String>{
@@ -37,10 +58,113 @@ class MacVendorRepository {
     'DC:A6:32': 'Raspberry Pi Trading',
   };
 
+  @override
+  Future<MacVendorDatabaseStatus> load() async => const MacVendorDatabaseStatus(
+    loaded: true,
+    entryCount: 6,
+    description: 'Gömülü yedek üretici listesi',
+  );
+
+  @override
   String? lookup(MacAddress address) {
     if (address.isLocallyAdministered) {
       return null;
     }
     return _knownVendors[address.oui];
+  }
+}
+
+class AssetMacVendorRepository implements MacVendorLookup {
+  const AssetMacVendorRepository({
+    this.assetPath = 'assets/data/oui_registry.tsv',
+    this.fallback = const MacVendorRepository(),
+  });
+
+  final String assetPath;
+  final MacVendorRepository fallback;
+
+  static Future<MacVendorDatabaseStatus>? _sharedLoad;
+  static Map<int, String> _prefix24 = const {};
+  static Map<int, String> _prefix28 = const {};
+  static Map<int, String> _prefix36 = const {};
+
+  @override
+  Future<MacVendorDatabaseStatus> load() => _sharedLoad ??= _loadFromAsset();
+
+  Future<MacVendorDatabaseStatus> _loadFromAsset() async {
+    try {
+      final source = await rootBundle.loadString(assetPath);
+      final prefix24 = <int, String>{};
+      final prefix28 = <int, String>{};
+      final prefix36 = <int, String>{};
+      String? snapshotDate;
+      for (final line in source.split(RegExp(r'\r?\n'))) {
+        if (line.startsWith('# Updated:')) {
+          snapshotDate = line
+              .substring('# Updated:'.length)
+              .trim()
+              .split('T')
+              .first;
+          continue;
+        }
+        if (line.isEmpty || line.startsWith('#')) {
+          continue;
+        }
+        final columns = line.split('\t');
+        if (columns.length != 3) {
+          continue;
+        }
+        final length = int.tryParse(columns[0]);
+        final prefix = int.tryParse(columns[1], radix: 16);
+        final vendor = columns[2].trim();
+        if (length == null || prefix == null || vendor.isEmpty) {
+          continue;
+        }
+        switch (length) {
+          case 24:
+            prefix24[prefix] = vendor;
+          case 28:
+            prefix28[prefix] = vendor;
+          case 36:
+            prefix36[prefix] = vendor;
+        }
+      }
+      final entryCount = prefix24.length + prefix28.length + prefix36.length;
+      if (entryCount < 1000) {
+        return const MacVendorDatabaseStatus(
+          loaded: false,
+          entryCount: 6,
+          description: 'OUI asset yüklenemedi; gömülü yedek liste kullanılıyor',
+        );
+      }
+      _prefix24 = Map.unmodifiable(prefix24);
+      _prefix28 = Map.unmodifiable(prefix28);
+      _prefix36 = Map.unmodifiable(prefix36);
+      return MacVendorDatabaseStatus(
+        loaded: true,
+        entryCount: entryCount,
+        description: snapshotDate == null || snapshotDate.isEmpty
+            ? 'Çevrimdışı IEEE OUI kayıtları'
+            : 'Çevrimdışı IEEE OUI kayıtları • snapshot $snapshotDate',
+      );
+    } on Object {
+      return const MacVendorDatabaseStatus(
+        loaded: false,
+        entryCount: 6,
+        description: 'OUI asset yüklenemedi; gömülü yedek liste kullanılıyor',
+      );
+    }
+  }
+
+  @override
+  String? lookup(MacAddress address) {
+    if (address.isLocallyAdministered) {
+      return null;
+    }
+    final value = int.parse(address.compact, radix: 16);
+    return _prefix36[value >> 12] ??
+        _prefix28[value >> 20] ??
+        _prefix24[value >> 24] ??
+        fallback.lookup(address);
   }
 }

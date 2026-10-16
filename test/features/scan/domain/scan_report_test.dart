@@ -34,33 +34,48 @@ void main() {
     );
   });
 
-  test(
-    'karşılaştırma için erişilebilirlik dahil keşiflerin bitmesini ister',
-    () {
-      var report = ScanReport.started(DateTime(2026, 10, 15));
-      for (final method in const [
-        DiscoveryMethod.tcp,
-        DiscoveryMethod.mdns,
-        DiscoveryMethod.ssdp,
-      ]) {
-        report = report.withMethod(
-          DiscoveryMethodResult(
-            method: method,
-            phase: DiscoveryMethodPhase.completed,
-          ),
-        );
-      }
-
-      expect(report.canComparePresence, isFalse);
-
+  test('karşılaştırma için en az bir cihaz varlığı yöntemi ister', () {
+    var report = ScanReport.started(DateTime(2026, 10, 15));
+    for (final method in const [
+      DiscoveryMethod.tcp,
+      DiscoveryMethod.mdns,
+      DiscoveryMethod.ssdp,
+      DiscoveryMethod.onvif,
+    ]) {
       report = report.withMethod(
-        const DiscoveryMethodResult(
-          method: DiscoveryMethod.reachability,
+        DiscoveryMethodResult(
+          method: method,
           phase: DiscoveryMethodPhase.completed,
         ),
       );
+    }
 
-      expect(report.canComparePresence, isTrue);
-    },
-  );
+    expect(report.canComparePresence, isFalse);
+
+    report = report.withMethod(
+      const DiscoveryMethodResult(
+        method: DiscoveryMethod.reachability,
+        phase: DiscoveryMethodPhase.completed,
+      ),
+    );
+
+    expect(report.canComparePresence, isTrue);
+
+    report = report
+        .withMethod(
+          const DiscoveryMethodResult(
+            method: DiscoveryMethod.reachability,
+            phase: DiscoveryMethodPhase.unavailable,
+          ),
+        )
+        .withMethod(
+          const DiscoveryMethodResult(
+            method: DiscoveryMethod.neighbor,
+            phase: DiscoveryMethodPhase.completed,
+          ),
+        );
+
+    expect(report.canComparePresence, isTrue);
+    expect(report.isPartial, isFalse);
+  });
 }

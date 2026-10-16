@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:spy_dev_det/features/history/data/app_database.dart';
 import 'package:spy_dev_det/features/history/domain/scan_history_repository.dart';
+import 'package:spy_dev_det/features/network/domain/ipv4_address.dart';
 import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/device_identity_resolver.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
@@ -31,7 +32,8 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
           networkKey: record.networkKey,
         );
         final existing = await _knownDevice(stableKey);
-        final familiarity = existing?.isKnown == true
+        final isLocalDevice = stableKey == 'local:this-installation';
+        final familiarity = isLocalDevice || existing?.isKnown == true
             ? DeviceFamiliarity.known
             : existing == null
             ? DeviceFamiliarity.newDevice
@@ -52,7 +54,7 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
               KnownDevicesCompanion.insert(
                 stableKey: stableKey,
                 customName: Value(existing?.customName),
-                isKnown: Value(existing?.isKnown ?? false),
+                isKnown: Value(existing?.isKnown ?? isLocalDevice),
                 note: Value(existing?.note),
                 firstSeenAt: existing?.firstSeenAt ?? completedAt,
                 lastSeenAt: completedAt,
@@ -162,7 +164,7 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
       devices.add(_observationFromRow(row, profile));
     }
     devices.sort(
-      (first, second) => first.ipAddress.compareTo(second.ipAddress),
+      (first, second) => Ipv4Address.compare(first.ipAddress, second.ipAddress),
     );
     return ScanHistoryDetails(
       summary: _summaryFromRow(session),
@@ -180,6 +182,14 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
   @override
   Future<void> clearHistory() async {
     await database.delete(database.scanSessions).go();
+  }
+
+  @override
+  Future<void> clearAllData() {
+    return database.transaction(() async {
+      await database.delete(database.scanSessions).go();
+      await database.delete(database.knownDevices).go();
+    });
   }
 
   Future<KnownDevice?> _knownDevice(String stableKey) {
@@ -289,6 +299,16 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
           'deviceCount': entry.value.deviceCount,
           'elapsedMillis': entry.value.elapsed.inMilliseconds,
           'userMessage': entry.value.userMessage,
+          'metrics': {
+            'attemptedTargets': entry.value.metrics.attemptedTargets,
+            'sentRequests': entry.value.metrics.sentRequests,
+            'receivedResponses': entry.value.metrics.receivedResponses,
+            'acceptedResponses': entry.value.metrics.acceptedResponses,
+            'ignoredResponses': entry.value.metrics.ignoredResponses,
+            'timeoutCount': entry.value.metrics.timeoutCount,
+            'multicastLockAcquired': entry.value.metrics.multicastLockAcquired,
+            'detail': entry.value.metrics.detail,
+          },
         },
     });
   }
@@ -303,9 +323,10 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
       for (final method in DiscoveryMethod.values) {
         final value = decoded[method.name];
         if (value is! Map<String, dynamic>) {
-          if (method == DiscoveryMethod.reachability) {
-            methods[method] = const DiscoveryMethodResult(
-              method: DiscoveryMethod.reachability,
+          if (method == DiscoveryMethod.reachability ||
+              method == DiscoveryMethod.onvif) {
+            methods[method] = DiscoveryMethodResult(
+              method: method,
               phase: DiscoveryMethodPhase.unavailable,
               userMessage: 'Bu yöntem eski uygulama sürümünde mevcut değildi.',
             );
@@ -322,12 +343,30 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
           deviceCount: value['deviceCount'] as int? ?? 0,
           elapsed: Duration(milliseconds: value['elapsedMillis'] as int? ?? 0),
           userMessage: value['userMessage'] as String?,
+          metrics: _decodeMetrics(value['metrics']),
         );
       }
       return Map.unmodifiable(methods);
     } on FormatException {
       return const {};
     }
+  }
+
+  DiscoveryMetrics _decodeMetrics(Object? source) {
+    if (source is! Map<String, dynamic>) {
+      return const DiscoveryMetrics();
+    }
+    int readCount(String key) => (source[key] as num?)?.toInt() ?? 0;
+    return DiscoveryMetrics(
+      attemptedTargets: readCount('attemptedTargets'),
+      sentRequests: readCount('sentRequests'),
+      receivedResponses: readCount('receivedResponses'),
+      acceptedResponses: readCount('acceptedResponses'),
+      ignoredResponses: readCount('ignoredResponses'),
+      timeoutCount: readCount('timeoutCount'),
+      multicastLockAcquired: source['multicastLockAcquired'] as bool?,
+      detail: source['detail'] as String?,
+    );
   }
 
   String _encodeEvidence(List<DeviceEvidence> evidence) => jsonEncode(

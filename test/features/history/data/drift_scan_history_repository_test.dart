@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:spy_dev_det/features/history/data/app_database.dart';
 import 'package:spy_dev_det/features/history/data/drift_scan_history_repository.dart';
 import 'package:spy_dev_det/features/history/domain/scan_history_repository.dart';
+import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
@@ -101,6 +102,59 @@ void main() {
     expect(next.single.effectiveDisplayName, 'Kişisel cihaz');
   });
 
+  test('tüm yerel veriler silinince cihaz profili de unutulur', () async {
+    final first = await repository.recordCompletedScan(
+      _record(ipAddress: '192.168.1.20', minute: 0),
+    );
+    await repository.updateDeviceProfile(
+      stableKey: first.single.stableKey!,
+      isKnown: true,
+      customName: 'Silinecek cihaz',
+      note: 'Yerel not',
+    );
+
+    await repository.clearAllData();
+
+    expect(await repository.getHistory(), isEmpty);
+    final next = await repository.recordCompletedScan(
+      _record(ipAddress: '192.168.1.21', minute: 5),
+    );
+    expect(next.single.familiarity, DeviceFamiliarity.newDevice);
+    expect(next.single.customName, isNull);
+    expect(next.single.note, isNull);
+  });
+
+  test('taramayı çalıştıran cihaz ilk kayıtta bilinen sayılır', () async {
+    final base = _record(ipAddress: '192.168.1.10', minute: 0);
+    final saved = await repository.recordCompletedScan(
+      CompletedScanRecord(
+        networkKey: base.networkKey,
+        report: base.report,
+        elapsed: base.elapsed,
+        devices: const [
+          DeviceObservation(
+            id: 'local-device',
+            ipAddress: '192.168.1.10',
+            displayName: 'Bu cihaz',
+            macStatus: MacStatus.notObserved,
+            services: [],
+            discoveryMethod: 'Yerel ağ bilgisi',
+            evidence: [
+              DeviceEvidence(
+                source: DeviceEvidenceSource.network,
+                description: 'Taramanın çalıştığı cihaz',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    expect(saved.single.stableKey, 'local:this-installation');
+    expect(saved.single.familiarity, DeviceFamiliarity.known);
+    expect((await repository.getHistory()).single.newDeviceCount, 0);
+  });
+
   test('kısmi taramada cihazı görülmedi olarak işaretlemez', () async {
     await repository.recordCompletedScan(
       _record(
@@ -118,6 +172,42 @@ void main() {
 
     final history = await repository.getHistory();
     expect(history.first.missingDevices, isEmpty);
+  });
+
+  test('keşif tanılama sayaçlarını geçmişte korur', () async {
+    final base = _record(ipAddress: '192.168.1.20', minute: 0);
+    final report = base.report.withMethod(
+      const DiscoveryMethodResult(
+        method: DiscoveryMethod.onvif,
+        phase: DiscoveryMethodPhase.completed,
+        deviceCount: 1,
+        elapsed: Duration(milliseconds: 2400),
+        metrics: DiscoveryMetrics(
+          sentRequests: 2,
+          receivedResponses: 3,
+          acceptedResponses: 1,
+          ignoredResponses: 2,
+          multicastLockAcquired: true,
+          detail: 'WS-Discovery Probe/ProbeMatch',
+        ),
+      ),
+    );
+
+    await repository.recordCompletedScan(
+      CompletedScanRecord(
+        networkKey: base.networkKey,
+        report: report,
+        elapsed: base.elapsed,
+        devices: base.devices,
+      ),
+    );
+
+    final saved =
+        (await repository.getHistory()).single.methods[DiscoveryMethod.onvif]!;
+    expect(saved.metrics.sentRequests, 2);
+    expect(saved.metrics.receivedResponses, 3);
+    expect(saved.metrics.multicastLockAcquired, isTrue);
+    expect(saved.metrics.detail, 'WS-Discovery Probe/ProbeMatch');
   });
 }
 

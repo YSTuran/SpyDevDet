@@ -15,10 +15,26 @@ class HistoryScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Tarama geçmişi'),
         actions: [
-          IconButton(
-            tooltip: 'Geçmişi temizle',
-            onPressed: () => _clearHistory(context, ref),
-            icon: const Icon(Icons.delete_sweep_outlined),
+          PopupMenuButton<_HistoryAction>(
+            tooltip: 'Geçmiş seçenekleri',
+            onSelected: (action) {
+              switch (action) {
+                case _HistoryAction.clearHistory:
+                  _clearHistory(context, ref);
+                case _HistoryAction.clearAllData:
+                  _clearAllData(context, ref);
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: _HistoryAction.clearHistory,
+                child: Text('Yalnız tarama geçmişini sil'),
+              ),
+              PopupMenuItem(
+                value: _HistoryAction.clearAllData,
+                child: Text('Tüm yerel verileri sil'),
+              ),
+            ],
           ),
         ],
       ),
@@ -82,10 +98,66 @@ class HistoryScreen extends ConsumerWidget {
     if (confirmed != true) {
       return;
     }
-    await ref.read(scanHistoryRepositoryProvider).clearHistory();
-    ref.invalidate(scanHistoryProvider);
+    try {
+      await ref.read(scanHistoryRepositoryProvider).clearHistory();
+      ref.invalidate(scanHistoryProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Tarama geçmişi silindi')));
+      }
+    } on Object {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tarama geçmişi silinemedi')),
+        );
+      }
+    }
+  }
+
+  Future<void> _clearAllData(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Tüm yerel veriler silinsin mi?'),
+        content: const Text(
+          'Tarama geçmişi, bilinen cihaz işaretleri, özel adlar ve notlar '
+          'kalıcı olarak silinir.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Tümünü sil'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+    try {
+      await ref.read(scanHistoryRepositoryProvider).clearAllData();
+      ref.invalidate(scanHistoryProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tüm yerel veriler silindi')),
+        );
+      }
+    } on Object {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Yerel veriler silinemedi')),
+        );
+      }
+    }
   }
 }
+
+enum _HistoryAction { clearHistory, clearAllData }
 
 class HistoryDetailsScreen extends ConsumerWidget {
   const HistoryDetailsScreen({required this.sessionId, super.key});
@@ -218,14 +290,7 @@ class _HistoryDetails extends StatelessWidget {
                 const SizedBox(height: 12),
                 ...DiscoveryMethod.values.map((method) {
                   final result = summary.methods[method];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Text(
-                      '${method.label}: '
-                      '${result?.phase.label ?? 'Kayıt yok'}'
-                      '${result == null ? '' : ' • ${result.deviceCount}'}',
-                    ),
-                  );
+                  return _HistoryMethodTile(method: method, result: result);
                 }),
               ],
             ),
@@ -284,6 +349,89 @@ class _HistoryDetails extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _HistoryMethodTile extends StatelessWidget {
+  const _HistoryMethodTile({required this.method, required this.result});
+
+  final DiscoveryMethod method;
+  final DiscoveryMethodResult? result;
+
+  @override
+  Widget build(BuildContext context) {
+    final current = result;
+    if (current == null) {
+      return ListTile(
+        contentPadding: EdgeInsets.zero,
+        dense: true,
+        title: Text(method.label),
+        trailing: const Text('Kayıt yok'),
+      );
+    }
+    final metrics = current.metrics;
+    return ExpansionTile(
+      tilePadding: EdgeInsets.zero,
+      childrenPadding: const EdgeInsets.only(left: 12, right: 8, bottom: 8),
+      dense: true,
+      title: Text(method.label),
+      subtitle: Text(
+        '${current.phase.label} • ${current.deviceCount} cihaz • '
+        '${current.elapsed.inMilliseconds} ms',
+      ),
+      children: [
+        if (!metrics.hasValues)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Bu kayıtta ayrıntılı tanılama sayacı yok.'),
+          ),
+        if (metrics.hasValues) ...[
+          if (metrics.attemptedTargets > 0)
+            _HistoryMetricLine(
+              'Kontrol edilen hedef',
+              metrics.attemptedTargets,
+            ),
+          _HistoryMetricLine('Gönderilen istek', metrics.sentRequests),
+          _HistoryMetricLine('Alınan yanıt', metrics.receivedResponses),
+          _HistoryMetricLine('Kabul edilen yanıt', metrics.acceptedResponses),
+          _HistoryMetricLine('Yok sayılan yanıt', metrics.ignoredResponses),
+          if (metrics.timeoutCount > 0)
+            _HistoryMetricLine('Zaman aşımı', metrics.timeoutCount),
+          if (metrics.multicastLockAcquired case final acquired?)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Multicast erişimi: ${acquired ? 'Alındı' : 'Alınamadı'}',
+              ),
+            ),
+          if (metrics.detail case final detail?)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Teknik açıklama: $detail'),
+            ),
+        ],
+        if (current.userMessage case final message?)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(message, style: Theme.of(context).textTheme.bodySmall),
+          ),
+      ],
+    );
+  }
+}
+
+class _HistoryMetricLine extends StatelessWidget {
+  const _HistoryMetricLine(this.label, this.value);
+
+  final String label;
+  final int value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text('$label: $value'),
     );
   }
 }

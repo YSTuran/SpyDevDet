@@ -126,6 +126,9 @@ class _TestHistoryRepository implements ScanHistoryRepository {
   Future<void> clearHistory() async {}
 
   @override
+  Future<void> clearAllData() async {}
+
+  @override
   Future<void> deleteSession(int sessionId) async {}
 
   @override

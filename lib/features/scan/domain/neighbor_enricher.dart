@@ -4,9 +4,13 @@ import 'package:spy_dev_det/features/scan/domain/mac_address.dart';
 import 'package:spy_dev_det/features/scan/domain/neighbor_snapshot.dart';
 
 class NeighborEnricher {
-  const NeighborEnricher({this.vendorRepository = const MacVendorRepository()});
+  const NeighborEnricher({
+    this.vendorRepository = const AssetMacVendorRepository(),
+  });
 
-  final MacVendorRepository vendorRepository;
+  final MacVendorLookup vendorRepository;
+
+  Future<MacVendorDatabaseStatus> prepare() => vendorRepository.load();
 
   DeviceObservation enrich(
     DeviceObservation device,

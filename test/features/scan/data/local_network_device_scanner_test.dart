@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spy_dev_det/features/network/domain/network_snapshot.dart';
 import 'package:spy_dev_det/features/scan/data/local_network_device_scanner.dart';
@@ -31,6 +33,7 @@ void main() {
         reachabilityDiscovery: const _ReachabilityDiscovery(),
         mdnsDiscovery: const _MdnsDiscovery(),
         ssdpDiscovery: const _EmptyDiscovery(),
+        onvifDiscovery: const _EmptyDiscovery(),
         neighborRepository: const _NeighborRepository(),
         multicastLock: const _MulticastLock(),
       );
@@ -74,31 +77,104 @@ void main() {
       expect(device.vendor, 'Raspberry Pi Foundation');
     },
   );
+
+  test('TCP ve diğer keşif yöntemlerini paralel başlatır', () async {
+    final discoveryStarted = Completer<void>();
+    final plan = ScanPlan.fromNetwork(
+      const NetworkSnapshot(
+        localIpv4: '192.168.1.2',
+        prefixLength: 30,
+        interfaceName: 'test',
+        gatewayIpv4: '192.168.1.1',
+        isWifi: true,
+        isVpn: false,
+      ),
+    );
+    final scanner = LocalNetworkDeviceScanner(
+      tcpScanner: _TcpWaitsForDiscovery(discoveryStarted.future),
+      reachabilityDiscovery: _SignalsDiscovery(discoveryStarted),
+      mdnsDiscovery: const _EmptyDiscovery(),
+      ssdpDiscovery: const _EmptyDiscovery(),
+      onvifDiscovery: const _EmptyDiscovery(),
+      neighborRepository: const _NeighborRepository(),
+      multicastLock: const _MulticastLock(),
+    );
+
+    final events = await scanner
+        .scan(plan, ScanCancellationToken())
+        .toList()
+        .timeout(const Duration(seconds: 1));
+
+    expect(discoveryStarted.isCompleted, isTrue);
+    expect(events.whereType<ScanCompleted>(), hasLength(1));
+  });
+}
+
+class _TcpWaitsForDiscovery implements DeviceScanner {
+  const _TcpWaitsForDiscovery(this.discoveryStarted);
+
+  final Future<void> discoveryStarted;
+
+  @override
+  Stream<ScanEvent> scan(
+    ScanPlan plan,
+    ScanCancellationToken cancellationToken,
+  ) async* {
+    yield ScanStarted(totalTargets: plan.targets.length);
+    await discoveryStarted;
+    yield ScanProgress(
+      completedTargets: plan.targets.length,
+      totalTargets: plan.targets.length,
+    );
+    yield ScanCompleted(
+      completedTargets: plan.targets.length,
+      elapsed: Duration.zero,
+    );
+  }
+}
+
+class _SignalsDiscovery implements DeviceDiscovery {
+  const _SignalsDiscovery(this.started);
+
+  final Completer<void> started;
+
+  @override
+  Future<DeviceDiscoveryResult> discover(
+    ScanPlan plan,
+    ScanCancellationToken cancellationToken,
+  ) async {
+    if (!started.isCompleted) {
+      started.complete();
+    }
+    return const DeviceDiscoveryResult.empty();
+  }
 }
 
 class _ReachabilityDiscovery implements DeviceDiscovery {
   const _ReachabilityDiscovery();
 
   @override
-  Future<List<DeviceObservation>> discover(
+  Future<DeviceDiscoveryResult> discover(
     ScanPlan plan,
     ScanCancellationToken cancellationToken,
-  ) async => const [
-    DeviceObservation(
-      id: 'device-192.168.1.4',
-      ipAddress: '192.168.1.4',
-      displayName: 'Erişilebilir ağ cihazı',
-      macStatus: MacStatus.notObserved,
-      services: [],
-      discoveryMethod: 'Ağ erişilebilirlik kontrolü',
-      evidence: [
-        DeviceEvidence(
-          source: DeviceEvidenceSource.reachability,
-          description: 'Cihaz erişilebilirlik kontrolüne yanıt verdi',
-        ),
-      ],
-    ),
-  ];
+  ) async => const DeviceDiscoveryResult(
+    devices: [
+      DeviceObservation(
+        id: 'device-192.168.1.4',
+        ipAddress: '192.168.1.4',
+        displayName: 'Erişilebilir ağ cihazı',
+        macStatus: MacStatus.notObserved,
+        services: [],
+        discoveryMethod: 'Ağ erişilebilirlik kontrolü',
+        evidence: [
+          DeviceEvidence(
+            source: DeviceEvidenceSource.reachability,
+            description: 'Cihaz erişilebilirlik kontrolüne yanıt verdi',
+          ),
+        ],
+      ),
+    ],
+  );
 }
 
 class _TcpScanner implements DeviceScanner {
@@ -142,37 +218,39 @@ class _MdnsDiscovery implements DeviceDiscovery {
   const _MdnsDiscovery();
 
   @override
-  Future<List<DeviceObservation>> discover(
+  Future<DeviceDiscoveryResult> discover(
     ScanPlan plan,
     ScanCancellationToken cancellationToken,
-  ) async => const [
-    DeviceObservation(
-      id: 'device-192.168.1.3',
-      ipAddress: '192.168.1.3',
-      displayName: 'Ofis yazıcısı',
-      macStatus: MacStatus.notObserved,
-      services: ['_ipp._tcp.local (631)'],
-      discoveryMethod: 'mDNS',
-      evidence: [
-        DeviceEvidence(
-          source: DeviceEvidenceSource.mdns,
-          description: 'mDNS servis duyurusu: _ipp._tcp.local (631)',
-          serviceType: '_ipp._tcp.local',
-          port: 631,
-        ),
-      ],
-    ),
-  ];
+  ) async => const DeviceDiscoveryResult(
+    devices: [
+      DeviceObservation(
+        id: 'device-192.168.1.3',
+        ipAddress: '192.168.1.3',
+        displayName: 'Ofis yazıcısı',
+        macStatus: MacStatus.notObserved,
+        services: ['_ipp._tcp.local (631)'],
+        discoveryMethod: 'mDNS',
+        evidence: [
+          DeviceEvidence(
+            source: DeviceEvidenceSource.mdns,
+            description: 'mDNS servis duyurusu: _ipp._tcp.local (631)',
+            serviceType: '_ipp._tcp.local',
+            port: 631,
+          ),
+        ],
+      ),
+    ],
+  );
 }
 
 class _EmptyDiscovery implements DeviceDiscovery {
   const _EmptyDiscovery();
 
   @override
-  Future<List<DeviceObservation>> discover(
+  Future<DeviceDiscoveryResult> discover(
     ScanPlan plan,
     ScanCancellationToken cancellationToken,
-  ) async => const [];
+  ) async => const DeviceDiscoveryResult.empty();
 }
 
 class _NeighborRepository implements NeighborRepository {
