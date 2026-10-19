@@ -13,10 +13,16 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.net.Inet4Address
 import java.net.InetAddress
+import java.net.NetworkInterface
+import java.util.concurrent.CancellationException
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : FlutterActivity() {
     private var multicastLock: WifiManager.MulticastLock? = null
+    private val reachabilityJobs = ConcurrentHashMap<String, ReachabilityJob>()
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -31,12 +37,19 @@ class MainActivity : FlutterActivity() {
                 "releaseMulticastLock" -> releaseMulticastLock(result)
                 "getNeighborSnapshot" -> readNeighborSnapshot(result)
                 "discoverReachableHosts" -> discoverReachableHosts(call, result)
+                "cancelReachability" -> cancelReachability(call, result)
                 else -> result.notImplemented()
             }
         }
     }
 
     override fun onDestroy() {
+        reachabilityJobs.values.forEach { job ->
+            job.cancelled.set(true)
+            job.completed.set(true)
+            job.executor.shutdownNow()
+        }
+        reachabilityJobs.clear()
         releaseMulticastLock(null)
         super.onDestroy()
     }
@@ -91,11 +104,38 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun discoverReachableHosts(call: MethodCall, result: MethodChannel.Result) {
+        val requestId = call.argument<String>("requestId")
+        if (requestId.isNullOrBlank() || requestId.length > 128) {
+            result.error(
+                "INVALID_REACHABILITY_REQUEST",
+                "Erişilebilirlik isteği geçersiz.",
+                null,
+            )
+            return
+        }
         val rawTargets = call.argument<List<*>>("targets")
         if (rawTargets == null || rawTargets.size > MAX_REACHABILITY_TARGETS) {
             result.error(
                 "INVALID_REACHABILITY_TARGETS",
                 "Erişilebilirlik hedefleri geçersiz.",
+                null,
+            )
+            return
+        }
+        val sourceAddress = call.argument<String>("sourceAddress")
+        val sourceInterface = try {
+            sourceAddress
+                ?.takeIf(IPV4_PATTERN::matches)
+                ?.let(InetAddress::getByName)
+                ?.takeIf { it is Inet4Address && it.isSiteLocalAddress }
+                ?.let(NetworkInterface::getByInetAddress)
+        } catch (_: Exception) {
+            null
+        }
+        if (sourceInterface == null) {
+            result.error(
+                "INVALID_REACHABILITY_SOURCE",
+                "Erişilebilirlik kaynağı geçersiz.",
                 null,
             )
             return
@@ -125,16 +165,34 @@ class MainActivity : FlutterActivity() {
         }
 
         val mainHandler = Handler(Looper.getMainLooper())
-        Thread({
-            val executor = Executors.newFixedThreadPool(
-                minOf(REACHABILITY_WORKERS, targets.size),
+        val executor = Executors.newFixedThreadPool(
+            minOf(REACHABILITY_WORKERS, targets.size),
+        )
+        val job = ReachabilityJob(
+            executor = executor,
+            cancelled = AtomicBoolean(false),
+            completed = AtomicBoolean(false),
+            result = result,
+        )
+        if (reachabilityJobs.putIfAbsent(requestId, job) != null) {
+            executor.shutdownNow()
+            result.error(
+                "DUPLICATE_REACHABILITY_REQUEST",
+                "Erişilebilirlik isteği zaten çalışıyor.",
+                null,
             )
+            return
+        }
+        Thread({
             try {
                 val checks = targets.associateWith { target ->
                     executor.submit<Boolean> {
+                        if (job.cancelled.get()) {
+                            return@submit false
+                        }
                         try {
                             InetAddress.getByName(target).isReachable(
-                                null,
+                                sourceInterface,
                                 REACHABILITY_TTL,
                                 timeoutMillis,
                             )
@@ -143,22 +201,65 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                 }
-                val reachable = checks.mapNotNull { (target, check) ->
-                    if (check.get()) target else null
+                val reachable = mutableListOf<String>()
+                for ((target, check) in checks) {
+                    if (job.cancelled.get()) {
+                        break
+                    }
+                    try {
+                        if (check.get()) {
+                            reachable.add(target)
+                        }
+                    } catch (_: CancellationException) {
+                        break
+                    } catch (_: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                        break
+                    }
                 }
-                mainHandler.post { result.success(reachable) }
+                completeReachability(job, mainHandler) {
+                    job.result.success(if (job.cancelled.get()) emptyList<String>() else reachable)
+                }
             } catch (_: Exception) {
-                mainHandler.post {
-                    result.error(
-                        "REACHABILITY_FAILED",
-                        "Yerel ağ erişilebilirlik kontrolü tamamlanamadı.",
-                        null,
-                    )
+                completeReachability(job, mainHandler) {
+                    if (job.cancelled.get()) {
+                        job.result.success(emptyList<String>())
+                    } else {
+                        job.result.error(
+                            "REACHABILITY_FAILED",
+                            "Yerel ağ erişilebilirlik kontrolü tamamlanamadı.",
+                            null,
+                        )
+                    }
                 }
             } finally {
                 executor.shutdownNow()
+                reachabilityJobs.remove(requestId, job)
             }
         }, "SpyDevDet-Reachability").start()
+    }
+
+    private fun cancelReachability(call: MethodCall, result: MethodChannel.Result) {
+        val requestId = call.argument<String>("requestId")
+        val job = requestId?.let(reachabilityJobs::get)
+        if (job != null) {
+            job.cancelled.set(true)
+            job.executor.shutdownNow()
+            completeReachability(job, Handler(Looper.getMainLooper())) {
+                job.result.success(emptyList<String>())
+            }
+        }
+        result.success(null)
+    }
+
+    private fun completeReachability(
+        job: ReachabilityJob,
+        mainHandler: Handler,
+        callback: () -> Unit,
+    ) {
+        if (job.completed.compareAndSet(false, true)) {
+            mainHandler.post(callback)
+        }
     }
 
     private fun readNetworkSnapshot(result: MethodChannel.Result) {
@@ -233,4 +334,11 @@ class MainActivity : FlutterActivity() {
         val IPV4_PATTERN = Regex("^(?:\\d{1,3}\\.){3}\\d{1,3}$")
         val MAC_PATTERN = Regex("^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
     }
+
+    private data class ReachabilityJob(
+        val executor: ExecutorService,
+        val cancelled: AtomicBoolean,
+        val completed: AtomicBoolean,
+        val result: MethodChannel.Result,
+    )
 }

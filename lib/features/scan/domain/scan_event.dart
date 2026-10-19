@@ -40,14 +40,21 @@ class DeviceObserved extends ScanEvent {
 }
 
 class ScanCompleted extends ScanEvent {
-  const ScanCompleted({required this.completedTargets, required this.elapsed});
+  const ScanCompleted({
+    required this.completedTargets,
+    required this.elapsed,
+    this.metrics = const DiscoveryMetrics(),
+  });
 
   final int completedTargets;
   final Duration elapsed;
+  final DiscoveryMetrics metrics;
 }
 
 class ScanCancelled extends ScanEvent {
-  const ScanCancelled();
+  const ScanCancelled({this.metrics = const DiscoveryMetrics()});
+
+  final DiscoveryMetrics metrics;
 }
 
 class ScanFailed extends ScanEvent {

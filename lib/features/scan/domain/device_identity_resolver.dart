@@ -6,7 +6,13 @@ import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
 class DeviceIdentityResolver {
   const DeviceIdentityResolver();
 
-  String resolve(DeviceObservation device, {required String networkKey}) {
+  String resolve(DeviceObservation device, {required String networkKey}) =>
+      candidateKeys(device, networkKey: networkKey).first;
+
+  List<String> candidateKeys(
+    DeviceObservation device, {
+    required String networkKey,
+  }) {
     final isLocalDevice = device.evidence.any(
       (item) =>
           item.source == DeviceEvidenceSource.network &&
@@ -15,39 +21,46 @@ class DeviceIdentityResolver {
     if (isLocalDevice) {
       // The database is local to this installation, so this reserved key stays
       // stable when DHCP changes the phone or computer's local IP address.
-      return 'local:this-installation';
+      return const ['local:this-installation'];
     }
 
+    final keys = <String>{};
     final rawMac = device.macAddress;
     if (rawMac != null) {
       final mac = MacAddress.tryParse(rawMac);
       if (mac != null && !mac.isLocallyAdministered) {
-        return 'mac:${mac.value}';
+        keys.add('mac:${mac.value}');
       }
     }
 
     final ssdpIdentifier = _identifierFor(device, DeviceEvidenceSource.ssdp);
     final onvifIdentifier = _identifierFor(device, DeviceEvidenceSource.onvif);
     if (onvifIdentifier != null) {
-      return 'onvif:$onvifIdentifier';
+      keys.add('onvif:$onvifIdentifier');
     }
     if (ssdpIdentifier != null) {
-      return 'ssdp:$ssdpIdentifier';
+      keys.add('ssdp:$ssdpIdentifier');
     }
 
     final mdnsIdentifier = _identifierFor(device, DeviceEvidenceSource.mdns);
     if (mdnsIdentifier != null) {
       // mDNS instance names are not globally unique and can repeat on another
       // home network, so keep this weaker identity scoped to the network.
-      return 'mdns:$networkKey|$mdnsIdentifier';
+      keys.add('mdns:$networkKey|$mdnsIdentifier');
     }
 
-    return 'network:$networkKey|ip:${device.ipAddress}';
+    keys.add('network:$networkKey|ip:${device.ipAddress}');
+    return List.unmodifiable(keys);
   }
 
-  String networkKey(ScanPlan plan) =>
-      '${plan.networkAddress}/${plan.network.prefixLength}|'
-      'gateway:${plan.network.gatewayIpv4 ?? '-'}';
+  String networkKey(ScanPlan plan, {String? gatewayMacAddress}) {
+    final gatewayMac = gatewayMacAddress == null
+        ? null
+        : MacAddress.tryParse(gatewayMacAddress);
+    return '${plan.networkAddress}/${plan.network.prefixLength}|'
+        'gateway:${plan.network.gatewayIpv4 ?? '-'}'
+        '${gatewayMac == null ? '' : '|gateway-mac:${gatewayMac.value}'}';
+  }
 
   String? _identifierFor(
     DeviceObservation device,

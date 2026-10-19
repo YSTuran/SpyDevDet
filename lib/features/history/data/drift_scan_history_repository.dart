@@ -17,6 +17,7 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
 
   final AppDatabase database;
   final DeviceIdentityResolver identityResolver;
+  static const _weakIdentityReuseWindow = Duration(days: 7);
 
   @override
   Future<List<DeviceObservation>> recordCompletedScan(
@@ -27,12 +28,16 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
       final decoratedDevices = <DeviceObservation>[];
 
       for (final device in record.devices) {
-        final stableKey = identityResolver.resolve(
+        final candidateKeys = identityResolver.candidateKeys(
           device,
           networkKey: record.networkKey,
         );
+        final stableKey = await _resolveStableKey(
+          candidateKeys,
+          observedAt: completedAt,
+        );
         final existing = await _knownDevice(stableKey);
-        final isLocalDevice = stableKey == 'local:this-installation';
+        final isLocalDevice = candidateKeys.contains('local:this-installation');
         final familiarity = isLocalDevice || existing?.isKnown == true
             ? DeviceFamiliarity.known
             : existing == null
@@ -63,6 +68,11 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
                 vendor: Value(device.vendor),
               ),
             );
+        await _rememberIdentityAliases(
+          candidateKeys: candidateKeys,
+          stableKey: stableKey,
+          observedAt: completedAt,
+        );
       }
 
       final newDeviceCount = decoratedDevices
@@ -188,9 +198,106 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
   Future<void> clearAllData() {
     return database.transaction(() async {
       await database.delete(database.scanSessions).go();
+      await database.delete(database.deviceIdentityAliases).go();
       await database.delete(database.knownDevices).go();
     });
   }
+
+  Future<String> _resolveStableKey(
+    List<String> candidateKeys, {
+    required DateTime observedAt,
+  }) async {
+    final strongKeys = candidateKeys.where((key) => !_isWeakKey(key)).toList();
+    final weakKeys = candidateKeys.where(_isWeakKey).toList();
+    var foundExpiredWeakIdentity = false;
+
+    for (final key in strongKeys) {
+      final alias = await _identityAlias(key);
+      if (alias != null && await _knownDevice(alias.stableKey) != null) {
+        return alias.stableKey;
+      }
+      if (await _knownDevice(key) != null) {
+        return key;
+      }
+    }
+
+    for (final key in weakKeys) {
+      final alias = await _identityAlias(key);
+      if (alias != null && await _knownDevice(alias.stableKey) != null) {
+        if (_isRecent(alias.lastSeenAt, observedAt)) {
+          if (strongKeys.isEmpty ||
+              !await _hasDifferentStrongAlias(
+                alias.stableKey,
+                strongKeys.toSet(),
+              )) {
+            return alias.stableKey;
+          }
+        } else {
+          foundExpiredWeakIdentity = true;
+        }
+      }
+      final known = await _knownDevice(key);
+      if (known != null) {
+        if (_isRecent(known.lastSeenAt, observedAt)) {
+          return key;
+        }
+        foundExpiredWeakIdentity = true;
+      }
+    }
+
+    if (strongKeys.isNotEmpty) {
+      return strongKeys.first;
+    }
+    if (foundExpiredWeakIdentity) {
+      return '${candidateKeys.first}|first-seen:'
+          '${observedAt.microsecondsSinceEpoch}';
+    }
+    return candidateKeys.first;
+  }
+
+  Future<void> _rememberIdentityAliases({
+    required List<String> candidateKeys,
+    required String stableKey,
+    required DateTime observedAt,
+  }) async {
+    for (final aliasKey in candidateKeys) {
+      await database
+          .into(database.deviceIdentityAliases)
+          .insertOnConflictUpdate(
+            DeviceIdentityAliasesCompanion.insert(
+              aliasKey: aliasKey,
+              stableKey: stableKey,
+              lastSeenAt: observedAt,
+            ),
+          );
+    }
+  }
+
+  Future<DeviceIdentityAlias?> _identityAlias(String aliasKey) {
+    return (database.select(
+      database.deviceIdentityAliases,
+    )..where((table) => table.aliasKey.equals(aliasKey))).getSingleOrNull();
+  }
+
+  Future<bool> _hasDifferentStrongAlias(
+    String stableKey,
+    Set<String> currentStrongKeys,
+  ) async {
+    final aliases = await (database.select(
+      database.deviceIdentityAliases,
+    )..where((table) => table.stableKey.equals(stableKey))).get();
+    return aliases.any(
+      (alias) =>
+          !_isWeakKey(alias.aliasKey) &&
+          !currentStrongKeys.contains(alias.aliasKey),
+    );
+  }
+
+  bool _isWeakKey(String key) =>
+      key.startsWith('network:') || key.startsWith('mdns:');
+
+  bool _isRecent(DateTime lastSeenAt, DateTime observedAt) =>
+      observedAt.difference(lastSeenAt) <= _weakIdentityReuseWindow;
 
   Future<KnownDevice?> _knownDevice(String stableKey) {
     return (database.select(

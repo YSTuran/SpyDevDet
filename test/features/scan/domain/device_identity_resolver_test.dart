@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:spy_dev_det/features/network/domain/network_snapshot.dart';
 import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/device_identity_resolver.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
 
 void main() {
   test('yerel cihazın kimliği DHCP adresinden bağımsızdır', () {
@@ -136,6 +138,54 @@ void main() {
     expect(
       resolver.resolve(device, networkKey: '192.168.1.0/24'),
       'onvif:urn:uuid:onvif-device',
+    );
+  });
+
+  test('bütün kimlik adaylarını güçlüden zayıfa sıralar', () {
+    const device = DeviceObservation(
+      id: 'multi-identity',
+      ipAddress: '192.168.1.40',
+      displayName: 'Cihaz',
+      macAddress: 'B8:27:EB:12:34:56',
+      macStatus: MacStatus.available,
+      services: [],
+      evidence: [
+        DeviceEvidence(
+          source: DeviceEvidenceSource.onvif,
+          description: 'ONVIF',
+          identifier: 'urn:uuid:onvif-device',
+        ),
+        DeviceEvidence(
+          source: DeviceEvidenceSource.ssdp,
+          description: 'SSDP',
+          identifier: 'uuid:ssdp-device',
+        ),
+      ],
+    );
+
+    expect(resolver.candidateKeys(device, networkKey: 'network-a'), [
+      'mac:B8:27:EB:12:34:56',
+      'onvif:urn:uuid:onvif-device',
+      'ssdp:uuid:ssdp-device',
+      'network:network-a|ip:192.168.1.40',
+    ]);
+  });
+
+  test('ağ geçidi MAC adresini ağ parmak izine ekler', () {
+    final plan = ScanPlan.fromNetwork(
+      const NetworkSnapshot(
+        localIpv4: '192.168.1.20',
+        prefixLength: 24,
+        interfaceName: 'test',
+        gatewayIpv4: '192.168.1.1',
+        isWifi: true,
+        isVpn: false,
+      ),
+    );
+
+    expect(
+      resolver.networkKey(plan, gatewayMacAddress: 'B8:27:EB:12:34:56'),
+      '192.168.1.0/24|gateway:192.168.1.1|gateway-mac:B8:27:EB:12:34:56',
     );
   });
 }

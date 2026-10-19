@@ -27,8 +27,14 @@ void main() {
     );
 
     final events = await scanner.scan(plan, token).toList();
+    final completed = events.whereType<ScanCompleted>().single;
 
-    expect(events.whereType<ScanCompleted>(), hasLength(1));
+    expect(completed.metrics.attemptedTargets, 1);
+    expect(completed.metrics.sentRequests, 8);
+    expect(
+      completed.metrics.receivedResponses + completed.metrics.timeoutCount,
+      lessThanOrEqualTo(8),
+    );
     expect(token.isCancelled, isFalse);
   });
 

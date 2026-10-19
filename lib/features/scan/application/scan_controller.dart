@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:spy_dev_det/features/history/application/history_providers.dart';
 import 'package:spy_dev_det/features/history/domain/scan_history_repository.dart';
 import 'package:spy_dev_det/features/network/data/native_network_info_repository.dart';
 import 'package:spy_dev_det/features/network/domain/ipv4_address.dart';
 import 'package:spy_dev_det/features/network/domain/network_info_repository.dart';
+import 'package:spy_dev_det/features/network/domain/network_snapshot.dart';
 import 'package:spy_dev_det/features/scan/application/scan_state.dart';
 import 'package:spy_dev_det/features/scan/data/local_network_device_scanner.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
@@ -29,11 +32,15 @@ final scanControllerProvider = NotifierProvider<ScanController, ScanState>(
 class ScanController extends Notifier<ScanState> {
   int _runId = 0;
   ScanCancellationToken? _cancellationToken;
+  Timer? _networkMonitor;
+  bool _networkCheckInProgress = false;
+  int _networkCheckFailures = 0;
 
   @override
   ScanState build() {
     ref.onDispose(() {
       _runId++;
+      _networkMonitor?.cancel();
       _cancellationToken?.cancel();
     });
     return const ScanState.idle();
@@ -47,6 +54,7 @@ class ScanController extends Notifier<ScanState> {
     final runId = ++_runId;
     _cancellationToken?.cancel();
     _cancellationToken = null;
+    _networkCheckInProgress = false;
     state = const ScanState(
       phase: ScanPhase.preparing,
       progress: 0,
@@ -67,6 +75,7 @@ class ScanController extends Notifier<ScanState> {
       final plan = ScanPlan.fromNetwork(network);
       final cancellationToken = ScanCancellationToken();
       _cancellationToken = cancellationToken;
+      _startNetworkMonitor(runId, network);
       final startedAt = DateTime.now();
       state = ScanState(
         phase: ScanPhase.scanning,
@@ -88,6 +97,13 @@ class ScanController extends Notifier<ScanState> {
         }
         _handleEvent(event);
         if (event is ScanCompleted) {
+          _networkMonitor?.cancel();
+          if (!await _networkStillMatches(network)) {
+            if (runId == _runId) {
+              _invalidateScanForNetworkChange();
+            }
+            return;
+          }
           await _persistCompletedScan(plan: plan, event: event, runId: runId);
         }
       }
@@ -105,22 +121,103 @@ class ScanController extends Notifier<ScanState> {
       }
     } finally {
       if (runId == _runId) {
+        _networkMonitor?.cancel();
+        _networkMonitor = null;
         _cancellationToken = null;
       }
     }
   }
 
-  void cancelScan() {
+  void cancelScan({
+    String message = 'Tarama kullanıcı tarafından iptal edildi',
+  }) {
     if (!state.canCancel) {
       return;
     }
 
     _runId++;
+    _networkMonitor?.cancel();
+    _networkMonitor = null;
     _cancellationToken?.cancel();
     _cancellationToken = null;
     state = state.copyWith(
       phase: ScanPhase.cancelled,
-      statusMessage: 'Tarama kullanıcı tarafından iptal edildi',
+      statusMessage: message,
+      report: state.report?.cancelRunning(),
+    );
+  }
+
+  void _startNetworkMonitor(int runId, NetworkSnapshot expected) {
+    _networkMonitor?.cancel();
+    _networkCheckInProgress = false;
+    _networkCheckFailures = 0;
+    _networkMonitor = Timer.periodic(const Duration(seconds: 2), (_) {
+      unawaited(_verifyNetworkDuringScan(runId, expected));
+    });
+  }
+
+  Future<void> _verifyNetworkDuringScan(
+    int runId,
+    NetworkSnapshot expected,
+  ) async {
+    if (_networkCheckInProgress || runId != _runId || !state.canCancel) {
+      return;
+    }
+    _networkCheckInProgress = true;
+    try {
+      final current = await ref
+          .read(networkInfoRepositoryProvider)
+          .getCurrentNetwork();
+      if (runId != _runId) {
+        return;
+      }
+      if (_sameNetwork(expected, current)) {
+        _networkCheckFailures = 0;
+      } else {
+        _invalidateScanForNetworkChange();
+      }
+    } on Object {
+      if (runId == _runId) {
+        _networkCheckFailures++;
+        if (_networkCheckFailures >= 2) {
+          _invalidateScanForNetworkChange();
+        }
+      }
+    } finally {
+      _networkCheckInProgress = false;
+    }
+  }
+
+  Future<bool> _networkStillMatches(NetworkSnapshot expected) async {
+    try {
+      final current = await ref
+          .read(networkInfoRepositoryProvider)
+          .getCurrentNetwork();
+      return _sameNetwork(expected, current);
+    } on Object {
+      return false;
+    }
+  }
+
+  bool _sameNetwork(NetworkSnapshot first, NetworkSnapshot second) =>
+      first.localIpv4 == second.localIpv4 &&
+      first.prefixLength == second.prefixLength &&
+      first.interfaceName == second.interfaceName &&
+      first.gatewayIpv4 == second.gatewayIpv4 &&
+      first.isWifi == second.isWifi &&
+      first.isEthernet == second.isEthernet &&
+      first.isVpn == second.isVpn;
+
+  void _invalidateScanForNetworkChange() {
+    _runId++;
+    _networkMonitor?.cancel();
+    _networkMonitor = null;
+    _cancellationToken?.cancel();
+    _cancellationToken = null;
+    state = state.copyWith(
+      phase: ScanPhase.failed,
+      statusMessage:
+          'Ağ bağlantısı tarama sırasında değişti. Sonuçlar kaydedilmedi.',
       report: state.report?.cancelRunning(),
     );
   }
@@ -249,9 +346,13 @@ class ScanController extends Notifier<ScanState> {
     }
     try {
       final repository = ref.read(scanHistoryRepositoryProvider);
+      final gatewayMacAddress = _gatewayMacAddress(plan);
       final devices = await repository.recordCompletedScan(
         CompletedScanRecord(
-          networkKey: const DeviceIdentityResolver().networkKey(plan),
+          networkKey: const DeviceIdentityResolver().networkKey(
+            plan,
+            gatewayMacAddress: gatewayMacAddress,
+          ),
           report: report,
           elapsed: event.elapsed,
           devices: state.devices,
@@ -280,6 +381,16 @@ class ScanController extends Notifier<ScanState> {
         );
       }
     }
+  }
+
+  String? _gatewayMacAddress(ScanPlan plan) {
+    for (final device in state.devices) {
+      if (device.ipAddress == plan.network.gatewayIpv4 &&
+          device.macStatus == MacStatus.available) {
+        return device.macAddress;
+      }
+    }
+    return null;
   }
 
   Future<void> updateDeviceProfile({

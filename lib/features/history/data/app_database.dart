@@ -18,6 +18,20 @@ class KnownDevices extends Table {
   Set<Column<Object>> get primaryKey => {stableKey};
 }
 
+@DataClassName('DeviceIdentityAlias')
+class DeviceIdentityAliases extends Table {
+  TextColumn get aliasKey => text()();
+  TextColumn get stableKey => text().references(
+    KnownDevices,
+    #stableKey,
+    onDelete: KeyAction.cascade,
+  )();
+  DateTimeColumn get lastSeenAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {aliasKey};
+}
+
 class ScanSessions extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get networkKey => text()();
@@ -51,17 +65,24 @@ class ScanObservations extends Table {
   BoolColumn get wasNew => boolean()();
 }
 
-@DriftDatabase(tables: [KnownDevices, ScanSessions, ScanObservations])
+@DriftDatabase(
+  tables: [KnownDevices, DeviceIdentityAliases, ScanSessions, ScanObservations],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(driftDatabase(name: 'spydevdet_history'));
 
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: (migrator, from, to) async {
+      if (from < 2) {
+        await migrator.createTable(deviceIdentityAliases);
+      }
+    },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
     },

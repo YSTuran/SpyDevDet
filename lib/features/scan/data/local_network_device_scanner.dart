@@ -245,7 +245,7 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
               phase: DiscoveryMethodPhase.completed,
               deviceCount: addresses.length,
               elapsed: stopwatch.elapsed,
-              metrics: _tcpMetrics(plan, addresses.length, completedTargets),
+              metrics: event.metrics,
             );
           case ScanCancelled():
             terminalEventReceived = true;
@@ -254,7 +254,7 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
               phase: DiscoveryMethodPhase.cancelled,
               deviceCount: addresses.length,
               elapsed: stopwatch.elapsed,
-              metrics: _tcpMetrics(plan, addresses.length, completedTargets),
+              metrics: event.metrics,
             );
           case ScanFailed():
             terminalEventReceived = true;

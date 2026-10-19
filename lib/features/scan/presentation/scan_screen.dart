@@ -11,11 +11,43 @@ import 'package:spy_dev_det/features/scan/domain/service_catalog.dart';
 import 'package:spy_dev_det/features/scan/presentation/scan_diagnostics_screen.dart';
 import 'package:spy_dev_det/features/history/presentation/history_screen.dart';
 
-class ScanScreen extends ConsumerWidget {
+class ScanScreen extends ConsumerStatefulWidget {
   const ScanScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ScanScreen> createState() => _ScanScreenState();
+}
+
+class _ScanScreenState extends ConsumerState<ScanScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      ref
+          .read(scanControllerProvider.notifier)
+          .cancelScan(
+            message:
+                'Tarama uygulama arka plana geçtiği için güvenli biçimde durduruldu',
+          );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final scanState = ref.watch(scanControllerProvider);
     final controller = ref.read(scanControllerProvider.notifier);
 

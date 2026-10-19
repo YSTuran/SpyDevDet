@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class MacAddress {
@@ -94,41 +95,11 @@ class AssetMacVendorRepository implements MacVendorLookup {
   Future<MacVendorDatabaseStatus> _loadFromAsset() async {
     try {
       final source = await rootBundle.loadString(assetPath);
-      final prefix24 = <int, String>{};
-      final prefix28 = <int, String>{};
-      final prefix36 = <int, String>{};
-      String? snapshotDate;
-      for (final line in source.split(RegExp(r'\r?\n'))) {
-        if (line.startsWith('# Updated:')) {
-          snapshotDate = line
-              .substring('# Updated:'.length)
-              .trim()
-              .split('T')
-              .first;
-          continue;
-        }
-        if (line.isEmpty || line.startsWith('#')) {
-          continue;
-        }
-        final columns = line.split('\t');
-        if (columns.length != 3) {
-          continue;
-        }
-        final length = int.tryParse(columns[0]);
-        final prefix = int.tryParse(columns[1], radix: 16);
-        final vendor = columns[2].trim();
-        if (length == null || prefix == null || vendor.isEmpty) {
-          continue;
-        }
-        switch (length) {
-          case 24:
-            prefix24[prefix] = vendor;
-          case 28:
-            prefix28[prefix] = vendor;
-          case 36:
-            prefix36[prefix] = vendor;
-        }
-      }
+      final parsed = await compute(_parseOuiRegistry, source);
+      final prefix24 = (parsed['prefix24']! as Map).cast<int, String>();
+      final prefix28 = (parsed['prefix28']! as Map).cast<int, String>();
+      final prefix36 = (parsed['prefix36']! as Map).cast<int, String>();
+      final snapshotDate = parsed['snapshotDate'] as String?;
       final entryCount = prefix24.length + prefix28.length + prefix36.length;
       if (entryCount < 1000) {
         return const MacVendorDatabaseStatus(
@@ -167,4 +138,48 @@ class AssetMacVendorRepository implements MacVendorLookup {
         _prefix24[value >> 24] ??
         fallback.lookup(address);
   }
+}
+
+Map<String, Object?> _parseOuiRegistry(String source) {
+  final prefix24 = <int, String>{};
+  final prefix28 = <int, String>{};
+  final prefix36 = <int, String>{};
+  String? snapshotDate;
+  for (final line in source.split(RegExp(r'\r?\n'))) {
+    if (line.startsWith('# Updated:')) {
+      snapshotDate = line
+          .substring('# Updated:'.length)
+          .trim()
+          .split('T')
+          .first;
+      continue;
+    }
+    if (line.isEmpty || line.startsWith('#')) {
+      continue;
+    }
+    final columns = line.split('\t');
+    if (columns.length != 3) {
+      continue;
+    }
+    final length = int.tryParse(columns[0]);
+    final prefix = int.tryParse(columns[1], radix: 16);
+    final vendor = columns[2].trim();
+    if (length == null || prefix == null || vendor.isEmpty) {
+      continue;
+    }
+    switch (length) {
+      case 24:
+        prefix24[prefix] = vendor;
+      case 28:
+        prefix28[prefix] = vendor;
+      case 36:
+        prefix36[prefix] = vendor;
+    }
+  }
+  return {
+    'prefix24': prefix24,
+    'prefix28': prefix28,
+    'prefix36': prefix36,
+    'snapshotDate': snapshotDate,
+  };
 }

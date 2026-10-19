@@ -1,18 +1,25 @@
 #include <winsock2.h>
 #include <iphlpapi.h>
+#include <iptypes.h>
+#include <icmpapi.h>
 #include <ws2tcpip.h>
 
 #include "network_info_channel.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <cstdint>
 #include <cwctype>
-#include <limits>
 #include <iomanip>
+#include <limits>
+#include <memory>
+#include <mutex>
 #include <optional>
 #include <sstream>
 #include <string>
+#include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include <flutter/standard_method_codec.h>
@@ -24,6 +31,20 @@ namespace {
 constexpr char kChannelName[] = "yusufs.turan.spydevdet/network_info";
 constexpr char kGetNetworkSnapshot[] = "getNetworkSnapshot";
 constexpr char kGetNeighborSnapshot[] = "getNeighborSnapshot";
+constexpr char kDiscoverReachableHosts[] = "discoverReachableHosts";
+constexpr char kCancelReachability[] = "cancelReachability";
+constexpr size_t kMaxReachabilityTargets = 254;
+constexpr size_t kReachabilityWorkers = 32;
+constexpr int kMinReachabilityTimeoutMs = 100;
+constexpr int kMaxReachabilityTimeoutMs = 2000;
+
+struct ReachabilityJob {
+  std::atomic_bool cancelled{false};
+};
+
+std::mutex g_reachability_mutex;
+std::unordered_map<std::string, std::shared_ptr<ReachabilityJob>>
+    g_reachability_jobs;
 
 struct NetworkCandidate {
   std::string local_ipv4;
@@ -43,6 +64,199 @@ bool IsPrivateIpv4(const sockaddr_in* address) {
   const uint8_t second = static_cast<uint8_t>((host >> 16) & 0xff);
   return first == 10 || (first == 172 && second >= 16 && second <= 31) ||
          (first == 192 && second == 168);
+}
+
+bool ParsePrivateIpv4(const std::string& value, IN_ADDR* address) {
+  if (InetPtonA(AF_INET, value.c_str(), address) != 1) {
+    return false;
+  }
+  sockaddr_in socket_address = {};
+  socket_address.sin_family = AF_INET;
+  socket_address.sin_addr = *address;
+  return IsPrivateIpv4(&socket_address);
+}
+
+std::optional<std::string> StringArgument(const flutter::EncodableMap& map,
+                                          const char* name) {
+  const auto iterator = map.find(flutter::EncodableValue(name));
+  if (iterator == map.end()) {
+    return std::nullopt;
+  }
+  const auto* value = std::get_if<std::string>(&iterator->second);
+  if (value == nullptr || value->empty()) {
+    return std::nullopt;
+  }
+  return *value;
+}
+
+int IntArgument(const flutter::EncodableMap& map, const char* name,
+                int fallback) {
+  const auto iterator = map.find(flutter::EncodableValue(name));
+  if (iterator == map.end()) {
+    return fallback;
+  }
+  if (const auto* value = std::get_if<int32_t>(&iterator->second)) {
+    return *value;
+  }
+  if (const auto* value = std::get_if<int64_t>(&iterator->second)) {
+    return static_cast<int>(std::clamp<int64_t>(
+        *value, std::numeric_limits<int>::min(),
+        std::numeric_limits<int>::max()));
+  }
+  return fallback;
+}
+
+std::optional<std::vector<std::string>> ReachabilityTargets(
+    const flutter::EncodableMap& map) {
+  const auto iterator = map.find(flutter::EncodableValue("targets"));
+  if (iterator == map.end()) {
+    return std::nullopt;
+  }
+  const auto* values = std::get_if<flutter::EncodableList>(&iterator->second);
+  if (values == nullptr || values->size() > kMaxReachabilityTargets) {
+    return std::nullopt;
+  }
+  std::vector<std::string> targets;
+  targets.reserve(values->size());
+  for (const auto& value : *values) {
+    const auto* target = std::get_if<std::string>(&value);
+    IN_ADDR address = {};
+    if (target != nullptr && ParsePrivateIpv4(*target, &address) &&
+        std::find(targets.begin(), targets.end(), *target) == targets.end()) {
+      targets.push_back(*target);
+    }
+  }
+  return targets;
+}
+
+bool SendIcmpEcho(HANDLE handle, ULONG source_address,
+                  const std::string& target, int timeout_millis) {
+  IN_ADDR destination = {};
+  if (!ParsePrivateIpv4(target, &destination)) {
+    return false;
+  }
+  constexpr char request_data[] = "SpyDevDet";
+  std::vector<unsigned char> reply(sizeof(ICMP_ECHO_REPLY) + 64);
+  const DWORD reply_count = IcmpSendEcho2Ex(
+      handle, nullptr, nullptr, nullptr, source_address,
+      destination.S_un.S_addr,
+      const_cast<char*>(request_data),
+      static_cast<WORD>(sizeof(request_data) - 1), nullptr, reply.data(),
+      static_cast<DWORD>(reply.size()), static_cast<DWORD>(timeout_millis));
+  if (reply_count == 0) {
+    return false;
+  }
+  const auto* echo_reply =
+      reinterpret_cast<const ICMP_ECHO_REPLY*>(reply.data());
+  return echo_reply->Status == IP_SUCCESS;
+}
+
+void StartReachability(
+    const flutter::MethodCall<flutter::EncodableValue>& call,
+    std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+  const auto* arguments =
+      std::get_if<flutter::EncodableMap>(call.arguments());
+  if (arguments == nullptr) {
+    result->Error("INVALID_REACHABILITY_REQUEST",
+                  "Erişilebilirlik isteği geçersiz.");
+    return;
+  }
+  const auto request_id = StringArgument(*arguments, "requestId");
+  const auto source_address_value = StringArgument(*arguments, "sourceAddress");
+  const auto targets = ReachabilityTargets(*arguments);
+  IN_ADDR source_address = {};
+  if (!request_id.has_value() || request_id->size() > 128 ||
+      !source_address_value.has_value() ||
+      !ParsePrivateIpv4(*source_address_value, &source_address) ||
+      !targets.has_value()) {
+    result->Error("INVALID_REACHABILITY_REQUEST",
+                  "Erişilebilirlik isteği geçersiz.");
+    return;
+  }
+  const int timeout_millis = std::clamp(
+      IntArgument(*arguments, "timeoutMillis", 500),
+      kMinReachabilityTimeoutMs, kMaxReachabilityTimeoutMs);
+  const auto job = std::make_shared<ReachabilityJob>();
+  {
+    std::lock_guard<std::mutex> lock(g_reachability_mutex);
+    if (g_reachability_jobs.find(*request_id) != g_reachability_jobs.end()) {
+      result->Error("DUPLICATE_REACHABILITY_REQUEST",
+                    "Erişilebilirlik isteği zaten çalışıyor.");
+      return;
+    }
+    g_reachability_jobs[*request_id] = job;
+  }
+
+  std::thread([request_id = *request_id, targets = *targets, timeout_millis,
+               source_address = source_address.S_un.S_addr, job,
+               result = std::move(result)]() mutable {
+    std::atomic_size_t next_target{0};
+    std::mutex reachable_mutex;
+    std::vector<std::string> reachable;
+    const size_t worker_count =
+        std::min(kReachabilityWorkers, targets.size());
+    std::vector<std::thread> workers;
+    workers.reserve(worker_count);
+    for (size_t worker = 0; worker < worker_count; ++worker) {
+      workers.emplace_back([&]() {
+        const HANDLE icmp_handle = IcmpCreateFile();
+        if (icmp_handle == INVALID_HANDLE_VALUE) {
+          return;
+        }
+        while (!job->cancelled.load()) {
+          const size_t index = next_target.fetch_add(1);
+          if (index >= targets.size()) {
+            break;
+          }
+          if (SendIcmpEcho(icmp_handle, source_address, targets[index],
+                           timeout_millis)) {
+            std::lock_guard<std::mutex> lock(reachable_mutex);
+            reachable.push_back(targets[index]);
+          }
+        }
+        IcmpCloseHandle(icmp_handle);
+      });
+    }
+    for (auto& worker : workers) {
+      worker.join();
+    }
+
+    {
+      std::lock_guard<std::mutex> lock(g_reachability_mutex);
+      const auto iterator = g_reachability_jobs.find(request_id);
+      if (iterator != g_reachability_jobs.end() &&
+          iterator->second == job) {
+        g_reachability_jobs.erase(iterator);
+      }
+    }
+
+    flutter::EncodableList response;
+    if (!job->cancelled.load()) {
+      std::sort(reachable.begin(), reachable.end());
+      for (const auto& target : reachable) {
+        response.emplace_back(target);
+      }
+    }
+    result->Success(flutter::EncodableValue(response));
+  }).detach();
+}
+
+void CancelReachability(
+    const flutter::MethodCall<flutter::EncodableValue>& call,
+    std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+  const auto* arguments =
+      std::get_if<flutter::EncodableMap>(call.arguments());
+  const auto request_id = arguments == nullptr
+                              ? std::nullopt
+                              : StringArgument(*arguments, "requestId");
+  if (request_id.has_value()) {
+    std::lock_guard<std::mutex> lock(g_reachability_mutex);
+    const auto iterator = g_reachability_jobs.find(*request_id);
+    if (iterator != g_reachability_jobs.end()) {
+      iterator->second->cancelled.store(true);
+    }
+  }
+  result->Success();
 }
 
 std::optional<std::string> Ipv4FromSockaddr(const SOCKADDR* address) {
@@ -335,6 +549,14 @@ RegisterNetworkInfoChannel(flutter::BinaryMessenger* messenger) {
   channel->SetMethodCallHandler(
       [](const flutter::MethodCall<flutter::EncodableValue>& call,
          std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+        if (call.method_name() == kDiscoverReachableHosts) {
+          StartReachability(call, std::move(result));
+          return;
+        }
+        if (call.method_name() == kCancelReachability) {
+          CancelReachability(call, std::move(result));
+          return;
+        }
         if (call.method_name() == kGetNeighborSnapshot) {
           result->Success(flutter::EncodableValue(ReadNeighborSnapshot()));
           return;

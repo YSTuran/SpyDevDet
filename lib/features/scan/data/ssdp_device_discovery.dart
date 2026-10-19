@@ -21,6 +21,9 @@ class SsdpDeviceDiscovery implements DeviceDiscovery {
       'MAN: "ssdp:discover"\r\n'
       'MX: 1\r\n'
       'ST: ssdp:all\r\n\r\n';
+  static const _maxDatagramBytes = 16384;
+  static const _maxReceivedResponses = 512;
+  static const _maxAcceptedResponses = 128;
 
   final Duration listenDuration;
 
@@ -58,34 +61,39 @@ class SsdpDeviceDiscovery implements DeviceDiscovery {
       );
       socket.multicastHops = 1;
       subscription = socket.listen((event) {
-        if (event != RawSocketEvent.read || observations.length >= 128) {
+        if (event != RawSocketEvent.read) {
           return;
         }
-        final datagram = socket?.receive();
-        if (datagram == null) {
-          return;
+        Datagram? datagram;
+        while ((datagram = socket?.receive()) != null) {
+          if (receivedResponses >= _maxReceivedResponses) {
+            ignoredResponses++;
+            finish();
+            break;
+          }
+          receivedResponses++;
+          final current = datagram!;
+          if (current.data.length > _maxDatagramBytes) {
+            ignoredResponses++;
+            continue;
+          }
+          final ipAddress = current.address.address;
+          if (!_isAllowed(ipAddress, plan)) {
+            ignoredResponses++;
+            continue;
+          }
+          final response = SsdpResponse.tryParse(current.data);
+          if (response == null || acceptedResponses >= _maxAcceptedResponses) {
+            ignoredResponses++;
+            continue;
+          }
+          acceptedResponses++;
+          final observation = _observation(ipAddress, response);
+          final existing = observations[ipAddress];
+          observations[ipAddress] = existing == null
+              ? observation
+              : const DeviceObservationMerger().merge(existing, observation);
         }
-        receivedResponses++;
-        if (datagram.data.length > 16384) {
-          ignoredResponses++;
-          return;
-        }
-        final ipAddress = datagram.address.address;
-        if (!_isAllowed(ipAddress, plan)) {
-          ignoredResponses++;
-          return;
-        }
-        final response = SsdpResponse.tryParse(datagram.data);
-        if (response == null) {
-          ignoredResponses++;
-          return;
-        }
-        acceptedResponses++;
-        final observation = _observation(ipAddress, response);
-        final existing = observations[ipAddress];
-        observations[ipAddress] = existing == null
-            ? observation
-            : const DeviceObservationMerger().merge(existing, observation);
       }, onError: (_) => finish());
 
       if (socket.send(

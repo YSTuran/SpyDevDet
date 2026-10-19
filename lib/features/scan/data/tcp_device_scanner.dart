@@ -8,6 +8,7 @@ import 'package:spy_dev_det/features/scan/domain/device_scanner.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_cancellation_token.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_event.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
 class TcpDeviceScanner implements DeviceScanner {
   const TcpDeviceScanner({
@@ -25,6 +26,7 @@ class TcpDeviceScanner implements DeviceScanner {
     _ProbePort(8080, 'Alternatif HTTP'),
     _ProbePort(9100, 'Yazıcı servisi'),
   ];
+  static const _androidProbeLimit = 20;
 
   final int maxConcurrentProbes;
   final Duration probeTimeout;
@@ -85,6 +87,9 @@ class TcpDeviceScanner implements DeviceScanner {
     final totalJobs = plan.targets.length * _ports.length;
     var nextJob = 0;
     var completedTargets = 0;
+    var sentRequests = 0;
+    var receivedResponses = 0;
+    var timeoutCount = 0;
 
     Future<void> worker() async {
       while (!cancellationToken.isCancelled) {
@@ -97,6 +102,7 @@ class TcpDeviceScanner implements DeviceScanner {
         final portIndex = jobIndex % _ports.length;
         final host = plan.targets[hostIndex];
         final probePort = _ports[portIndex];
+        sentRequests++;
         final probeResult = await _probe(
           host: host,
           port: probePort.number,
@@ -108,7 +114,12 @@ class TcpDeviceScanner implements DeviceScanner {
           return;
         }
 
-        if (probeResult != _ProbeResult.noResponse) {
+        if (probeResult == _ProbeResult.timeout) {
+          timeoutCount++;
+        }
+        if (probeResult == _ProbeResult.open ||
+            probeResult == _ProbeResult.rejected) {
+          receivedResponses++;
           final firstResponse = responsiveHosts.add(host);
           final openPorts = openPortsByHost.putIfAbsent(host, () => <int>{});
           if (probeResult == _ProbeResult.open) {
@@ -144,18 +155,44 @@ class TcpDeviceScanner implements DeviceScanner {
       }
     }
 
-    final workerCount = math.min(maxConcurrentProbes, totalJobs);
+    final platformConcurrency = Platform.isAndroid
+        ? math.min(maxConcurrentProbes, _androidProbeLimit)
+        : maxConcurrentProbes;
+    final workerCount = math.min(platformConcurrency, totalJobs);
     await Future.wait(List.generate(workerCount, (_) => worker()));
     stopwatch.stop();
 
     if (cancellationToken.isCancelled) {
-      controller.add(const ScanCancelled());
+      controller.add(
+        ScanCancelled(
+          metrics: DiscoveryMetrics(
+            attemptedTargets: completedTargets,
+            sentRequests: sentRequests,
+            receivedResponses: receivedResponses,
+            acceptedResponses: responsiveHosts.length,
+            timeoutCount: timeoutCount,
+            detail:
+                'Gerçek TCP bağlantı denemeleri; en fazla $workerCount eşzamanlı; '
+                'tarama iptal edildi',
+          ),
+        ),
+      );
       return;
     }
     controller.add(
       ScanCompleted(
         completedTargets: completedTargets,
         elapsed: stopwatch.elapsed,
+        metrics: DiscoveryMetrics(
+          attemptedTargets: completedTargets,
+          sentRequests: sentRequests,
+          receivedResponses: receivedResponses,
+          acceptedResponses: responsiveHosts.length,
+          timeoutCount: timeoutCount,
+          detail:
+              'Sekiz sınırlı TCP portunda gerçek bağlantı denemeleri; '
+              'en fazla $workerCount eşzamanlı',
+        ),
       ),
     );
   }
@@ -202,7 +239,7 @@ class TcpDeviceScanner implements DeviceScanner {
           ? _ProbeResult.rejected
           : _ProbeResult.noResponse;
     } on TimeoutException {
-      return _ProbeResult.noResponse;
+      return _ProbeResult.timeout;
     } finally {
       removeCancelListener();
     }
@@ -266,7 +303,7 @@ class TcpDeviceScanner implements DeviceScanner {
   }
 }
 
-enum _ProbeResult { open, rejected, noResponse }
+enum _ProbeResult { open, rejected, timeout, noResponse }
 
 class _ProbePort {
   const _ProbePort(this.number, this.service);

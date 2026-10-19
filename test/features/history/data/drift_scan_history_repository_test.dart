@@ -209,6 +209,109 @@ void main() {
     expect(saved.metrics.multicastLockAcquired, isTrue);
     expect(saved.metrics.detail, 'WS-Discovery Probe/ProbeMatch');
   });
+
+  test(
+    'sonradan bulunan güçlü kimliği mevcut cihaz profiline bağlar',
+    () async {
+      final firstRecord = _record(ipAddress: '192.168.1.20', minute: 0);
+      final first = await repository.recordCompletedScan(
+        CompletedScanRecord(
+          networkKey: firstRecord.networkKey,
+          report: firstRecord.report,
+          elapsed: firstRecord.elapsed,
+          devices: const [
+            DeviceObservation(
+              id: 'ip-only',
+              ipAddress: '192.168.1.20',
+              displayName: 'İlk gözlem',
+              macStatus: MacStatus.notObserved,
+              services: [],
+            ),
+          ],
+        ),
+      );
+      await repository.updateDeviceProfile(
+        stableKey: first.single.stableKey!,
+        isKnown: true,
+        customName: 'Salon cihazı',
+        note: null,
+      );
+
+      final withMac = await repository.recordCompletedScan(
+        _record(ipAddress: '192.168.1.20', minute: 5),
+      );
+      final afterDhcpChange = await repository.recordCompletedScan(
+        _record(ipAddress: '192.168.1.45', minute: 10),
+      );
+
+      expect(withMac.single.stableKey, first.single.stableKey);
+      expect(afterDhcpChange.single.stableKey, first.single.stableKey);
+      expect(afterDhcpChange.single.familiarity, DeviceFamiliarity.known);
+      expect(afterDhcpChange.single.effectiveDisplayName, 'Salon cihazı');
+    },
+  );
+
+  test('aynı IP adresine gelen farklı MAC cihaz profilini devralmaz', () async {
+    final first = await repository.recordCompletedScan(
+      _record(ipAddress: '192.168.1.20', minute: 0),
+    );
+    await repository.updateDeviceProfile(
+      stableKey: first.single.stableKey!,
+      isKnown: true,
+      customName: 'Eski cihaz',
+      note: null,
+    );
+
+    final replacement = await repository.recordCompletedScan(
+      _record(
+        ipAddress: '192.168.1.20',
+        minute: 5,
+        devices: const [
+          (ipAddress: '192.168.1.20', macAddress: '00:17:88:12:34:56'),
+        ],
+      ),
+    );
+
+    expect(replacement.single.stableKey, isNot(first.single.stableKey));
+    expect(replacement.single.familiarity, DeviceFamiliarity.newDevice);
+    expect(replacement.single.customName, isNull);
+  });
+
+  test('eski IP tabanlı kimlik yeni cihaza süresiz aktarılmaz', () async {
+    CompletedScanRecord ipOnlyRecord(int minute) {
+      final base = _record(ipAddress: '192.168.1.20', minute: minute);
+      return CompletedScanRecord(
+        networkKey: base.networkKey,
+        report: base.report,
+        elapsed: base.elapsed,
+        devices: const [
+          DeviceObservation(
+            id: 'ip-only',
+            ipAddress: '192.168.1.20',
+            displayName: 'Kimliği zayıf cihaz',
+            macStatus: MacStatus.notObserved,
+            services: [],
+          ),
+        ],
+      );
+    }
+
+    final first = await repository.recordCompletedScan(ipOnlyRecord(0));
+    await repository.updateDeviceProfile(
+      stableKey: first.single.stableKey!,
+      isKnown: true,
+      customName: 'Önceki cihaz',
+      note: null,
+    );
+
+    final replacement = await repository.recordCompletedScan(
+      ipOnlyRecord(8 * 24 * 60),
+    );
+
+    expect(replacement.single.stableKey, isNot(first.single.stableKey));
+    expect(replacement.single.familiarity, DeviceFamiliarity.newDevice);
+    expect(replacement.single.customName, isNull);
+  });
 }
 
 CompletedScanRecord _record({

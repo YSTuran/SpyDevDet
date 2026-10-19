@@ -84,6 +84,22 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('tarama sırasında ağ değişirse sonucu kaydetmez', (tester) async {
+    await tester.pumpWidget(_testApp(repository: _ChangingNetworkRepository()));
+
+    await tester.tap(find.text('Yerel ağı tara'));
+    for (var index = 0; index < 5; index++) {
+      await tester.pump(const Duration(milliseconds: 310));
+    }
+
+    expect(
+      find.text(
+        'Ağ bağlantısı tarama sırasında değişti. Sonuçlar kaydedilmedi.',
+      ),
+      findsOneWidget,
+    );
+  });
 }
 
 Widget _testApp({NetworkInfoRepository? repository}) {
@@ -171,6 +187,23 @@ class _FailingRepository implements NetworkInfoRepository {
     throw const NetworkInfoException(
       'WIFI_REQUIRED',
       'Yerel ağ taraması için Wi-Fi bağlantısı gereklidir.',
+    );
+  }
+}
+
+class _ChangingNetworkRepository implements NetworkInfoRepository {
+  var _requestCount = 0;
+
+  @override
+  Future<NetworkSnapshot> getCurrentNetwork() async {
+    _requestCount++;
+    return NetworkSnapshot(
+      localIpv4: _requestCount == 1 ? '192.168.1.24' : '192.168.1.25',
+      prefixLength: 24,
+      interfaceName: 'wlan0',
+      gatewayIpv4: '192.168.1.1',
+      isWifi: true,
+      isVpn: false,
     );
   }
 }

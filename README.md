@@ -21,17 +21,20 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   yerel API'lerinden alınır.
 - Yalnızca RFC1918 özel adres aralıkları taranır.
 - Tarama en fazla 254 uzak adres ve sekiz yaygın TCP portuyla sınırlıdır.
-- Android'de yerel adreslere işletim sisteminin ICMP/TCP tabanlı erişilebilirlik
-  kontrolü uygulanır. Açık bir servis portu olmasa da yanıt veren cihazlar
-  gözlemlenebilir; taramayı çalıştıran telefon ayrıca "Bu cihaz" olarak gösterilir.
+- Android ve Windows'ta yerel adreslere işletim sisteminin erişilebilirlik
+  kontrolü uygulanır. Windows tarafında sınırlı ICMP Echo kullanılır. Açık bir
+  servis portu olmasa da yanıt veren cihazlar gözlemlenebilir; taramayı
+  çalıştıran telefon veya bilgisayar ayrıca "Bu cihaz" olarak gösterilir.
 - Mobil ağ ve algılanan VPN bağlantıları üzerinden tarama engellenir.
 - TCP bağlantısı kurulduğunda socket hemen kapatılır; kimlik doğrulama veya veri
   gönderme işlemi yapılmaz.
 - TCP, erişilebilirlik, mDNS, SSDP ve ONVIF/WS-Discovery keşifleri birbirini
   beklemeden paralel çalışır; ilerleme göstergesi bütün yöntemlerin durumunu
   hesaba katar.
-- mDNS ve SSDP üzerinden yaygın yerel servis duyuruları dinlenir. SSDP'nin
-  bildirdiği konum adreslerinden içerik indirilmez.
+- mDNS üzerinden yaygın servisler ve DNS-SD servis türü duyuruları keşfedilir.
+  Yalnız model/üretici gibi sınırlı TXT alanları temizlenerek kullanılır. SSDP
+  yanıtları sayısal ve boyutsal sınırlarla işlenir; bildirilen konum
+  adreslerinden içerik indirilmez.
 - Erişilebildiği platformlarda IP komşu tablosundaki geçerli kayıtlar hem cihaz
   keşfi hem de MAC zenginleştirmesi için kullanılır. Android 10 ve üzerinin
   `/proc/net` kısıtı nedeniyle MAC tablosu okunamazsa durum açıkça
@@ -59,7 +62,13 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   Veriler bir sunucuya veya bulut hesabına gönderilmez.
 - Cihaz kimliği için IP yerine öncelikle genel MAC, ardından ONVIF endpoint,
   SSDP ve ağ kapsamındaki mDNS kimlikleri kullanılır. Güçlü kimlik yoksa ağ ve
-  IP tabanlı düşük güvenli eşleştirmeye dönülür.
+  IP tabanlı düşük güvenli eşleştirmeye dönülür. Sonradan güçlü kimlik bulunan
+  cihazlar kimlik takma adlarıyla önceki profiline bağlanır; aynı IP'yi alan
+  farklı bir güçlü kimlik eski profili devralmaz.
+- Ağ geçidinin MAC adresi edinilebildiğinde ağ parmak izine katılır. Tarama
+  sırasında yerel IP, bağdaştırıcı veya ağ geçidi değişirse sonuçlar eski ağın
+  geçmişine yazılmadan tarama durdurulur. Uygulama arka plana geçtiğinde de
+  devam eden tarama güvenli biçimde iptal edilir.
 - Kullanıcı cihazı bilinen olarak işaretleyebilir, özel ad ve not ekleyebilir.
   Sonraki taramalarda yeni, daha önce görülen ve bilinen cihazlar ayrılır.
 - TCP, mDNS, SSDP ve ONVIF aşamalarıyla birlikte erişilebilirlik veya komşu
@@ -71,6 +80,22 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
 Bu yöntemlerin hiçbiri bütün cihazları bulmayı veya bir cihazın amacını kesin
 olarak belirlemeyi garanti etmez. Özellikle "kamera adayı" etiketi, cihazın
 gizli ya da kötü amaçlı olduğu anlamına gelmez.
+
+## Gerçek cihaz kontrol listesi
+
+Her önemli APK kontrol noktasında aynı Wi-Fi ağı için en az iki ardışık tarama
+yapılması önerilir:
+
+1. Modem arayüzündeki bağlı cihaz listesini not et.
+2. Telefon, bilgisayar ve varsa televizyon/yazıcı gibi cihazlar açıkken tara.
+3. İkinci taramada cihazların "daha önce görüldü" durumunu kontrol et.
+4. Bir cihazın IP adresi değiştiğinde MAC veya servis kimliğiyle aynı profile
+   bağlanıp bağlanmadığını kontrol et.
+5. Tarama sürerken Wi-Fi'yi kapat veya başka ağa geç; sonucun kaydedilmediğini
+   doğrula.
+6. Tanılama ekranındaki gerçek TCP deneme, yanıt ve zaman aşımı sayılarını
+   kaydet. Görünmeyen cihazların uyku, güvenlik duvarı veya istemci izolasyonu
+   nedeniyle yanıt vermeyebileceğini göz önünde bulundur.
 
 ## OUI verisini güncelleme
 

@@ -591,6 +591,285 @@ class KnownDevicesCompanion extends UpdateCompanion<KnownDevice> {
   }
 }
 
+class $DeviceIdentityAliasesTable extends DeviceIdentityAliases
+    with TableInfo<$DeviceIdentityAliasesTable, DeviceIdentityAlias> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DeviceIdentityAliasesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _aliasKeyMeta = const VerificationMeta(
+    'aliasKey',
+  );
+  @override
+  late final GeneratedColumn<String> aliasKey = GeneratedColumn<String>(
+    'alias_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _stableKeyMeta = const VerificationMeta(
+    'stableKey',
+  );
+  @override
+  late final GeneratedColumn<String> stableKey = GeneratedColumn<String>(
+    'stable_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES known_devices (stable_key) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _lastSeenAtMeta = const VerificationMeta(
+    'lastSeenAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastSeenAt = GeneratedColumn<DateTime>(
+    'last_seen_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [aliasKey, stableKey, lastSeenAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'device_identity_aliases';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DeviceIdentityAlias> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('alias_key')) {
+      context.handle(
+        _aliasKeyMeta,
+        aliasKey.isAcceptableOrUnknown(data['alias_key']!, _aliasKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_aliasKeyMeta);
+    }
+    if (data.containsKey('stable_key')) {
+      context.handle(
+        _stableKeyMeta,
+        stableKey.isAcceptableOrUnknown(data['stable_key']!, _stableKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_stableKeyMeta);
+    }
+    if (data.containsKey('last_seen_at')) {
+      context.handle(
+        _lastSeenAtMeta,
+        lastSeenAt.isAcceptableOrUnknown(
+          data['last_seen_at']!,
+          _lastSeenAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_lastSeenAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {aliasKey};
+  @override
+  DeviceIdentityAlias map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DeviceIdentityAlias(
+      aliasKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}alias_key'],
+      )!,
+      stableKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}stable_key'],
+      )!,
+      lastSeenAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_seen_at'],
+      )!,
+    );
+  }
+
+  @override
+  $DeviceIdentityAliasesTable createAlias(String alias) {
+    return $DeviceIdentityAliasesTable(attachedDatabase, alias);
+  }
+}
+
+class DeviceIdentityAlias extends DataClass
+    implements Insertable<DeviceIdentityAlias> {
+  final String aliasKey;
+  final String stableKey;
+  final DateTime lastSeenAt;
+  const DeviceIdentityAlias({
+    required this.aliasKey,
+    required this.stableKey,
+    required this.lastSeenAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['alias_key'] = Variable<String>(aliasKey);
+    map['stable_key'] = Variable<String>(stableKey);
+    map['last_seen_at'] = Variable<DateTime>(lastSeenAt);
+    return map;
+  }
+
+  DeviceIdentityAliasesCompanion toCompanion(bool nullToAbsent) {
+    return DeviceIdentityAliasesCompanion(
+      aliasKey: Value(aliasKey),
+      stableKey: Value(stableKey),
+      lastSeenAt: Value(lastSeenAt),
+    );
+  }
+
+  factory DeviceIdentityAlias.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DeviceIdentityAlias(
+      aliasKey: serializer.fromJson<String>(json['aliasKey']),
+      stableKey: serializer.fromJson<String>(json['stableKey']),
+      lastSeenAt: serializer.fromJson<DateTime>(json['lastSeenAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'aliasKey': serializer.toJson<String>(aliasKey),
+      'stableKey': serializer.toJson<String>(stableKey),
+      'lastSeenAt': serializer.toJson<DateTime>(lastSeenAt),
+    };
+  }
+
+  DeviceIdentityAlias copyWith({
+    String? aliasKey,
+    String? stableKey,
+    DateTime? lastSeenAt,
+  }) => DeviceIdentityAlias(
+    aliasKey: aliasKey ?? this.aliasKey,
+    stableKey: stableKey ?? this.stableKey,
+    lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+  );
+  DeviceIdentityAlias copyWithCompanion(DeviceIdentityAliasesCompanion data) {
+    return DeviceIdentityAlias(
+      aliasKey: data.aliasKey.present ? data.aliasKey.value : this.aliasKey,
+      stableKey: data.stableKey.present ? data.stableKey.value : this.stableKey,
+      lastSeenAt: data.lastSeenAt.present
+          ? data.lastSeenAt.value
+          : this.lastSeenAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeviceIdentityAlias(')
+          ..write('aliasKey: $aliasKey, ')
+          ..write('stableKey: $stableKey, ')
+          ..write('lastSeenAt: $lastSeenAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(aliasKey, stableKey, lastSeenAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DeviceIdentityAlias &&
+          other.aliasKey == this.aliasKey &&
+          other.stableKey == this.stableKey &&
+          other.lastSeenAt == this.lastSeenAt);
+}
+
+class DeviceIdentityAliasesCompanion
+    extends UpdateCompanion<DeviceIdentityAlias> {
+  final Value<String> aliasKey;
+  final Value<String> stableKey;
+  final Value<DateTime> lastSeenAt;
+  final Value<int> rowid;
+  const DeviceIdentityAliasesCompanion({
+    this.aliasKey = const Value.absent(),
+    this.stableKey = const Value.absent(),
+    this.lastSeenAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DeviceIdentityAliasesCompanion.insert({
+    required String aliasKey,
+    required String stableKey,
+    required DateTime lastSeenAt,
+    this.rowid = const Value.absent(),
+  }) : aliasKey = Value(aliasKey),
+       stableKey = Value(stableKey),
+       lastSeenAt = Value(lastSeenAt);
+  static Insertable<DeviceIdentityAlias> custom({
+    Expression<String>? aliasKey,
+    Expression<String>? stableKey,
+    Expression<DateTime>? lastSeenAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (aliasKey != null) 'alias_key': aliasKey,
+      if (stableKey != null) 'stable_key': stableKey,
+      if (lastSeenAt != null) 'last_seen_at': lastSeenAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DeviceIdentityAliasesCompanion copyWith({
+    Value<String>? aliasKey,
+    Value<String>? stableKey,
+    Value<DateTime>? lastSeenAt,
+    Value<int>? rowid,
+  }) {
+    return DeviceIdentityAliasesCompanion(
+      aliasKey: aliasKey ?? this.aliasKey,
+      stableKey: stableKey ?? this.stableKey,
+      lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (aliasKey.present) {
+      map['alias_key'] = Variable<String>(aliasKey.value);
+    }
+    if (stableKey.present) {
+      map['stable_key'] = Variable<String>(stableKey.value);
+    }
+    if (lastSeenAt.present) {
+      map['last_seen_at'] = Variable<DateTime>(lastSeenAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeviceIdentityAliasesCompanion(')
+          ..write('aliasKey: $aliasKey, ')
+          ..write('stableKey: $stableKey, ')
+          ..write('lastSeenAt: $lastSeenAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $ScanSessionsTable extends ScanSessions
     with TableInfo<$ScanSessionsTable, ScanSession> {
   @override
@@ -2159,6 +2438,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $KnownDevicesTable knownDevices = $KnownDevicesTable(this);
+  late final $DeviceIdentityAliasesTable deviceIdentityAliases =
+      $DeviceIdentityAliasesTable(this);
   late final $ScanSessionsTable scanSessions = $ScanSessionsTable(this);
   late final $ScanObservationsTable scanObservations = $ScanObservationsTable(
     this,
@@ -2169,11 +2450,19 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     knownDevices,
+    deviceIdentityAliases,
     scanSessions,
     scanObservations,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'known_devices',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('device_identity_aliases', kind: UpdateKind.delete)],
+    ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'scan_sessions',
@@ -2210,6 +2499,44 @@ typedef $$KnownDevicesTableUpdateCompanionBuilder =
       Value<String?> vendor,
       Value<int> rowid,
     });
+
+final class $$KnownDevicesTableReferences
+    extends BaseReferences<_$AppDatabase, $KnownDevicesTable, KnownDevice> {
+  $$KnownDevicesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<
+    $DeviceIdentityAliasesTable,
+    List<DeviceIdentityAlias>
+  >
+  _deviceIdentityAliasesRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.deviceIdentityAliases,
+        aliasName: $_aliasNameGenerator(
+          db.knownDevices.stableKey,
+          db.deviceIdentityAliases.stableKey,
+        ),
+      );
+
+  $$DeviceIdentityAliasesTableProcessedTableManager
+  get deviceIdentityAliasesRefs {
+    final manager =
+        $$DeviceIdentityAliasesTableTableManager(
+          $_db,
+          $_db.deviceIdentityAliases,
+        ).filter(
+          (f) => f.stableKey.stableKey.sqlEquals(
+            $_itemColumn<String>('stable_key')!,
+          ),
+        );
+
+    final cache = $_typedResult.readTableOrNull(
+      _deviceIdentityAliasesRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
 
 class $$KnownDevicesTableFilterComposer
     extends Composer<_$AppDatabase, $KnownDevicesTable> {
@@ -2264,6 +2591,32 @@ class $$KnownDevicesTableFilterComposer
     column: $table.vendor,
     builder: (column) => ColumnFilters(column),
   );
+
+  Expression<bool> deviceIdentityAliasesRefs(
+    Expression<bool> Function($$DeviceIdentityAliasesTableFilterComposer f) f,
+  ) {
+    final $$DeviceIdentityAliasesTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.stableKey,
+          referencedTable: $db.deviceIdentityAliases,
+          getReferencedColumn: (t) => t.stableKey,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$DeviceIdentityAliasesTableFilterComposer(
+                $db: $db,
+                $table: $db.deviceIdentityAliases,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$KnownDevicesTableOrderingComposer
@@ -2366,6 +2719,32 @@ class $$KnownDevicesTableAnnotationComposer
 
   GeneratedColumn<String> get vendor =>
       $composableBuilder(column: $table.vendor, builder: (column) => column);
+
+  Expression<T> deviceIdentityAliasesRefs<T extends Object>(
+    Expression<T> Function($$DeviceIdentityAliasesTableAnnotationComposer a) f,
+  ) {
+    final $$DeviceIdentityAliasesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.stableKey,
+          referencedTable: $db.deviceIdentityAliases,
+          getReferencedColumn: (t) => t.stableKey,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$DeviceIdentityAliasesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.deviceIdentityAliases,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$KnownDevicesTableTableManager
@@ -2379,12 +2758,9 @@ class $$KnownDevicesTableTableManager
           $$KnownDevicesTableAnnotationComposer,
           $$KnownDevicesTableCreateCompanionBuilder,
           $$KnownDevicesTableUpdateCompanionBuilder,
-          (
-            KnownDevice,
-            BaseReferences<_$AppDatabase, $KnownDevicesTable, KnownDevice>,
-          ),
+          (KnownDevice, $$KnownDevicesTableReferences),
           KnownDevice,
-          PrefetchHooks Function()
+          PrefetchHooks Function({bool deviceIdentityAliasesRefs})
         > {
   $$KnownDevicesTableTableManager(_$AppDatabase db, $KnownDevicesTable table)
     : super(
@@ -2446,9 +2822,47 @@ class $$KnownDevicesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$KnownDevicesTableReferences(db, table, e),
+                ),
+              )
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback: ({deviceIdentityAliasesRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (deviceIdentityAliasesRefs) db.deviceIdentityAliases,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (deviceIdentityAliasesRefs)
+                    await $_getPrefetchedData<
+                      KnownDevice,
+                      $KnownDevicesTable,
+                      DeviceIdentityAlias
+                    >(
+                      currentTable: table,
+                      referencedTable: $$KnownDevicesTableReferences
+                          ._deviceIdentityAliasesRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$KnownDevicesTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).deviceIdentityAliasesRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where(
+                            (e) => e.stableKey == item.stableKey,
+                          ),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
         ),
       );
 }
@@ -2463,12 +2877,317 @@ typedef $$KnownDevicesTableProcessedTableManager =
       $$KnownDevicesTableAnnotationComposer,
       $$KnownDevicesTableCreateCompanionBuilder,
       $$KnownDevicesTableUpdateCompanionBuilder,
-      (
-        KnownDevice,
-        BaseReferences<_$AppDatabase, $KnownDevicesTable, KnownDevice>,
-      ),
+      (KnownDevice, $$KnownDevicesTableReferences),
       KnownDevice,
-      PrefetchHooks Function()
+      PrefetchHooks Function({bool deviceIdentityAliasesRefs})
+    >;
+typedef $$DeviceIdentityAliasesTableCreateCompanionBuilder =
+    DeviceIdentityAliasesCompanion Function({
+      required String aliasKey,
+      required String stableKey,
+      required DateTime lastSeenAt,
+      Value<int> rowid,
+    });
+typedef $$DeviceIdentityAliasesTableUpdateCompanionBuilder =
+    DeviceIdentityAliasesCompanion Function({
+      Value<String> aliasKey,
+      Value<String> stableKey,
+      Value<DateTime> lastSeenAt,
+      Value<int> rowid,
+    });
+
+final class $$DeviceIdentityAliasesTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $DeviceIdentityAliasesTable,
+          DeviceIdentityAlias
+        > {
+  $$DeviceIdentityAliasesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $KnownDevicesTable _stableKeyTable(_$AppDatabase db) =>
+      db.knownDevices.createAlias(
+        $_aliasNameGenerator(
+          db.deviceIdentityAliases.stableKey,
+          db.knownDevices.stableKey,
+        ),
+      );
+
+  $$KnownDevicesTableProcessedTableManager get stableKey {
+    final $_column = $_itemColumn<String>('stable_key')!;
+
+    final manager = $$KnownDevicesTableTableManager(
+      $_db,
+      $_db.knownDevices,
+    ).filter((f) => f.stableKey.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_stableKeyTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$DeviceIdentityAliasesTableFilterComposer
+    extends Composer<_$AppDatabase, $DeviceIdentityAliasesTable> {
+  $$DeviceIdentityAliasesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get aliasKey => $composableBuilder(
+    column: $table.aliasKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$KnownDevicesTableFilterComposer get stableKey {
+    final $$KnownDevicesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.stableKey,
+      referencedTable: $db.knownDevices,
+      getReferencedColumn: (t) => t.stableKey,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$KnownDevicesTableFilterComposer(
+            $db: $db,
+            $table: $db.knownDevices,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DeviceIdentityAliasesTableOrderingComposer
+    extends Composer<_$AppDatabase, $DeviceIdentityAliasesTable> {
+  $$DeviceIdentityAliasesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get aliasKey => $composableBuilder(
+    column: $table.aliasKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$KnownDevicesTableOrderingComposer get stableKey {
+    final $$KnownDevicesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.stableKey,
+      referencedTable: $db.knownDevices,
+      getReferencedColumn: (t) => t.stableKey,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$KnownDevicesTableOrderingComposer(
+            $db: $db,
+            $table: $db.knownDevices,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DeviceIdentityAliasesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DeviceIdentityAliasesTable> {
+  $$DeviceIdentityAliasesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get aliasKey =>
+      $composableBuilder(column: $table.aliasKey, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => column,
+  );
+
+  $$KnownDevicesTableAnnotationComposer get stableKey {
+    final $$KnownDevicesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.stableKey,
+      referencedTable: $db.knownDevices,
+      getReferencedColumn: (t) => t.stableKey,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$KnownDevicesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.knownDevices,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DeviceIdentityAliasesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DeviceIdentityAliasesTable,
+          DeviceIdentityAlias,
+          $$DeviceIdentityAliasesTableFilterComposer,
+          $$DeviceIdentityAliasesTableOrderingComposer,
+          $$DeviceIdentityAliasesTableAnnotationComposer,
+          $$DeviceIdentityAliasesTableCreateCompanionBuilder,
+          $$DeviceIdentityAliasesTableUpdateCompanionBuilder,
+          (DeviceIdentityAlias, $$DeviceIdentityAliasesTableReferences),
+          DeviceIdentityAlias,
+          PrefetchHooks Function({bool stableKey})
+        > {
+  $$DeviceIdentityAliasesTableTableManager(
+    _$AppDatabase db,
+    $DeviceIdentityAliasesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DeviceIdentityAliasesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$DeviceIdentityAliasesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$DeviceIdentityAliasesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> aliasKey = const Value.absent(),
+                Value<String> stableKey = const Value.absent(),
+                Value<DateTime> lastSeenAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DeviceIdentityAliasesCompanion(
+                aliasKey: aliasKey,
+                stableKey: stableKey,
+                lastSeenAt: lastSeenAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String aliasKey,
+                required String stableKey,
+                required DateTime lastSeenAt,
+                Value<int> rowid = const Value.absent(),
+              }) => DeviceIdentityAliasesCompanion.insert(
+                aliasKey: aliasKey,
+                stableKey: stableKey,
+                lastSeenAt: lastSeenAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$DeviceIdentityAliasesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({stableKey = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (stableKey) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.stableKey,
+                                referencedTable:
+                                    $$DeviceIdentityAliasesTableReferences
+                                        ._stableKeyTable(db),
+                                referencedColumn:
+                                    $$DeviceIdentityAliasesTableReferences
+                                        ._stableKeyTable(db)
+                                        .stableKey,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$DeviceIdentityAliasesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DeviceIdentityAliasesTable,
+      DeviceIdentityAlias,
+      $$DeviceIdentityAliasesTableFilterComposer,
+      $$DeviceIdentityAliasesTableOrderingComposer,
+      $$DeviceIdentityAliasesTableAnnotationComposer,
+      $$DeviceIdentityAliasesTableCreateCompanionBuilder,
+      $$DeviceIdentityAliasesTableUpdateCompanionBuilder,
+      (DeviceIdentityAlias, $$DeviceIdentityAliasesTableReferences),
+      DeviceIdentityAlias,
+      PrefetchHooks Function({bool stableKey})
     >;
 typedef $$ScanSessionsTableCreateCompanionBuilder =
     ScanSessionsCompanion Function({
@@ -3439,6 +4158,8 @@ class $AppDatabaseManager {
   $AppDatabaseManager(this._db);
   $$KnownDevicesTableTableManager get knownDevices =>
       $$KnownDevicesTableTableManager(_db, _db.knownDevices);
+  $$DeviceIdentityAliasesTableTableManager get deviceIdentityAliases =>
+      $$DeviceIdentityAliasesTableTableManager(_db, _db.deviceIdentityAliases);
   $$ScanSessionsTableTableManager get scanSessions =>
       $$ScanSessionsTableTableManager(_db, _db.scanSessions);
   $$ScanObservationsTableTableManager get scanObservations =>

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -14,6 +15,7 @@ class NativeReachabilityDiscovery implements DeviceDiscovery {
   });
 
   static const _channel = MethodChannel('yusufs.turan.spydevdet/network_info');
+  static int _requestSequence = 0;
 
   final Duration timeout;
 
@@ -28,20 +30,30 @@ class NativeReachabilityDiscovery implements DeviceDiscovery {
     if (cancellationToken.isCancelled) {
       return const DeviceDiscoveryResult.empty();
     }
-    if (!Platform.isAndroid) {
+    if (!Platform.isAndroid && !Platform.isWindows) {
       throw const ReachabilityUnavailableException();
     }
 
+    final requestId =
+        '${DateTime.now().microsecondsSinceEpoch}-${_requestSequence++}';
+    final removeCancelListener = cancellationToken.addCancelListener(() {
+      unawaited(_cancelNativeRequest(requestId));
+    });
     List<String>? addresses;
     try {
-      addresses = await _channel.invokeListMethod<String>(
-        'discoverReachableHosts',
-        {'targets': plan.targets, 'timeoutMillis': timeout.inMilliseconds},
-      );
+      addresses = await _channel
+          .invokeListMethod<String>('discoverReachableHosts', {
+            'requestId': requestId,
+            'sourceAddress': plan.network.localIpv4,
+            'targets': plan.targets,
+            'timeoutMillis': timeout.inMilliseconds,
+          });
     } on PlatformException {
       throw const ReachabilityUnavailableException();
     } on MissingPluginException {
       throw const ReachabilityUnavailableException();
+    } finally {
+      removeCancelListener();
     }
     if (cancellationToken.isCancelled) {
       return const DeviceDiscoveryResult.empty();
@@ -82,6 +94,17 @@ class NativeReachabilityDiscovery implements DeviceDiscovery {
         detail: 'İşletim sistemi erişilebilirlik kontrolü',
       ),
     );
+  }
+
+  static Future<void> _cancelNativeRequest(String requestId) async {
+    try {
+      await _channel.invokeMethod<void>('cancelReachability', {
+        'requestId': requestId,
+      });
+    } on Object {
+      // The request may already have completed or the platform channel may be
+      // shutting down. Cancellation remains best effort in either case.
+    }
   }
 }
 
