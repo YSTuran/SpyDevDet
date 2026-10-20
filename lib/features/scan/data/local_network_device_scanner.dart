@@ -19,6 +19,7 @@ import 'package:spy_dev_det/features/scan/domain/neighbor_enricher.dart';
 import 'package:spy_dev_det/features/scan/domain/neighbor_snapshot.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_cancellation_token.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_event.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
@@ -88,8 +89,10 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
     controller.add(ScanStarted(totalTargets: plan.targets.length));
     _storeAndEmit(observations, _selfObservation(plan), plan, controller);
     controller.add(
-      const ScanStageChanged(
-        'TCP, erişilebilirlik ve servis keşifleri paralel çalışıyor',
+      ScanStageChanged(
+        plan.mode == ScanMode.quick
+            ? 'Hızlı erişilebilirlik ve TCP kontrolleri çalışıyor'
+            : 'TCP, erişilebilirlik ve servis keşifleri paralel çalışıyor',
       ),
     );
 
@@ -110,12 +113,15 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
         observations: observations,
         controller: controller,
       ),
-      _runMulticastDiscoveries(
-        plan: plan,
-        cancellationToken: cancellationToken,
-        observations: observations,
-        controller: controller,
-      ),
+      if (plan.mode == ScanMode.detailed)
+        _runMulticastDiscoveries(
+          plan: plan,
+          cancellationToken: cancellationToken,
+          observations: observations,
+          controller: controller,
+        )
+      else
+        _skipMulticastDiscoveries(controller),
     ];
     await Future.wait(discoveryTasks);
 
@@ -327,12 +333,32 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
     int completedTargets,
   ) => DiscoveryMetrics(
     attemptedTargets: completedTargets,
-    sentRequests: completedTargets * 8,
+    sentRequests: completedTargets * (plan.mode == ScanMode.quick ? 5 : 8),
     acceptedResponses: responsiveDevices,
     detail:
         'Planlanan ${plan.targets.length} hedef; tamamlanan her hedefte '
-        'sekiz sınırlı TCP bağlantı denemesi',
+        '${plan.mode == ScanMode.quick ? 5 : 8} sınırlı TCP bağlantı denemesi',
   );
+
+  Future<void> _skipMulticastDiscoveries(
+    StreamController<ScanEvent> controller,
+  ) async {
+    for (final method in const [
+      DiscoveryMethod.mdns,
+      DiscoveryMethod.ssdp,
+      DiscoveryMethod.onvif,
+    ]) {
+      controller.add(
+        ScanMethodStatusChanged(
+          DiscoveryMethodResult(
+            method: method,
+            phase: DiscoveryMethodPhase.skipped,
+            userMessage: 'Hızlı tarama modunda çalıştırılmadı.',
+          ),
+        ),
+      );
+    }
+  }
 
   Future<void> _runAndEmitDiscovery({
     required DiscoveryMethod method,

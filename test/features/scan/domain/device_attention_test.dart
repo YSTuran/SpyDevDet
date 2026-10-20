@@ -58,4 +58,26 @@ void main() {
       expect(evaluator.evaluate(device).level, AttentionLevel.review);
     },
   );
+
+  test(
+    'kategori düzeltmesini puan hesabında kullanır ve faktörleri açıklar',
+    () {
+      const device = DeviceObservation(
+        id: 'corrected',
+        ipAddress: '192.168.1.40',
+        displayName: 'Yanlış sınıflandırılan cihaz',
+        macStatus: MacStatus.notObserved,
+        services: ['RTSP (554)'],
+        category: DeviceCategory.cameraCandidate,
+        categoryOverride: DeviceCategory.mediaDevice,
+        confidence: ConfidenceLevel.high,
+      );
+
+      final assessment = evaluator.evaluate(device);
+
+      expect(assessment.level, AttentionLevel.normal);
+      expect(assessment.score, 0);
+      expect(assessment.factors.single.points, 0);
+    },
+  );
 }

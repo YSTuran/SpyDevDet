@@ -10,6 +10,7 @@ import 'package:spy_dev_det/features/history/application/history_providers.dart'
 import 'package:spy_dev_det/features/history/domain/scan_history_repository.dart';
 import 'package:spy_dev_det/features/scan/application/scan_controller.dart';
 import 'package:spy_dev_det/features/scan/data/fake_device_scanner.dart';
+import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 import 'package:spy_dev_det/features/scan/domain/device_scanner.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_cancellation_token.dart';
@@ -198,8 +199,13 @@ class _TestHistoryRepository implements ScanHistoryRepository {
   Future<void> deleteSession(int sessionId) async {}
 
   @override
-  Future<List<ScanHistorySummary>> getHistory({int limit = 50}) async =>
-      const [];
+  Future<List<ScanHistorySummary>> getHistory({
+    int limit = 50,
+    String? networkKey,
+  }) async => const [];
+
+  @override
+  Future<List<NetworkProfileSummary>> getNetworkProfiles() async => const [];
 
   @override
   Future<ScanHistoryDetails?> getDetails(int sessionId) async => null;
@@ -210,6 +216,15 @@ class _TestHistoryRepository implements ScanHistoryRepository {
     required bool isKnown,
     required String? customName,
     required String? note,
+    bool? isOwned,
+    DeviceCategory? categoryOverride,
+    bool clearCategoryOverride = false,
+  }) async {}
+
+  @override
+  Future<void> renameNetworkProfile({
+    required String networkKey,
+    required String? customName,
   }) async {}
 }
 

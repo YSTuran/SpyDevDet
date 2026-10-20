@@ -4,12 +4,16 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:spy_dev_det/features/scan/application/scan_controller.dart';
 import 'package:spy_dev_det/features/scan/application/scan_state.dart';
 import 'package:spy_dev_det/features/scan/domain/device_attention.dart';
+import 'package:spy_dev_det/features/scan/domain/device_filter.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
+import 'package:spy_dev_det/features/scan/domain/discovery_coverage_advisor.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 import 'package:spy_dev_det/features/scan/domain/service_catalog.dart';
 import 'package:spy_dev_det/features/scan/presentation/scan_diagnostics_screen.dart';
 import 'package:spy_dev_det/features/history/presentation/history_screen.dart';
+import 'package:spy_dev_det/features/history/presentation/network_profiles_screen.dart';
 
 class ScanScreen extends ConsumerStatefulWidget {
   const ScanScreen({super.key});
@@ -20,6 +24,10 @@ class ScanScreen extends ConsumerStatefulWidget {
 
 class _ScanScreenState extends ConsumerState<ScanScreen>
     with WidgetsBindingObserver {
+  final _searchController = TextEditingController();
+  DeviceFilterOption _filter = DeviceFilterOption.all;
+  DeviceSortOption _sort = DeviceSortOption.ipAddress;
+
   @override
   void initState() {
     super.initState();
@@ -29,6 +37,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -50,11 +59,26 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
   Widget build(BuildContext context) {
     final scanState = ref.watch(scanControllerProvider);
     final controller = ref.read(scanControllerProvider.notifier);
+    final displayedDevices = const DeviceListFilter().apply(
+      scanState.devices,
+      query: _searchController.text,
+      filter: _filter,
+      sort: _sort,
+    );
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('SpyDevDet'),
         actions: [
+          IconButton(
+            tooltip: 'Ağ profilleri',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (context) => const NetworkProfilesScreen(),
+              ),
+            ),
+            icon: const Icon(Icons.router_outlined),
+          ),
           IconButton(
             tooltip: 'Tarama geçmişi',
             onPressed: () => Navigator.of(context).push(
@@ -103,21 +127,62 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
                         : 'Yerel ağı tara',
                   ),
                 ),
+                const SizedBox(height: 12),
+                _ScanModeSelector(
+                  selected: scanState.scanMode,
+                  enabled: !scanState.isBusy,
+                  onChanged: controller.selectScanMode,
+                ),
                 const SizedBox(height: 20),
                 if (scanState.phase == ScanPhase.completed &&
                     scanState.devices.isNotEmpty) ...[
                   _ResultSummary(devices: scanState.devices),
                   const SizedBox(height: 20),
                 ],
+                if (scanState.phase == ScanPhase.completed &&
+                    scanState.report != null) ...[
+                  _CoverageNotice(
+                    messages: const DiscoveryCoverageAdvisor().explain(
+                      methods: scanState.report!.methods,
+                      rangeTruncated: scanState.rangeTruncated,
+                      noDevicesObserved: scanState.devices.length <= 1,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (scanState.devices.isNotEmpty) ...[
+                  _DeviceFilters(
+                    controller: _searchController,
+                    filter: _filter,
+                    sort: _sort,
+                    onQueryChanged: (_) => setState(() {}),
+                    onFilterChanged: (value) => setState(() => _filter = value),
+                    onSortChanged: (value) => setState(() => _sort = value),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 Text(
-                  'Gözlemlenen cihazlar (${scanState.devices.length})',
+                  displayedDevices.length == scanState.devices.length
+                      ? 'Gözlemlenen cihazlar (${scanState.devices.length})'
+                      : 'Gözlemlenen cihazlar '
+                            '(${displayedDevices.length}/${scanState.devices.length})',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 10),
                 if (scanState.devices.isEmpty)
                   _EmptyDevices(state: scanState)
+                else if (displayedDevices.isEmpty)
+                  const Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'Arama ve filtrelerle eşleşen cihaz bulunamadı.',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  )
                 else
-                  ...scanState.devices.map(
+                  ...displayedDevices.map(
                     (device) => Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: _DeviceCard(
@@ -175,6 +240,8 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
     final nameController = TextEditingController(text: device.customName);
     final noteController = TextEditingController(text: device.note);
     var isKnown = device.isKnown;
+    var isOwned = device.isOwned;
+    var categoryOverride = device.categoryOverride;
     final shouldSave = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -204,9 +271,55 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
                 CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
                   value: isKnown,
-                  onChanged: (value) =>
-                      setDialogState(() => isKnown = value ?? false),
+                  onChanged: (value) => setDialogState(() {
+                    isKnown = value ?? false;
+                    if (!isKnown) {
+                      isOwned = false;
+                    }
+                  }),
                   title: const Text('Bu cihazı tanıyorum'),
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: isOwned,
+                  onChanged: (value) => setDialogState(() {
+                    isOwned = value ?? false;
+                    if (isOwned) {
+                      isKnown = true;
+                    }
+                  }),
+                  title: const Text('Bu cihaz bana/evime ait'),
+                  subtitle: const Text(
+                    'Yalnızca inceleme puanını açıklamak ve profili tanımak '
+                    'için cihazında saklanır.',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<DeviceCategory?>(
+                  initialValue: categoryOverride,
+                  decoration: const InputDecoration(
+                    labelText: 'Cihaz türü düzeltmesi',
+                  ),
+                  items: [
+                    const DropdownMenuItem<DeviceCategory?>(
+                      value: null,
+                      child: Text('Otomatik sınıflandırmayı kullan'),
+                    ),
+                    ...DeviceCategory.values.map(
+                      (category) => DropdownMenuItem<DeviceCategory?>(
+                        value: category,
+                        child: Text(category.label),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      setDialogState(() => categoryOverride = value),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Uygulamanın otomatik tahmini korunur; yaptığın düzeltme '
+                  'ayrı bir alan olarak gösterilir.',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),
@@ -235,6 +348,8 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
         isKnown: isKnown,
         customName: nameController.text,
         note: noteController.text,
+        isOwned: isOwned,
+        categoryOverride: categoryOverride,
       );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -254,6 +369,204 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
   }
 }
 
+class _ScanModeSelector extends StatelessWidget {
+  const _ScanModeSelector({
+    required this.selected,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final ScanMode selected;
+  final bool enabled;
+  final ValueChanged<ScanMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Tarama modu', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<ScanMode>(
+                segments: ScanMode.values
+                    .map(
+                      (mode) => ButtonSegment<ScanMode>(
+                        value: mode,
+                        icon: Icon(
+                          mode == ScanMode.quick
+                              ? Icons.bolt_outlined
+                              : Icons.manage_search_outlined,
+                        ),
+                        label: Text(mode.label),
+                      ),
+                    )
+                    .toList(growable: false),
+                selected: {selected},
+                onSelectionChanged: enabled
+                    ? (selection) => onChanged(selection.first)
+                    : null,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              selected.description,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DeviceFilters extends StatelessWidget {
+  const _DeviceFilters({
+    required this.controller,
+    required this.filter,
+    required this.sort,
+    required this.onQueryChanged,
+    required this.onFilterChanged,
+    required this.onSortChanged,
+  });
+
+  final TextEditingController controller;
+  final DeviceFilterOption filter;
+  final DeviceSortOption sort;
+  final ValueChanged<String> onQueryChanged;
+  final ValueChanged<DeviceFilterOption> onFilterChanged;
+  final ValueChanged<DeviceSortOption> onSortChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            TextField(
+              controller: controller,
+              onChanged: onQueryChanged,
+              decoration: InputDecoration(
+                labelText: 'Cihazlarda ara',
+                hintText: 'Ad, IP, MAC, üretici veya servis',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: controller.text.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Aramayı temizle',
+                        onPressed: () {
+                          controller.clear();
+                          onQueryChanged('');
+                        },
+                        icon: const Icon(Icons.clear),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<DeviceFilterOption>(
+                    initialValue: filter,
+                    decoration: const InputDecoration(
+                      labelText: 'Filtre',
+                      prefixIcon: Icon(Icons.filter_list),
+                    ),
+                    items: DeviceFilterOption.values
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(value.label),
+                          ),
+                        )
+                        .toList(growable: false),
+                    onChanged: (value) {
+                      if (value != null) {
+                        onFilterChanged(value);
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: DropdownButtonFormField<DeviceSortOption>(
+                    initialValue: sort,
+                    decoration: const InputDecoration(
+                      labelText: 'Sırala',
+                      prefixIcon: Icon(Icons.sort),
+                    ),
+                    items: DeviceSortOption.values
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(value.label),
+                          ),
+                        )
+                        .toList(growable: false),
+                    onChanged: (value) {
+                      if (value != null) {
+                        onSortChanged(value);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CoverageNotice extends StatelessWidget {
+  const _CoverageNotice({required this.messages});
+
+  final List<String> messages;
+
+  @override
+  Widget build(BuildContext context) {
+    if (messages.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Card(
+      color: Theme.of(context).colorScheme.tertiaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.info_outline),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Bazı cihazlar neden görünmeyebilir?',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ...messages.map(
+              (message) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text('• $message'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ResultSummary extends StatelessWidget {
   const _ResultSummary({required this.devices});
 
@@ -267,7 +580,10 @@ class _ResultSummary extends StatelessWidget {
         .length;
     final knownCount = devices.where((device) => device.isKnown).length;
     final cameraCount = devices
-        .where((device) => device.category == DeviceCategory.cameraCandidate)
+        .where(
+          (device) =>
+              device.effectiveCategory == DeviceCategory.cameraCandidate,
+        )
         .length;
     final reviewCount = devices
         .where(
@@ -465,6 +781,8 @@ class _MethodResultRow extends StatelessWidget {
                 ? Icons.sync
                 : result.phase == DiscoveryMethodPhase.completed
                 ? Icons.check_circle_outline
+                : result.phase == DiscoveryMethodPhase.skipped
+                ? Icons.skip_next_outlined
                 : result.isProblem
                 ? Icons.warning_amber_outlined
                 : Icons.schedule,
@@ -577,9 +895,22 @@ class _DeviceCard extends StatelessWidget {
                 runSpacing: 6,
                 children: [
                   Chip(
-                    avatar: Icon(_categoryIcon(device.category), size: 18),
-                    label: Text(device.category.label),
+                    avatar: Icon(
+                      _categoryIcon(device.effectiveCategory),
+                      size: 18,
+                    ),
+                    label: Text(device.effectiveCategory.label),
                   ),
+                  if (device.categoryOverride != null)
+                    const Chip(
+                      avatar: Icon(Icons.edit_outlined, size: 18),
+                      label: Text('Kullanıcı düzeltmesi'),
+                    ),
+                  if (device.isOwned)
+                    const Chip(
+                      avatar: Icon(Icons.home_outlined, size: 18),
+                      label: Text('Bana ait'),
+                    ),
                   Chip(label: Text(device.confidence.label)),
                   Chip(
                     avatar: Icon(
@@ -656,12 +987,22 @@ class _DeviceCard extends StatelessWidget {
                 _DetailRow(
                   label: 'Cihaz türü',
                   value:
-                      '${device.category.label} • ${device.confidence.label}',
+                      '${device.effectiveCategory.label} • '
+                      '${device.confidence.label}',
                 ),
+                if (device.categoryOverride != null)
+                  _DetailRow(
+                    label: 'Otomatik tahmin',
+                    value:
+                        '${device.category.label} (kullanıcı tarafından '
+                        'düzeltildi)',
+                  ),
                 _DetailRow(
                   label: 'İnceleme durumu',
                   value:
-                      '${attention.level.label}\n${attention.reasons.join('\n')}',
+                      '${attention.level.label} • ${attention.score} puan\n'
+                      '${attention.factors.map((factor) => '+${factor.points}: '
+                          '${factor.description}').join('\n')}',
                 ),
                 _DetailRow(
                   label: 'Gözlemlenen servisler',
@@ -692,7 +1033,9 @@ class _DeviceCard extends StatelessWidget {
                 if (device.familiarity != DeviceFamiliarity.unclassified)
                   _DetailRow(
                     label: 'Tanıma durumu',
-                    value: device.familiarity.label,
+                    value: device.isOwned
+                        ? '${device.familiarity.label} • Bana/evime ait'
+                        : device.familiarity.label,
                   ),
                 if (device.note?.trim().isNotEmpty == true)
                   _DetailRow(label: 'Not', value: device.note!),
@@ -707,7 +1050,8 @@ class _DeviceCard extends StatelessWidget {
                             )
                             .join('\n'),
                 ),
-                if (device.category == DeviceCategory.cameraCandidate)
+                if (device.category == DeviceCategory.cameraCandidate ||
+                    device.effectiveCategory == DeviceCategory.cameraCandidate)
                   Text(
                     'Kamera adayı etiketi yalnızca ağ servislerine dayanır; '
                     'cihazın gizli veya kötü amaçlı olduğunu kanıtlamaz.',

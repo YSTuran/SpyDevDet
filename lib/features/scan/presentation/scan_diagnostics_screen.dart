@@ -199,6 +199,7 @@ class _MethodDiagnostics extends StatelessWidget {
     DiscoveryMethodPhase.failed ||
     DiscoveryMethodPhase.unavailable => Icons.warning_amber_outlined,
     DiscoveryMethodPhase.cancelled => Icons.cancel_outlined,
+    DiscoveryMethodPhase.skipped => Icons.skip_next_outlined,
     DiscoveryMethodPhase.waiting => Icons.schedule,
   };
 

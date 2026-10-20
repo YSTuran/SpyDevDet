@@ -2,41 +2,52 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:spy_dev_det/features/history/application/history_providers.dart';
 import 'package:spy_dev_det/features/history/domain/scan_history_repository.dart';
+import 'package:spy_dev_det/features/scan/domain/device_attention.dart';
+import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
+import 'package:spy_dev_det/features/scan/domain/discovery_coverage_advisor.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
 class HistoryScreen extends ConsumerWidget {
-  const HistoryScreen({super.key});
+  const HistoryScreen({this.networkKey, this.title, super.key});
+
+  final String? networkKey;
+  final String? title;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final history = ref.watch(scanHistoryProvider);
+    final history = networkKey == null
+        ? ref.watch(scanHistoryProvider)
+        : ref.watch(networkScanHistoryProvider(networkKey!));
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tarama geçmişi'),
-        actions: [
-          PopupMenuButton<_HistoryAction>(
-            tooltip: 'Geçmiş seçenekleri',
-            onSelected: (action) {
-              switch (action) {
-                case _HistoryAction.clearHistory:
-                  _clearHistory(context, ref);
-                case _HistoryAction.clearAllData:
-                  _clearAllData(context, ref);
-              }
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem(
-                value: _HistoryAction.clearHistory,
-                child: Text('Yalnız tarama geçmişini sil'),
-              ),
-              PopupMenuItem(
-                value: _HistoryAction.clearAllData,
-                child: Text('Tüm yerel verileri sil'),
-              ),
-            ],
-          ),
-        ],
+        title: Text(title ?? 'Tarama geçmişi'),
+        actions: networkKey == null
+            ? [
+                PopupMenuButton<_HistoryAction>(
+                  tooltip: 'Geçmiş seçenekleri',
+                  onSelected: (action) {
+                    switch (action) {
+                      case _HistoryAction.clearHistory:
+                        _clearHistory(context, ref);
+                      case _HistoryAction.clearAllData:
+                        _clearAllData(context, ref);
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: _HistoryAction.clearHistory,
+                      child: Text('Yalnız tarama geçmişini sil'),
+                    ),
+                    PopupMenuItem(
+                      value: _HistoryAction.clearAllData,
+                      child: Text('Tüm yerel verileri sil'),
+                    ),
+                  ],
+                ),
+              ]
+            : null,
       ),
       body: SafeArea(
         child: Center(
@@ -45,10 +56,16 @@ class HistoryScreen extends ConsumerWidget {
             child: history.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, stackTrace) => _HistoryError(
-                onRetry: () => ref.invalidate(scanHistoryProvider),
+                onRetry: () => networkKey == null
+                    ? ref.invalidate(scanHistoryProvider)
+                    : ref.invalidate(networkScanHistoryProvider(networkKey!)),
               ),
               data: (items) => RefreshIndicator(
-                onRefresh: () => ref.refresh(scanHistoryProvider.future),
+                onRefresh: () => networkKey == null
+                    ? ref.refresh(scanHistoryProvider.future)
+                    : ref.refresh(
+                        networkScanHistoryProvider(networkKey!).future,
+                      ),
                 child: items.isEmpty
                     ? const _EmptyHistory()
                     : ListView.separated(
@@ -101,6 +118,8 @@ class HistoryScreen extends ConsumerWidget {
     try {
       await ref.read(scanHistoryRepositoryProvider).clearHistory();
       ref.invalidate(scanHistoryProvider);
+      ref.invalidate(networkScanHistoryProvider);
+      ref.invalidate(networkProfilesProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,
@@ -142,6 +161,8 @@ class HistoryScreen extends ConsumerWidget {
     try {
       await ref.read(scanHistoryRepositoryProvider).clearAllData();
       ref.invalidate(scanHistoryProvider);
+      ref.invalidate(networkScanHistoryProvider);
+      ref.invalidate(networkProfilesProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Tüm yerel veriler silindi')),
@@ -224,6 +245,8 @@ class HistoryDetailsScreen extends ConsumerWidget {
     }
     await ref.read(scanHistoryRepositoryProvider).deleteSession(sessionId);
     ref.invalidate(scanHistoryProvider);
+    ref.invalidate(networkScanHistoryProvider);
+    ref.invalidate(networkProfilesProvider);
     ref.invalidate(scanHistoryDetailsProvider(sessionId));
     if (context.mounted) {
       Navigator.pop(context);
@@ -249,7 +272,8 @@ class _HistoryCard extends StatelessWidget {
         subtitle: Text(
           '${item.totalDeviceCount} cihaz • ${item.newDeviceCount} yeni • '
           '${item.missingDevices.length} görülmedi\n'
-          '${item.isPartial ? 'Kısmi tarama' : 'Tam tarama'} • '
+          '${item.scanMode.label} • '
+          '${item.isPartial ? 'Kısmi sonuç' : 'Planlandığı gibi tamamlandı'} • '
           '${_formatDuration(item.elapsed)}',
         ),
         isThreeLine: true,
@@ -287,6 +311,10 @@ class _HistoryDetails extends StatelessWidget {
                   '${summary.missingDevices.length} görülmedi • '
                   '${_formatDuration(summary.elapsed)}',
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  '${summary.scanMode.label}: ${summary.scanMode.description}',
+                ),
                 const SizedBox(height: 12),
                 ...DiscoveryMethod.values.map((method) {
                   final result = summary.methods[method];
@@ -298,6 +326,13 @@ class _HistoryDetails extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         if (summary.missingDevices.isNotEmpty) ...[
+          _HistoryCoverageNotice(
+            messages: const DiscoveryCoverageAdvisor().explain(
+              methods: summary.methods,
+              hasMissingDevices: true,
+            ),
+          ),
+          const SizedBox(height: 18),
           Text(
             'Bu taramada görülmeyen cihazlar',
             style: Theme.of(context).textTheme.titleLarge,
@@ -330,25 +365,138 @@ class _HistoryDetails extends StatelessWidget {
           ...details.devices.map(
             (device) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: Card(
-                child: ListTile(
-                  leading: Icon(
-                    device.isKnown
-                        ? Icons.verified_user_outlined
-                        : device.familiarity == DeviceFamiliarity.newDevice
-                        ? Icons.fiber_new_outlined
-                        : Icons.devices_outlined,
-                  ),
-                  title: Text(device.effectiveDisplayName),
-                  subtitle: Text(
-                    '${device.ipAddress}\n${device.familiarity.label}',
-                  ),
-                  isThreeLine: true,
-                ),
-              ),
+              child: _HistoryDeviceCard(device: device),
             ),
           ),
       ],
+    );
+  }
+}
+
+class _HistoryDeviceCard extends StatelessWidget {
+  const _HistoryDeviceCard({required this.device});
+
+  final DeviceObservation device;
+
+  @override
+  Widget build(BuildContext context) {
+    final attention = const DeviceAttentionEvaluator().evaluate(device);
+    return Card(
+      child: ExpansionTile(
+        leading: Icon(
+          device.isKnown
+              ? Icons.verified_user_outlined
+              : device.familiarity == DeviceFamiliarity.newDevice
+              ? Icons.fiber_new_outlined
+              : Icons.devices_outlined,
+        ),
+        title: Text(device.effectiveDisplayName),
+        subtitle: Text(
+          '${device.ipAddress} • ${device.effectiveCategory.label}\n'
+          '${device.familiarity.label} • ${attention.level.label}',
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          _HistoryDetailLine(
+            label: 'İnceleme puanı',
+            value: '${attention.score}',
+          ),
+          ...attention.factors.map(
+            (factor) => _HistoryDetailLine(
+              label: '+${factor.points}',
+              value: factor.description,
+            ),
+          ),
+          if (device.categoryOverride != null)
+            _HistoryDetailLine(
+              label: 'Tür düzeltmesi',
+              value:
+                  '${device.category.label} → '
+                  '${device.categoryOverride!.label}',
+            ),
+          if (device.isOwned)
+            const _HistoryDetailLine(
+              label: 'Sahiplik',
+              value: 'Bana/evime ait olarak işaretlendi',
+            ),
+          _HistoryDetailLine(
+            label: 'Servisler',
+            value: device.services.isEmpty
+                ? 'Gözlemlenmedi'
+                : device.services.join(', '),
+          ),
+          _HistoryDetailLine(
+            label: 'MAC',
+            value: device.macAddress ?? device.macStatus.label,
+          ),
+          if (device.evidence.isNotEmpty)
+            _HistoryDetailLine(
+              label: 'Kanıtlar',
+              value: device.evidence
+                  .map((item) => '${item.source.label}: ${item.description}')
+                  .join('\n'),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HistoryDetailLine extends StatelessWidget {
+  const _HistoryDetailLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 112,
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+}
+
+class _HistoryCoverageNotice extends StatelessWidget {
+  const _HistoryCoverageNotice({required this.messages});
+
+  final List<String> messages;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: Theme.of(context).colorScheme.tertiaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Bir cihaz neden görülmemiş olabilir?',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            ...messages.map(
+              (message) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text('• $message'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

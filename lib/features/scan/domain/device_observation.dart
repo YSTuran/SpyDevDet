@@ -35,6 +35,8 @@ class DeviceObservation {
     this.vendor,
     this.evidence = const [],
     this.category = DeviceCategory.unknown,
+    this.categoryOverride,
+    this.isOwned = false,
     this.confidence = ConfidenceLevel.none,
     this.stableKey,
     this.customName,
@@ -54,6 +56,8 @@ class DeviceObservation {
   final String discoveryMethod;
   final List<DeviceEvidence> evidence;
   final DeviceCategory category;
+  final DeviceCategory? categoryOverride;
+  final bool isOwned;
   final ConfidenceLevel confidence;
   final String? stableKey;
   final String? customName;
@@ -64,6 +68,7 @@ class DeviceObservation {
 
   bool get hasKnownVendor => vendor != null && vendor!.trim().isNotEmpty;
   bool get isKnown => familiarity == DeviceFamiliarity.known;
+  DeviceCategory get effectiveCategory => categoryOverride ?? category;
   String get effectiveDisplayName =>
       customName?.trim().isNotEmpty == true ? customName!.trim() : displayName;
 
@@ -79,6 +84,9 @@ class DeviceObservation {
     String? discoveryMethod,
     List<DeviceEvidence>? evidence,
     DeviceCategory? category,
+    DeviceCategory? categoryOverride,
+    bool clearCategoryOverride = false,
+    bool? isOwned,
     ConfidenceLevel? confidence,
     String? stableKey,
     String? customName,
@@ -100,6 +108,10 @@ class DeviceObservation {
       discoveryMethod: discoveryMethod ?? this.discoveryMethod,
       evidence: evidence ?? this.evidence,
       category: category ?? this.category,
+      categoryOverride: clearCategoryOverride
+          ? null
+          : (categoryOverride ?? this.categoryOverride),
+      isOwned: isOwned ?? this.isOwned,
       confidence: confidence ?? this.confidence,
       stableKey: stableKey ?? this.stableKey,
       customName: clearCustomName ? null : (customName ?? this.customName),

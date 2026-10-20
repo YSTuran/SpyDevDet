@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
 void main() {
@@ -34,48 +35,77 @@ void main() {
     );
   });
 
-  test('karşılaştırma için en az bir cihaz varlığı yöntemi ister', () {
-    var report = ScanReport.started(DateTime(2026, 10, 15));
-    for (final method in const [
-      DiscoveryMethod.tcp,
-      DiscoveryMethod.mdns,
-      DiscoveryMethod.ssdp,
-      DiscoveryMethod.onvif,
-    ]) {
+  test(
+    'karşılaştırma için bütün ayrıntılı yöntemlerin tamamlanmasını ister',
+    () {
+      var report = ScanReport.started(DateTime(2026, 10, 15));
+      for (final method in const [
+        DiscoveryMethod.tcp,
+        DiscoveryMethod.mdns,
+        DiscoveryMethod.ssdp,
+        DiscoveryMethod.onvif,
+      ]) {
+        report = report.withMethod(
+          DiscoveryMethodResult(
+            method: method,
+            phase: DiscoveryMethodPhase.completed,
+          ),
+        );
+      }
+
+      expect(report.canComparePresence, isFalse);
+
+      report = report.withMethod(
+        const DiscoveryMethodResult(
+          method: DiscoveryMethod.reachability,
+          phase: DiscoveryMethodPhase.completed,
+        ),
+      );
+
+      expect(report.canComparePresence, isFalse);
+
+      report = report
+          .withMethod(
+            const DiscoveryMethodResult(
+              method: DiscoveryMethod.reachability,
+              phase: DiscoveryMethodPhase.completed,
+            ),
+          )
+          .withMethod(
+            const DiscoveryMethodResult(
+              method: DiscoveryMethod.neighbor,
+              phase: DiscoveryMethodPhase.completed,
+            ),
+          );
+
+      expect(report.canComparePresence, isTrue);
+      expect(report.isPartial, isFalse);
+    },
+  );
+
+  test('hızlı tarama atlanan yöntemlerle tamamlanır ama kıyaslanmaz', () {
+    var report = ScanReport.started(
+      DateTime(2026, 10, 15),
+      scanMode: ScanMode.quick,
+    );
+    for (final method in DiscoveryMethod.values) {
       report = report.withMethod(
         DiscoveryMethodResult(
           method: method,
-          phase: DiscoveryMethodPhase.completed,
+          phase:
+              const {
+                DiscoveryMethod.mdns,
+                DiscoveryMethod.ssdp,
+                DiscoveryMethod.onvif,
+              }.contains(method)
+              ? DiscoveryMethodPhase.skipped
+              : DiscoveryMethodPhase.completed,
         ),
       );
     }
 
-    expect(report.canComparePresence, isFalse);
-
-    report = report.withMethod(
-      const DiscoveryMethodResult(
-        method: DiscoveryMethod.reachability,
-        phase: DiscoveryMethodPhase.completed,
-      ),
-    );
-
-    expect(report.canComparePresence, isTrue);
-
-    report = report
-        .withMethod(
-          const DiscoveryMethodResult(
-            method: DiscoveryMethod.reachability,
-            phase: DiscoveryMethodPhase.unavailable,
-          ),
-        )
-        .withMethod(
-          const DiscoveryMethodResult(
-            method: DiscoveryMethod.neighbor,
-            phase: DiscoveryMethodPhase.completed,
-          ),
-        );
-
-    expect(report.canComparePresence, isTrue);
     expect(report.isPartial, isFalse);
+    expect(report.canComparePresence, isFalse);
+    expect(report.scanMode, ScanMode.quick);
   });
 }

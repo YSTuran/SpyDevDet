@@ -8,6 +8,7 @@ import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/device_identity_resolver.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
 
 class DriftScanHistoryRepository implements ScanHistoryRepository {
   const DriftScanHistoryRepository(
@@ -47,7 +48,10 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
         );
         final existing = await _knownDevice(stableKey);
         final isLocalDevice = candidateKeys.contains('local:this-installation');
-        final familiarity = isLocalDevice || existing?.isKnown == true
+        final familiarity =
+            isLocalDevice ||
+                existing?.isKnown == true ||
+                existing?.isOwned == true
             ? DeviceFamiliarity.known
             : existing == null
             ? DeviceFamiliarity.newDevice
@@ -56,6 +60,13 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
           stableKey: stableKey,
           customName: existing?.customName,
           note: existing?.note,
+          categoryOverride:
+              _enumByNameOrNull(
+                DeviceCategory.values,
+                existing?.categoryOverride,
+              ) ??
+              device.categoryOverride,
+          isOwned: existing?.isOwned ?? device.isOwned,
           familiarity: familiarity,
           firstSeenAt: existing?.firstSeenAt ?? completedAt,
           lastSeenAt: completedAt,
@@ -75,6 +86,10 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
                 lastIpAddress: device.ipAddress,
                 lastMacAddress: Value(device.macAddress),
                 vendor: Value(device.vendor),
+                categoryOverride: Value(
+                  existing?.categoryOverride ?? device.categoryOverride?.name,
+                ),
+                isOwned: Value(existing?.isOwned ?? device.isOwned),
               ),
             );
         await _rememberIdentityAliases(
@@ -110,6 +125,7 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
               missingDevicesJson: _encodeMissingDevices(missingDevices),
               presenceComparable: record.report.canComparePresence,
               elapsedMillis: record.elapsed.inMilliseconds,
+              scanMode: Value(record.report.scanMode.name),
             ),
           );
 
@@ -145,25 +161,85 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
     required bool isKnown,
     required String? customName,
     required String? note,
+    bool? isOwned,
+    DeviceCategory? categoryOverride,
+    bool clearCategoryOverride = false,
   }) async {
     await (database.update(
       database.knownDevices,
     )..where((table) => table.stableKey.equals(stableKey))).write(
       KnownDevicesCompanion(
         customName: Value(_normalizeOptional(customName)),
-        isKnown: Value(isKnown),
+        isKnown: Value(isKnown || isOwned == true),
         note: Value(_normalizeOptional(note)),
+        isOwned: isOwned == null ? const Value.absent() : Value(isOwned),
+        categoryOverride: clearCategoryOverride
+            ? const Value(null)
+            : categoryOverride == null
+            ? const Value.absent()
+            : Value(categoryOverride.name),
       ),
     );
   }
 
   @override
-  Future<List<ScanHistorySummary>> getHistory({int limit = 50}) async {
-    final query = database.select(database.scanSessions)
+  Future<List<ScanHistorySummary>> getHistory({
+    int limit = 50,
+    String? networkKey,
+  }) async {
+    final query = database.select(database.scanSessions);
+    if (networkKey != null) {
+      query.where((table) => table.networkKey.equals(networkKey));
+    }
+    query
       ..orderBy([(table) => OrderingTerm.desc(table.completedAt)])
       ..limit(limit.clamp(1, 200));
     final rows = await query.get();
     return List.unmodifiable(rows.map(_summaryFromRow));
+  }
+
+  @override
+  Future<List<NetworkProfileSummary>> getNetworkProfiles() async {
+    final profiles = await (database.select(
+      database.networkProfiles,
+    )..orderBy([(table) => OrderingTerm.desc(table.lastSeenAt)])).get();
+    final sessions = await database.select(database.scanSessions).get();
+    return List.unmodifiable(
+      profiles.map((profile) {
+        final matching =
+            sessions
+                .where((session) => session.networkKey == profile.networkKey)
+                .toList()
+              ..sort(
+                (first, second) =>
+                    second.completedAt.compareTo(first.completedAt),
+              );
+        return NetworkProfileSummary(
+          networkKey: profile.networkKey,
+          customName: profile.customName,
+          firstSeenAt: profile.firstSeenAt,
+          lastSeenAt: profile.lastSeenAt,
+          scanCount: matching.length,
+          lastDeviceCount: matching.isEmpty
+              ? 0
+              : matching.first.totalDeviceCount,
+        );
+      }),
+    );
+  }
+
+  @override
+  Future<void> renameNetworkProfile({
+    required String networkKey,
+    required String? customName,
+  }) async {
+    await (database.update(
+      database.networkProfiles,
+    )..where((table) => table.networkKey.equals(networkKey))).write(
+      NetworkProfilesCompanion(
+        customName: Value(_normalizeOptional(customName)),
+      ),
+    );
   }
 
   @override
@@ -275,6 +351,7 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
         .insertOnConflictUpdate(
           NetworkProfilesCompanion.insert(
             networkKey: networkKey,
+            customName: Value(existing?.customName),
             firstSeenAt: existing?.firstSeenAt ?? observedAt,
             lastSeenAt: observedAt,
           ),
@@ -458,6 +535,7 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
       missingDevices: _decodeMissingDevices(row.missingDevicesJson),
       elapsed: Duration(milliseconds: row.elapsedMillis),
       methods: _decodeMethods(row.methodsJson),
+      scanMode: _enumByName(ScanMode.values, row.scanMode, ScanMode.detailed),
     );
   }
 
@@ -521,6 +599,11 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
         row.category,
         DeviceCategory.unknown,
       ),
+      categoryOverride: _enumByNameOrNull(
+        DeviceCategory.values,
+        profile?.categoryOverride,
+      ),
+      isOwned: profile?.isOwned ?? false,
       confidence: _enumByName(
         ConfidenceLevel.values,
         row.confidence,
@@ -711,6 +794,18 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
       }
     }
     return fallback;
+  }
+
+  T? _enumByNameOrNull<T extends Enum>(List<T> values, String? name) {
+    if (name == null) {
+      return null;
+    }
+    for (final value in values) {
+      if (value.name == name) {
+        return value;
+      }
+    }
+    return null;
   }
 
   String? _normalizeOptional(String? value) {

@@ -5,6 +5,7 @@ import 'package:spy_dev_det/features/history/data/drift_scan_history_repository.
 import 'package:spy_dev_det/features/history/domain/scan_history_repository.dart';
 import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
 void main() {
@@ -390,6 +391,68 @@ void main() {
       expect(history.last.networkKey, firstStrongKey);
     },
   );
+
+  test('sahiplik ve kategori düzeltmesini sonraki taramada korur', () async {
+    final first = await repository.recordCompletedScan(
+      _record(ipAddress: '192.168.1.20', minute: 0),
+    );
+    await repository.updateDeviceProfile(
+      stableKey: first.single.stableKey!,
+      isKnown: false,
+      isOwned: true,
+      categoryOverride: DeviceCategory.mediaDevice,
+      customName: 'Salon cihazı',
+      note: null,
+    );
+
+    final next = await repository.recordCompletedScan(
+      _record(ipAddress: '192.168.1.21', minute: 5),
+    );
+
+    expect(next.single.isOwned, isTrue);
+    expect(next.single.familiarity, DeviceFamiliarity.known);
+    expect(next.single.categoryOverride, DeviceCategory.mediaDevice);
+    expect(next.single.effectiveCategory, DeviceCategory.mediaDevice);
+  });
+
+  test('ağ profillerini adlandırır ve geçmişi ağa göre filtreler', () async {
+    const firstNetwork = '192.168.1.0/24|gateway:192.168.1.1';
+    const secondNetwork = '10.0.0.0/24|gateway:10.0.0.1';
+    await repository.recordCompletedScan(
+      _record(ipAddress: '192.168.1.20', minute: 0, networkKey: firstNetwork),
+    );
+    await repository.recordCompletedScan(
+      _record(ipAddress: '10.0.0.20', minute: 5, networkKey: secondNetwork),
+    );
+
+    await repository.renameNetworkProfile(
+      networkKey: firstNetwork,
+      customName: 'Ev ağı',
+    );
+    final profiles = await repository.getNetworkProfiles();
+    final firstProfile = profiles.singleWhere(
+      (profile) => profile.networkKey == firstNetwork,
+    );
+    final filteredHistory = await repository.getHistory(
+      networkKey: firstNetwork,
+    );
+
+    expect(profiles, hasLength(2));
+    expect(firstProfile.displayName, 'Ev ağı');
+    expect(firstProfile.scanCount, 1);
+    expect(filteredHistory, hasLength(1));
+    expect(filteredHistory.single.networkKey, firstNetwork);
+  });
+
+  test('tarama modunu geçmişte saklar', () async {
+    await repository.recordCompletedScan(
+      _record(ipAddress: '192.168.1.20', minute: 0, scanMode: ScanMode.quick),
+    );
+
+    final history = await repository.getHistory();
+
+    expect(history.single.scanMode, ScanMode.quick);
+  });
 }
 
 CompletedScanRecord _record({
@@ -398,6 +461,8 @@ CompletedScanRecord _record({
   List<({String ipAddress, String macAddress})>? devices,
   bool discoveryComplete = true,
   List<String> networkIdentityKeys = const [],
+  String networkKey = '192.168.1.0/24|gateway:192.168.1.1',
+  ScanMode scanMode = ScanMode.detailed,
 }) {
   final startedAt = DateTime(2026, 10, 15, 10, minute);
   final completedAt = startedAt.add(const Duration(seconds: 2));
@@ -413,12 +478,13 @@ CompletedScanRecord _record({
       ),
   };
   return CompletedScanRecord(
-    networkKey: '192.168.1.0/24|gateway:192.168.1.1',
+    networkKey: networkKey,
     networkIdentityKeys: networkIdentityKeys,
     report: ScanReport(
       startedAt: startedAt,
       completedAt: completedAt,
       methods: methods,
+      scanMode: scanMode,
     ),
     elapsed: const Duration(seconds: 2),
     devices:

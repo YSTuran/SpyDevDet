@@ -11,6 +11,7 @@ import 'package:spy_dev_det/features/scan/domain/device_scanner.dart';
 import 'package:spy_dev_det/features/scan/domain/neighbor_snapshot.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_cancellation_token.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_event.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
@@ -107,6 +108,44 @@ void main() {
 
     expect(discoveryStarted.isCompleted, isTrue);
     expect(events.whereType<ScanCompleted>(), hasLength(1));
+  });
+
+  test('hızlı mod multicast keşiflerini çalıştırmadan atlandı sayar', () async {
+    final plan = ScanPlan.fromNetwork(
+      const NetworkSnapshot(
+        localIpv4: '192.168.1.2',
+        prefixLength: 30,
+        interfaceName: 'test',
+        gatewayIpv4: '192.168.1.1',
+        isWifi: true,
+        isVpn: false,
+      ),
+      mode: ScanMode.quick,
+    );
+    final scanner = LocalNetworkDeviceScanner(
+      tcpScanner: const _TcpScanner(),
+      reachabilityDiscovery: const _ReachabilityDiscovery(),
+      mdnsDiscovery: const _FailIfCalledDiscovery(),
+      ssdpDiscovery: const _FailIfCalledDiscovery(),
+      onvifDiscovery: const _FailIfCalledDiscovery(),
+      neighborRepository: const _NeighborRepository(),
+      multicastLock: const _MulticastLock(),
+    );
+
+    final events = await scanner.scan(plan, ScanCancellationToken()).toList();
+    final results = <DiscoveryMethod, DiscoveryMethodResult>{
+      for (final event in events.whereType<ScanMethodStatusChanged>())
+        event.result.method: event.result,
+    };
+
+    expect(results[DiscoveryMethod.mdns]?.phase, DiscoveryMethodPhase.skipped);
+    expect(results[DiscoveryMethod.ssdp]?.phase, DiscoveryMethodPhase.skipped);
+    expect(results[DiscoveryMethod.onvif]?.phase, DiscoveryMethodPhase.skipped);
+    expect(results[DiscoveryMethod.tcp]?.phase, DiscoveryMethodPhase.completed);
+    expect(
+      results[DiscoveryMethod.neighbor]?.phase,
+      DiscoveryMethodPhase.completed,
+    );
   });
 }
 
@@ -251,6 +290,16 @@ class _EmptyDiscovery implements DeviceDiscovery {
     ScanPlan plan,
     ScanCancellationToken cancellationToken,
   ) async => const DeviceDiscoveryResult.empty();
+}
+
+class _FailIfCalledDiscovery implements DeviceDiscovery {
+  const _FailIfCalledDiscovery();
+
+  @override
+  Future<DeviceDiscoveryResult> discover(
+    ScanPlan plan,
+    ScanCancellationToken cancellationToken,
+  ) => throw StateError('Hızlı mod bu keşfi çalıştırmamalı');
 }
 
 class _NeighborRepository implements NeighborRepository {

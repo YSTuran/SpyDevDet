@@ -7,6 +7,7 @@ import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/device_scanner.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_cancellation_token.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_event.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
@@ -26,6 +27,7 @@ class TcpDeviceScanner implements DeviceScanner {
     _ProbePort(8080, 'Alternatif HTTP'),
     _ProbePort(9100, 'Yazıcı servisi'),
   ];
+  static const _quickPortNumbers = {80, 443, 554, 8000, 8080};
   static const _androidProbeLimit = 20;
 
   final int maxConcurrentProbes;
@@ -77,14 +79,19 @@ class TcpDeviceScanner implements DeviceScanner {
 
     final stopwatch = Stopwatch()..start();
     controller.add(ScanStarted(totalTargets: plan.targets.length));
+    final ports = plan.mode == ScanMode.quick
+        ? _ports
+              .where((port) => _quickPortNumbers.contains(port.number))
+              .toList(growable: false)
+        : _ports;
 
     final openPortsByHost = <String, Set<int>>{};
     final rejectedPortByHost = <String, int>{};
     final responsiveHosts = <String>{};
     final remainingProbesByHost = <String, int>{
-      for (final target in plan.targets) target: _ports.length,
+      for (final target in plan.targets) target: ports.length,
     };
-    final totalJobs = plan.targets.length * _ports.length;
+    final totalJobs = plan.targets.length * ports.length;
     var nextJob = 0;
     var completedTargets = 0;
     var sentRequests = 0;
@@ -98,10 +105,10 @@ class TcpDeviceScanner implements DeviceScanner {
           return;
         }
 
-        final hostIndex = jobIndex ~/ _ports.length;
-        final portIndex = jobIndex % _ports.length;
+        final hostIndex = jobIndex ~/ ports.length;
+        final portIndex = jobIndex % ports.length;
         final host = plan.targets[hostIndex];
-        final probePort = _ports[portIndex];
+        final probePort = ports[portIndex];
         sentRequests++;
         final probeResult = await _probe(
           host: host,
@@ -190,7 +197,7 @@ class TcpDeviceScanner implements DeviceScanner {
           acceptedResponses: responsiveHosts.length,
           timeoutCount: timeoutCount,
           detail:
-              'Sekiz sınırlı TCP portunda gerçek bağlantı denemeleri; '
+              '${ports.length} sınırlı TCP portunda gerçek bağlantı denemeleri; '
               'en fazla $workerCount eşzamanlı',
         ),
       ),

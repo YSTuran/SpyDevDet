@@ -21,6 +21,9 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   yerel API'lerinden alınır.
 - Yalnızca RFC1918 özel adres aralıkları taranır.
 - Tarama en fazla 254 uzak adres ve sekiz yaygın TCP portuyla sınırlıdır.
+- Hızlı mod erişilebilirlik, komşu tablosu ve kamera odaklı beş TCP portunu
+  kontrol eder. Ayrıntılı mod sekiz TCP portunun yanı sıra mDNS, SSDP ve ONVIF
+  duyurularını da çalıştırır. Atlanan yöntemler tanılamada açıkça gösterilir.
 - Android ve Windows'ta yerel adreslere işletim sisteminin erişilebilirlik
   kontrolü uygulanır. Windows tarafında sınırlı ICMP Echo kullanılır. Açık bir
   servis portu olmasa da yanıt veren cihazlar gözlemlenebilir; taramayı
@@ -75,10 +78,19 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   geç dönen ağ kontrolü kaydedilmiş sonucu geçersiz kılamaz. Uygulama arka
   plana geçtiğinde de devam eden tarama güvenli biçimde iptal edilir.
 - Kullanıcı cihazı bilinen olarak işaretleyebilir, özel ad ve not ekleyebilir.
-  Sonraki taramalarda yeni, daha önce görülen ve bilinen cihazlar ayrılır.
-- TCP, mDNS, SSDP ve ONVIF aşamalarıyla birlikte erişilebilirlik veya komşu
-  tablosu yöntemlerinden en az biri tamamlandığında önceki taramada olup bu taramada
-  görülmeyen cihazlar listelenir. Tarama geçmişi kullanıcı tarafından
+  Ayrıca cihazın kendisine/evine ait olduğunu belirtebilir ve otomatik cihaz
+  türünü düzeltebilir. Otomatik tahmin kaybedilmeden kullanıcı düzeltmesi ayrı
+  saklanır. Sonraki taramalarda yeni, daha önce görülen ve bilinen cihazlar ayrılır.
+- Cihazlar ad, IP, MAC, üretici ve servis bilgisiyle aranabilir; tanınma,
+  kategori, üretici, MAC ve inceleme durumuna göre filtrelenip sıralanabilir.
+- İnceleme sonucu toplam puanla birlikte puana katkı yapan her bulguyu gösterir.
+  Bir cihazın görünmemesi halinde uyku, güvenlik duvarı, misafir ağı, istemci
+  izolasyonu ve kullanılamayan keşif yöntemleri gibi olası nedenler açıklanır.
+- Ağlar ayrı yerel profillerde tutulur, kullanıcı tarafından adlandırılabilir
+  ve her ağın tarama geçmişi ayrıca görüntülenebilir.
+- Yalnız bütün ayrıntılı keşif yöntemlerinin başarıyla tamamlandığı taramalarda
+  önceki taramada olup bu taramada görülmeyen cihazlar listelenir. Hızlı veya
+  kısmi tarama hatalı "görülmedi" sonucu üretmez. Tarama geçmişi kullanıcı tarafından
   tek tek veya topluca silinebilir; ayrıca bilinen cihaz profilleri, özel adlar
   ve notlar dahil bütün yerel veriler de temizlenebilir.
 
@@ -101,6 +113,10 @@ yapılması önerilir:
 6. Tanılama ekranındaki gerçek TCP deneme, yanıt ve zaman aşımı sayılarını
    kaydet. Görünmeyen cihazların uyku, güvenlik duvarı veya istemci izolasyonu
    nedeniyle yanıt vermeyebileceğini göz önünde bulundur.
+7. Aynı ağı önce hızlı, sonra ayrıntılı modda tara; ayrıntılı modda mDNS, SSDP
+   ve ONVIF aşamalarının çalıştığını kontrol et.
+8. Ağ profiline bir ad, bir cihaza sahiplik/kategori düzeltmesi ekle; uygulamayı
+   yeniden açtıktan ve tekrar taradıktan sonra bilgilerin korunduğunu doğrula.
 
 ## OUI verisini güncelleme
 

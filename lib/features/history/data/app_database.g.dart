@@ -108,6 +108,32 @@ class $KnownDevicesTable extends KnownDevices
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _categoryOverrideMeta = const VerificationMeta(
+    'categoryOverride',
+  );
+  @override
+  late final GeneratedColumn<String> categoryOverride = GeneratedColumn<String>(
+    'category_override',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isOwnedMeta = const VerificationMeta(
+    'isOwned',
+  );
+  @override
+  late final GeneratedColumn<bool> isOwned = GeneratedColumn<bool>(
+    'is_owned',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_owned" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     stableKey,
@@ -119,6 +145,8 @@ class $KnownDevicesTable extends KnownDevices
     lastIpAddress,
     lastMacAddress,
     vendor,
+    categoryOverride,
+    isOwned,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -206,6 +234,21 @@ class $KnownDevicesTable extends KnownDevices
         vendor.isAcceptableOrUnknown(data['vendor']!, _vendorMeta),
       );
     }
+    if (data.containsKey('category_override')) {
+      context.handle(
+        _categoryOverrideMeta,
+        categoryOverride.isAcceptableOrUnknown(
+          data['category_override']!,
+          _categoryOverrideMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_owned')) {
+      context.handle(
+        _isOwnedMeta,
+        isOwned.isAcceptableOrUnknown(data['is_owned']!, _isOwnedMeta),
+      );
+    }
     return context;
   }
 
@@ -251,6 +294,14 @@ class $KnownDevicesTable extends KnownDevices
         DriftSqlType.string,
         data['${effectivePrefix}vendor'],
       ),
+      categoryOverride: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category_override'],
+      ),
+      isOwned: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_owned'],
+      )!,
     );
   }
 
@@ -270,6 +321,8 @@ class KnownDevice extends DataClass implements Insertable<KnownDevice> {
   final String lastIpAddress;
   final String? lastMacAddress;
   final String? vendor;
+  final String? categoryOverride;
+  final bool isOwned;
   const KnownDevice({
     required this.stableKey,
     this.customName,
@@ -280,6 +333,8 @@ class KnownDevice extends DataClass implements Insertable<KnownDevice> {
     required this.lastIpAddress,
     this.lastMacAddress,
     this.vendor,
+    this.categoryOverride,
+    required this.isOwned,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -301,6 +356,10 @@ class KnownDevice extends DataClass implements Insertable<KnownDevice> {
     if (!nullToAbsent || vendor != null) {
       map['vendor'] = Variable<String>(vendor);
     }
+    if (!nullToAbsent || categoryOverride != null) {
+      map['category_override'] = Variable<String>(categoryOverride);
+    }
+    map['is_owned'] = Variable<bool>(isOwned);
     return map;
   }
 
@@ -321,6 +380,10 @@ class KnownDevice extends DataClass implements Insertable<KnownDevice> {
       vendor: vendor == null && nullToAbsent
           ? const Value.absent()
           : Value(vendor),
+      categoryOverride: categoryOverride == null && nullToAbsent
+          ? const Value.absent()
+          : Value(categoryOverride),
+      isOwned: Value(isOwned),
     );
   }
 
@@ -339,6 +402,8 @@ class KnownDevice extends DataClass implements Insertable<KnownDevice> {
       lastIpAddress: serializer.fromJson<String>(json['lastIpAddress']),
       lastMacAddress: serializer.fromJson<String?>(json['lastMacAddress']),
       vendor: serializer.fromJson<String?>(json['vendor']),
+      categoryOverride: serializer.fromJson<String?>(json['categoryOverride']),
+      isOwned: serializer.fromJson<bool>(json['isOwned']),
     );
   }
   @override
@@ -354,6 +419,8 @@ class KnownDevice extends DataClass implements Insertable<KnownDevice> {
       'lastIpAddress': serializer.toJson<String>(lastIpAddress),
       'lastMacAddress': serializer.toJson<String?>(lastMacAddress),
       'vendor': serializer.toJson<String?>(vendor),
+      'categoryOverride': serializer.toJson<String?>(categoryOverride),
+      'isOwned': serializer.toJson<bool>(isOwned),
     };
   }
 
@@ -367,6 +434,8 @@ class KnownDevice extends DataClass implements Insertable<KnownDevice> {
     String? lastIpAddress,
     Value<String?> lastMacAddress = const Value.absent(),
     Value<String?> vendor = const Value.absent(),
+    Value<String?> categoryOverride = const Value.absent(),
+    bool? isOwned,
   }) => KnownDevice(
     stableKey: stableKey ?? this.stableKey,
     customName: customName.present ? customName.value : this.customName,
@@ -379,6 +448,10 @@ class KnownDevice extends DataClass implements Insertable<KnownDevice> {
         ? lastMacAddress.value
         : this.lastMacAddress,
     vendor: vendor.present ? vendor.value : this.vendor,
+    categoryOverride: categoryOverride.present
+        ? categoryOverride.value
+        : this.categoryOverride,
+    isOwned: isOwned ?? this.isOwned,
   );
   KnownDevice copyWithCompanion(KnownDevicesCompanion data) {
     return KnownDevice(
@@ -401,6 +474,10 @@ class KnownDevice extends DataClass implements Insertable<KnownDevice> {
           ? data.lastMacAddress.value
           : this.lastMacAddress,
       vendor: data.vendor.present ? data.vendor.value : this.vendor,
+      categoryOverride: data.categoryOverride.present
+          ? data.categoryOverride.value
+          : this.categoryOverride,
+      isOwned: data.isOwned.present ? data.isOwned.value : this.isOwned,
     );
   }
 
@@ -415,7 +492,9 @@ class KnownDevice extends DataClass implements Insertable<KnownDevice> {
           ..write('lastSeenAt: $lastSeenAt, ')
           ..write('lastIpAddress: $lastIpAddress, ')
           ..write('lastMacAddress: $lastMacAddress, ')
-          ..write('vendor: $vendor')
+          ..write('vendor: $vendor, ')
+          ..write('categoryOverride: $categoryOverride, ')
+          ..write('isOwned: $isOwned')
           ..write(')'))
         .toString();
   }
@@ -431,6 +510,8 @@ class KnownDevice extends DataClass implements Insertable<KnownDevice> {
     lastIpAddress,
     lastMacAddress,
     vendor,
+    categoryOverride,
+    isOwned,
   );
   @override
   bool operator ==(Object other) =>
@@ -444,7 +525,9 @@ class KnownDevice extends DataClass implements Insertable<KnownDevice> {
           other.lastSeenAt == this.lastSeenAt &&
           other.lastIpAddress == this.lastIpAddress &&
           other.lastMacAddress == this.lastMacAddress &&
-          other.vendor == this.vendor);
+          other.vendor == this.vendor &&
+          other.categoryOverride == this.categoryOverride &&
+          other.isOwned == this.isOwned);
 }
 
 class KnownDevicesCompanion extends UpdateCompanion<KnownDevice> {
@@ -457,6 +540,8 @@ class KnownDevicesCompanion extends UpdateCompanion<KnownDevice> {
   final Value<String> lastIpAddress;
   final Value<String?> lastMacAddress;
   final Value<String?> vendor;
+  final Value<String?> categoryOverride;
+  final Value<bool> isOwned;
   final Value<int> rowid;
   const KnownDevicesCompanion({
     this.stableKey = const Value.absent(),
@@ -468,6 +553,8 @@ class KnownDevicesCompanion extends UpdateCompanion<KnownDevice> {
     this.lastIpAddress = const Value.absent(),
     this.lastMacAddress = const Value.absent(),
     this.vendor = const Value.absent(),
+    this.categoryOverride = const Value.absent(),
+    this.isOwned = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   KnownDevicesCompanion.insert({
@@ -480,6 +567,8 @@ class KnownDevicesCompanion extends UpdateCompanion<KnownDevice> {
     required String lastIpAddress,
     this.lastMacAddress = const Value.absent(),
     this.vendor = const Value.absent(),
+    this.categoryOverride = const Value.absent(),
+    this.isOwned = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : stableKey = Value(stableKey),
        firstSeenAt = Value(firstSeenAt),
@@ -495,6 +584,8 @@ class KnownDevicesCompanion extends UpdateCompanion<KnownDevice> {
     Expression<String>? lastIpAddress,
     Expression<String>? lastMacAddress,
     Expression<String>? vendor,
+    Expression<String>? categoryOverride,
+    Expression<bool>? isOwned,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -507,6 +598,8 @@ class KnownDevicesCompanion extends UpdateCompanion<KnownDevice> {
       if (lastIpAddress != null) 'last_ip_address': lastIpAddress,
       if (lastMacAddress != null) 'last_mac_address': lastMacAddress,
       if (vendor != null) 'vendor': vendor,
+      if (categoryOverride != null) 'category_override': categoryOverride,
+      if (isOwned != null) 'is_owned': isOwned,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -521,6 +614,8 @@ class KnownDevicesCompanion extends UpdateCompanion<KnownDevice> {
     Value<String>? lastIpAddress,
     Value<String?>? lastMacAddress,
     Value<String?>? vendor,
+    Value<String?>? categoryOverride,
+    Value<bool>? isOwned,
     Value<int>? rowid,
   }) {
     return KnownDevicesCompanion(
@@ -533,6 +628,8 @@ class KnownDevicesCompanion extends UpdateCompanion<KnownDevice> {
       lastIpAddress: lastIpAddress ?? this.lastIpAddress,
       lastMacAddress: lastMacAddress ?? this.lastMacAddress,
       vendor: vendor ?? this.vendor,
+      categoryOverride: categoryOverride ?? this.categoryOverride,
+      isOwned: isOwned ?? this.isOwned,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -567,6 +664,12 @@ class KnownDevicesCompanion extends UpdateCompanion<KnownDevice> {
     if (vendor.present) {
       map['vendor'] = Variable<String>(vendor.value);
     }
+    if (categoryOverride.present) {
+      map['category_override'] = Variable<String>(categoryOverride.value);
+    }
+    if (isOwned.present) {
+      map['is_owned'] = Variable<bool>(isOwned.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -585,6 +688,8 @@ class KnownDevicesCompanion extends UpdateCompanion<KnownDevice> {
           ..write('lastIpAddress: $lastIpAddress, ')
           ..write('lastMacAddress: $lastMacAddress, ')
           ..write('vendor: $vendor, ')
+          ..write('categoryOverride: $categoryOverride, ')
+          ..write('isOwned: $isOwned, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -887,6 +992,17 @@ class $NetworkProfilesTable extends NetworkProfiles
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _customNameMeta = const VerificationMeta(
+    'customName',
+  );
+  @override
+  late final GeneratedColumn<String> customName = GeneratedColumn<String>(
+    'custom_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _firstSeenAtMeta = const VerificationMeta(
     'firstSeenAt',
   );
@@ -910,7 +1026,12 @@ class $NetworkProfilesTable extends NetworkProfiles
     requiredDuringInsert: true,
   );
   @override
-  List<GeneratedColumn> get $columns => [networkKey, firstSeenAt, lastSeenAt];
+  List<GeneratedColumn> get $columns => [
+    networkKey,
+    customName,
+    firstSeenAt,
+    lastSeenAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -930,6 +1051,12 @@ class $NetworkProfilesTable extends NetworkProfiles
       );
     } else if (isInserting) {
       context.missing(_networkKeyMeta);
+    }
+    if (data.containsKey('custom_name')) {
+      context.handle(
+        _customNameMeta,
+        customName.isAcceptableOrUnknown(data['custom_name']!, _customNameMeta),
+      );
     }
     if (data.containsKey('first_seen_at')) {
       context.handle(
@@ -966,6 +1093,10 @@ class $NetworkProfilesTable extends NetworkProfiles
         DriftSqlType.string,
         data['${effectivePrefix}network_key'],
       )!,
+      customName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}custom_name'],
+      ),
       firstSeenAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}first_seen_at'],
@@ -985,10 +1116,12 @@ class $NetworkProfilesTable extends NetworkProfiles
 
 class NetworkProfile extends DataClass implements Insertable<NetworkProfile> {
   final String networkKey;
+  final String? customName;
   final DateTime firstSeenAt;
   final DateTime lastSeenAt;
   const NetworkProfile({
     required this.networkKey,
+    this.customName,
     required this.firstSeenAt,
     required this.lastSeenAt,
   });
@@ -996,6 +1129,9 @@ class NetworkProfile extends DataClass implements Insertable<NetworkProfile> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['network_key'] = Variable<String>(networkKey);
+    if (!nullToAbsent || customName != null) {
+      map['custom_name'] = Variable<String>(customName);
+    }
     map['first_seen_at'] = Variable<DateTime>(firstSeenAt);
     map['last_seen_at'] = Variable<DateTime>(lastSeenAt);
     return map;
@@ -1004,6 +1140,9 @@ class NetworkProfile extends DataClass implements Insertable<NetworkProfile> {
   NetworkProfilesCompanion toCompanion(bool nullToAbsent) {
     return NetworkProfilesCompanion(
       networkKey: Value(networkKey),
+      customName: customName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customName),
       firstSeenAt: Value(firstSeenAt),
       lastSeenAt: Value(lastSeenAt),
     );
@@ -1016,6 +1155,7 @@ class NetworkProfile extends DataClass implements Insertable<NetworkProfile> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return NetworkProfile(
       networkKey: serializer.fromJson<String>(json['networkKey']),
+      customName: serializer.fromJson<String?>(json['customName']),
       firstSeenAt: serializer.fromJson<DateTime>(json['firstSeenAt']),
       lastSeenAt: serializer.fromJson<DateTime>(json['lastSeenAt']),
     );
@@ -1025,6 +1165,7 @@ class NetworkProfile extends DataClass implements Insertable<NetworkProfile> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'networkKey': serializer.toJson<String>(networkKey),
+      'customName': serializer.toJson<String?>(customName),
       'firstSeenAt': serializer.toJson<DateTime>(firstSeenAt),
       'lastSeenAt': serializer.toJson<DateTime>(lastSeenAt),
     };
@@ -1032,10 +1173,12 @@ class NetworkProfile extends DataClass implements Insertable<NetworkProfile> {
 
   NetworkProfile copyWith({
     String? networkKey,
+    Value<String?> customName = const Value.absent(),
     DateTime? firstSeenAt,
     DateTime? lastSeenAt,
   }) => NetworkProfile(
     networkKey: networkKey ?? this.networkKey,
+    customName: customName.present ? customName.value : this.customName,
     firstSeenAt: firstSeenAt ?? this.firstSeenAt,
     lastSeenAt: lastSeenAt ?? this.lastSeenAt,
   );
@@ -1044,6 +1187,9 @@ class NetworkProfile extends DataClass implements Insertable<NetworkProfile> {
       networkKey: data.networkKey.present
           ? data.networkKey.value
           : this.networkKey,
+      customName: data.customName.present
+          ? data.customName.value
+          : this.customName,
       firstSeenAt: data.firstSeenAt.present
           ? data.firstSeenAt.value
           : this.firstSeenAt,
@@ -1057,6 +1203,7 @@ class NetworkProfile extends DataClass implements Insertable<NetworkProfile> {
   String toString() {
     return (StringBuffer('NetworkProfile(')
           ..write('networkKey: $networkKey, ')
+          ..write('customName: $customName, ')
           ..write('firstSeenAt: $firstSeenAt, ')
           ..write('lastSeenAt: $lastSeenAt')
           ..write(')'))
@@ -1064,29 +1211,34 @@ class NetworkProfile extends DataClass implements Insertable<NetworkProfile> {
   }
 
   @override
-  int get hashCode => Object.hash(networkKey, firstSeenAt, lastSeenAt);
+  int get hashCode =>
+      Object.hash(networkKey, customName, firstSeenAt, lastSeenAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is NetworkProfile &&
           other.networkKey == this.networkKey &&
+          other.customName == this.customName &&
           other.firstSeenAt == this.firstSeenAt &&
           other.lastSeenAt == this.lastSeenAt);
 }
 
 class NetworkProfilesCompanion extends UpdateCompanion<NetworkProfile> {
   final Value<String> networkKey;
+  final Value<String?> customName;
   final Value<DateTime> firstSeenAt;
   final Value<DateTime> lastSeenAt;
   final Value<int> rowid;
   const NetworkProfilesCompanion({
     this.networkKey = const Value.absent(),
+    this.customName = const Value.absent(),
     this.firstSeenAt = const Value.absent(),
     this.lastSeenAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   NetworkProfilesCompanion.insert({
     required String networkKey,
+    this.customName = const Value.absent(),
     required DateTime firstSeenAt,
     required DateTime lastSeenAt,
     this.rowid = const Value.absent(),
@@ -1095,12 +1247,14 @@ class NetworkProfilesCompanion extends UpdateCompanion<NetworkProfile> {
        lastSeenAt = Value(lastSeenAt);
   static Insertable<NetworkProfile> custom({
     Expression<String>? networkKey,
+    Expression<String>? customName,
     Expression<DateTime>? firstSeenAt,
     Expression<DateTime>? lastSeenAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (networkKey != null) 'network_key': networkKey,
+      if (customName != null) 'custom_name': customName,
       if (firstSeenAt != null) 'first_seen_at': firstSeenAt,
       if (lastSeenAt != null) 'last_seen_at': lastSeenAt,
       if (rowid != null) 'rowid': rowid,
@@ -1109,12 +1263,14 @@ class NetworkProfilesCompanion extends UpdateCompanion<NetworkProfile> {
 
   NetworkProfilesCompanion copyWith({
     Value<String>? networkKey,
+    Value<String?>? customName,
     Value<DateTime>? firstSeenAt,
     Value<DateTime>? lastSeenAt,
     Value<int>? rowid,
   }) {
     return NetworkProfilesCompanion(
       networkKey: networkKey ?? this.networkKey,
+      customName: customName ?? this.customName,
       firstSeenAt: firstSeenAt ?? this.firstSeenAt,
       lastSeenAt: lastSeenAt ?? this.lastSeenAt,
       rowid: rowid ?? this.rowid,
@@ -1126,6 +1282,9 @@ class NetworkProfilesCompanion extends UpdateCompanion<NetworkProfile> {
     final map = <String, Expression>{};
     if (networkKey.present) {
       map['network_key'] = Variable<String>(networkKey.value);
+    }
+    if (customName.present) {
+      map['custom_name'] = Variable<String>(customName.value);
     }
     if (firstSeenAt.present) {
       map['first_seen_at'] = Variable<DateTime>(firstSeenAt.value);
@@ -1143,6 +1302,7 @@ class NetworkProfilesCompanion extends UpdateCompanion<NetworkProfile> {
   String toString() {
     return (StringBuffer('NetworkProfilesCompanion(')
           ..write('networkKey: $networkKey, ')
+          ..write('customName: $customName, ')
           ..write('firstSeenAt: $firstSeenAt, ')
           ..write('lastSeenAt: $lastSeenAt, ')
           ..write('rowid: $rowid')
@@ -1573,6 +1733,18 @@ class $ScanSessionsTable extends ScanSessions
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _scanModeMeta = const VerificationMeta(
+    'scanMode',
+  );
+  @override
+  late final GeneratedColumn<String> scanMode = GeneratedColumn<String>(
+    'scan_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('detailed'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1587,6 +1759,7 @@ class $ScanSessionsTable extends ScanSessions
     missingDevicesJson,
     presenceComparable,
     elapsedMillis,
+    scanMode,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1715,6 +1888,12 @@ class $ScanSessionsTable extends ScanSessions
     } else if (isInserting) {
       context.missing(_elapsedMillisMeta);
     }
+    if (data.containsKey('scan_mode')) {
+      context.handle(
+        _scanModeMeta,
+        scanMode.isAcceptableOrUnknown(data['scan_mode']!, _scanModeMeta),
+      );
+    }
     return context;
   }
 
@@ -1772,6 +1951,10 @@ class $ScanSessionsTable extends ScanSessions
         DriftSqlType.int,
         data['${effectivePrefix}elapsed_millis'],
       )!,
+      scanMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}scan_mode'],
+      )!,
     );
   }
 
@@ -1794,6 +1977,7 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
   final String missingDevicesJson;
   final bool presenceComparable;
   final int elapsedMillis;
+  final String scanMode;
   const ScanSession({
     required this.id,
     required this.networkKey,
@@ -1807,6 +1991,7 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
     required this.missingDevicesJson,
     required this.presenceComparable,
     required this.elapsedMillis,
+    required this.scanMode,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1823,6 +2008,7 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
     map['missing_devices_json'] = Variable<String>(missingDevicesJson);
     map['presence_comparable'] = Variable<bool>(presenceComparable);
     map['elapsed_millis'] = Variable<int>(elapsedMillis);
+    map['scan_mode'] = Variable<String>(scanMode);
     return map;
   }
 
@@ -1840,6 +2026,7 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
       missingDevicesJson: Value(missingDevicesJson),
       presenceComparable: Value(presenceComparable),
       elapsedMillis: Value(elapsedMillis),
+      scanMode: Value(scanMode),
     );
   }
 
@@ -1863,6 +2050,7 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
       ),
       presenceComparable: serializer.fromJson<bool>(json['presenceComparable']),
       elapsedMillis: serializer.fromJson<int>(json['elapsedMillis']),
+      scanMode: serializer.fromJson<String>(json['scanMode']),
     );
   }
   @override
@@ -1881,6 +2069,7 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
       'missingDevicesJson': serializer.toJson<String>(missingDevicesJson),
       'presenceComparable': serializer.toJson<bool>(presenceComparable),
       'elapsedMillis': serializer.toJson<int>(elapsedMillis),
+      'scanMode': serializer.toJson<String>(scanMode),
     };
   }
 
@@ -1897,6 +2086,7 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
     String? missingDevicesJson,
     bool? presenceComparable,
     int? elapsedMillis,
+    String? scanMode,
   }) => ScanSession(
     id: id ?? this.id,
     networkKey: networkKey ?? this.networkKey,
@@ -1910,6 +2100,7 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
     missingDevicesJson: missingDevicesJson ?? this.missingDevicesJson,
     presenceComparable: presenceComparable ?? this.presenceComparable,
     elapsedMillis: elapsedMillis ?? this.elapsedMillis,
+    scanMode: scanMode ?? this.scanMode,
   );
   ScanSession copyWithCompanion(ScanSessionsCompanion data) {
     return ScanSession(
@@ -1943,6 +2134,7 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
       elapsedMillis: data.elapsedMillis.present
           ? data.elapsedMillis.value
           : this.elapsedMillis,
+      scanMode: data.scanMode.present ? data.scanMode.value : this.scanMode,
     );
   }
 
@@ -1960,7 +2152,8 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
           ..write('missingDeviceCount: $missingDeviceCount, ')
           ..write('missingDevicesJson: $missingDevicesJson, ')
           ..write('presenceComparable: $presenceComparable, ')
-          ..write('elapsedMillis: $elapsedMillis')
+          ..write('elapsedMillis: $elapsedMillis, ')
+          ..write('scanMode: $scanMode')
           ..write(')'))
         .toString();
   }
@@ -1979,6 +2172,7 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
     missingDevicesJson,
     presenceComparable,
     elapsedMillis,
+    scanMode,
   );
   @override
   bool operator ==(Object other) =>
@@ -1995,7 +2189,8 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
           other.missingDeviceCount == this.missingDeviceCount &&
           other.missingDevicesJson == this.missingDevicesJson &&
           other.presenceComparable == this.presenceComparable &&
-          other.elapsedMillis == this.elapsedMillis);
+          other.elapsedMillis == this.elapsedMillis &&
+          other.scanMode == this.scanMode);
 }
 
 class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
@@ -2011,6 +2206,7 @@ class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
   final Value<String> missingDevicesJson;
   final Value<bool> presenceComparable;
   final Value<int> elapsedMillis;
+  final Value<String> scanMode;
   const ScanSessionsCompanion({
     this.id = const Value.absent(),
     this.networkKey = const Value.absent(),
@@ -2024,6 +2220,7 @@ class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
     this.missingDevicesJson = const Value.absent(),
     this.presenceComparable = const Value.absent(),
     this.elapsedMillis = const Value.absent(),
+    this.scanMode = const Value.absent(),
   });
   ScanSessionsCompanion.insert({
     this.id = const Value.absent(),
@@ -2038,6 +2235,7 @@ class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
     required String missingDevicesJson,
     required bool presenceComparable,
     required int elapsedMillis,
+    this.scanMode = const Value.absent(),
   }) : networkKey = Value(networkKey),
        startedAt = Value(startedAt),
        completedAt = Value(completedAt),
@@ -2062,6 +2260,7 @@ class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
     Expression<String>? missingDevicesJson,
     Expression<bool>? presenceComparable,
     Expression<int>? elapsedMillis,
+    Expression<String>? scanMode,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -2078,6 +2277,7 @@ class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
         'missing_devices_json': missingDevicesJson,
       if (presenceComparable != null) 'presence_comparable': presenceComparable,
       if (elapsedMillis != null) 'elapsed_millis': elapsedMillis,
+      if (scanMode != null) 'scan_mode': scanMode,
     });
   }
 
@@ -2094,6 +2294,7 @@ class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
     Value<String>? missingDevicesJson,
     Value<bool>? presenceComparable,
     Value<int>? elapsedMillis,
+    Value<String>? scanMode,
   }) {
     return ScanSessionsCompanion(
       id: id ?? this.id,
@@ -2108,6 +2309,7 @@ class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
       missingDevicesJson: missingDevicesJson ?? this.missingDevicesJson,
       presenceComparable: presenceComparable ?? this.presenceComparable,
       elapsedMillis: elapsedMillis ?? this.elapsedMillis,
+      scanMode: scanMode ?? this.scanMode,
     );
   }
 
@@ -2150,6 +2352,9 @@ class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
     if (elapsedMillis.present) {
       map['elapsed_millis'] = Variable<int>(elapsedMillis.value);
     }
+    if (scanMode.present) {
+      map['scan_mode'] = Variable<String>(scanMode.value);
+    }
     return map;
   }
 
@@ -2167,7 +2372,8 @@ class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
           ..write('missingDeviceCount: $missingDeviceCount, ')
           ..write('missingDevicesJson: $missingDevicesJson, ')
           ..write('presenceComparable: $presenceComparable, ')
-          ..write('elapsedMillis: $elapsedMillis')
+          ..write('elapsedMillis: $elapsedMillis, ')
+          ..write('scanMode: $scanMode')
           ..write(')'))
         .toString();
   }
@@ -3062,6 +3268,8 @@ typedef $$KnownDevicesTableCreateCompanionBuilder =
       required String lastIpAddress,
       Value<String?> lastMacAddress,
       Value<String?> vendor,
+      Value<String?> categoryOverride,
+      Value<bool> isOwned,
       Value<int> rowid,
     });
 typedef $$KnownDevicesTableUpdateCompanionBuilder =
@@ -3075,6 +3283,8 @@ typedef $$KnownDevicesTableUpdateCompanionBuilder =
       Value<String> lastIpAddress,
       Value<String?> lastMacAddress,
       Value<String?> vendor,
+      Value<String?> categoryOverride,
+      Value<bool> isOwned,
       Value<int> rowid,
     });
 
@@ -3170,6 +3380,16 @@ class $$KnownDevicesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get categoryOverride => $composableBuilder(
+    column: $table.categoryOverride,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isOwned => $composableBuilder(
+    column: $table.isOwned,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> deviceIdentityAliasesRefs(
     Expression<bool> Function($$DeviceIdentityAliasesTableFilterComposer f) f,
   ) {
@@ -3250,6 +3470,16 @@ class $$KnownDevicesTableOrderingComposer
     column: $table.vendor,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get categoryOverride => $composableBuilder(
+    column: $table.categoryOverride,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isOwned => $composableBuilder(
+    column: $table.isOwned,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$KnownDevicesTableAnnotationComposer
@@ -3297,6 +3527,14 @@ class $$KnownDevicesTableAnnotationComposer
 
   GeneratedColumn<String> get vendor =>
       $composableBuilder(column: $table.vendor, builder: (column) => column);
+
+  GeneratedColumn<String> get categoryOverride => $composableBuilder(
+    column: $table.categoryOverride,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isOwned =>
+      $composableBuilder(column: $table.isOwned, builder: (column) => column);
 
   Expression<T> deviceIdentityAliasesRefs<T extends Object>(
     Expression<T> Function($$DeviceIdentityAliasesTableAnnotationComposer a) f,
@@ -3362,6 +3600,8 @@ class $$KnownDevicesTableTableManager
                 Value<String> lastIpAddress = const Value.absent(),
                 Value<String?> lastMacAddress = const Value.absent(),
                 Value<String?> vendor = const Value.absent(),
+                Value<String?> categoryOverride = const Value.absent(),
+                Value<bool> isOwned = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => KnownDevicesCompanion(
                 stableKey: stableKey,
@@ -3373,6 +3613,8 @@ class $$KnownDevicesTableTableManager
                 lastIpAddress: lastIpAddress,
                 lastMacAddress: lastMacAddress,
                 vendor: vendor,
+                categoryOverride: categoryOverride,
+                isOwned: isOwned,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3386,6 +3628,8 @@ class $$KnownDevicesTableTableManager
                 required String lastIpAddress,
                 Value<String?> lastMacAddress = const Value.absent(),
                 Value<String?> vendor = const Value.absent(),
+                Value<String?> categoryOverride = const Value.absent(),
+                Value<bool> isOwned = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => KnownDevicesCompanion.insert(
                 stableKey: stableKey,
@@ -3397,6 +3641,8 @@ class $$KnownDevicesTableTableManager
                 lastIpAddress: lastIpAddress,
                 lastMacAddress: lastMacAddress,
                 vendor: vendor,
+                categoryOverride: categoryOverride,
+                isOwned: isOwned,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -3770,6 +4016,7 @@ typedef $$DeviceIdentityAliasesTableProcessedTableManager =
 typedef $$NetworkProfilesTableCreateCompanionBuilder =
     NetworkProfilesCompanion Function({
       required String networkKey,
+      Value<String?> customName,
       required DateTime firstSeenAt,
       required DateTime lastSeenAt,
       Value<int> rowid,
@@ -3777,6 +4024,7 @@ typedef $$NetworkProfilesTableCreateCompanionBuilder =
 typedef $$NetworkProfilesTableUpdateCompanionBuilder =
     NetworkProfilesCompanion Function({
       Value<String> networkKey,
+      Value<String?> customName,
       Value<DateTime> firstSeenAt,
       Value<DateTime> lastSeenAt,
       Value<int> rowid,
@@ -3839,6 +4087,11 @@ class $$NetworkProfilesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get customName => $composableBuilder(
+    column: $table.customName,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get firstSeenAt => $composableBuilder(
     column: $table.firstSeenAt,
     builder: (column) => ColumnFilters(column),
@@ -3890,6 +4143,11 @@ class $$NetworkProfilesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get customName => $composableBuilder(
+    column: $table.customName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get firstSeenAt => $composableBuilder(
     column: $table.firstSeenAt,
     builder: (column) => ColumnOrderings(column),
@@ -3912,6 +4170,11 @@ class $$NetworkProfilesTableAnnotationComposer
   });
   GeneratedColumn<String> get networkKey => $composableBuilder(
     column: $table.networkKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get customName => $composableBuilder(
+    column: $table.customName,
     builder: (column) => column,
   );
 
@@ -3983,11 +4246,13 @@ class $$NetworkProfilesTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> networkKey = const Value.absent(),
+                Value<String?> customName = const Value.absent(),
                 Value<DateTime> firstSeenAt = const Value.absent(),
                 Value<DateTime> lastSeenAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NetworkProfilesCompanion(
                 networkKey: networkKey,
+                customName: customName,
                 firstSeenAt: firstSeenAt,
                 lastSeenAt: lastSeenAt,
                 rowid: rowid,
@@ -3995,11 +4260,13 @@ class $$NetworkProfilesTableTableManager
           createCompanionCallback:
               ({
                 required String networkKey,
+                Value<String?> customName = const Value.absent(),
                 required DateTime firstSeenAt,
                 required DateTime lastSeenAt,
                 Value<int> rowid = const Value.absent(),
               }) => NetworkProfilesCompanion.insert(
                 networkKey: networkKey,
+                customName: customName,
                 firstSeenAt: firstSeenAt,
                 lastSeenAt: lastSeenAt,
                 rowid: rowid,
@@ -4386,6 +4653,7 @@ typedef $$ScanSessionsTableCreateCompanionBuilder =
       required String missingDevicesJson,
       required bool presenceComparable,
       required int elapsedMillis,
+      Value<String> scanMode,
     });
 typedef $$ScanSessionsTableUpdateCompanionBuilder =
     ScanSessionsCompanion Function({
@@ -4401,6 +4669,7 @@ typedef $$ScanSessionsTableUpdateCompanionBuilder =
       Value<String> missingDevicesJson,
       Value<bool> presenceComparable,
       Value<int> elapsedMillis,
+      Value<String> scanMode,
     });
 
 final class $$ScanSessionsTableReferences
@@ -4500,6 +4769,11 @@ class $$ScanSessionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get scanMode => $composableBuilder(
+    column: $table.scanMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> scanObservationsRefs(
     Expression<bool> Function($$ScanObservationsTableFilterComposer f) f,
   ) {
@@ -4594,6 +4868,11 @@ class $$ScanSessionsTableOrderingComposer
     column: $table.elapsedMillis,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get scanMode => $composableBuilder(
+    column: $table.scanMode,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ScanSessionsTableAnnotationComposer
@@ -4658,6 +4937,9 @@ class $$ScanSessionsTableAnnotationComposer
     column: $table.elapsedMillis,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get scanMode =>
+      $composableBuilder(column: $table.scanMode, builder: (column) => column);
 
   Expression<T> scanObservationsRefs<T extends Object>(
     Expression<T> Function($$ScanObservationsTableAnnotationComposer a) f,
@@ -4725,6 +5007,7 @@ class $$ScanSessionsTableTableManager
                 Value<String> missingDevicesJson = const Value.absent(),
                 Value<bool> presenceComparable = const Value.absent(),
                 Value<int> elapsedMillis = const Value.absent(),
+                Value<String> scanMode = const Value.absent(),
               }) => ScanSessionsCompanion(
                 id: id,
                 networkKey: networkKey,
@@ -4738,6 +5021,7 @@ class $$ScanSessionsTableTableManager
                 missingDevicesJson: missingDevicesJson,
                 presenceComparable: presenceComparable,
                 elapsedMillis: elapsedMillis,
+                scanMode: scanMode,
               ),
           createCompanionCallback:
               ({
@@ -4753,6 +5037,7 @@ class $$ScanSessionsTableTableManager
                 required String missingDevicesJson,
                 required bool presenceComparable,
                 required int elapsedMillis,
+                Value<String> scanMode = const Value.absent(),
               }) => ScanSessionsCompanion.insert(
                 id: id,
                 networkKey: networkKey,
@@ -4766,6 +5051,7 @@ class $$ScanSessionsTableTableManager
                 missingDevicesJson: missingDevicesJson,
                 presenceComparable: presenceComparable,
                 elapsedMillis: elapsedMillis,
+                scanMode: scanMode,
               ),
           withReferenceMapper: (p0) => p0
               .map(

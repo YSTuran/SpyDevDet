@@ -1,4 +1,6 @@
+import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
 class CompletedScanRecord {
@@ -29,6 +31,7 @@ class ScanHistorySummary {
     required this.missingDevices,
     required this.elapsed,
     required this.methods,
+    this.scanMode = ScanMode.detailed,
   });
 
   final int id;
@@ -41,6 +44,28 @@ class ScanHistorySummary {
   final List<MissingDeviceSummary> missingDevices;
   final Duration elapsed;
   final Map<DiscoveryMethod, DiscoveryMethodResult> methods;
+  final ScanMode scanMode;
+}
+
+class NetworkProfileSummary {
+  const NetworkProfileSummary({
+    required this.networkKey,
+    required this.firstSeenAt,
+    required this.lastSeenAt,
+    required this.scanCount,
+    required this.lastDeviceCount,
+    this.customName,
+  });
+
+  final String networkKey;
+  final String? customName;
+  final DateTime firstSeenAt;
+  final DateTime lastSeenAt;
+  final int scanCount;
+  final int lastDeviceCount;
+
+  String get displayName =>
+      customName?.trim().isNotEmpty == true ? customName!.trim() : 'Yerel ağ';
 }
 
 class MissingDeviceSummary {
@@ -72,9 +97,22 @@ abstract interface class ScanHistoryRepository {
     required bool isKnown,
     required String? customName,
     required String? note,
+    bool? isOwned,
+    DeviceCategory? categoryOverride,
+    bool clearCategoryOverride = false,
   });
 
-  Future<List<ScanHistorySummary>> getHistory({int limit = 50});
+  Future<List<ScanHistorySummary>> getHistory({
+    int limit = 50,
+    String? networkKey,
+  });
+
+  Future<List<NetworkProfileSummary>> getNetworkProfiles();
+
+  Future<void> renameNetworkProfile({
+    required String networkKey,
+    required String? customName,
+  });
 
   Future<ScanHistoryDetails?> getDetails(int sessionId);
 

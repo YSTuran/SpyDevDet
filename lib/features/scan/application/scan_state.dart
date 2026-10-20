@@ -1,5 +1,6 @@
 import 'package:spy_dev_det/features/network/domain/network_snapshot.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
 enum ScanPhase {
@@ -21,6 +22,7 @@ class ScanState {
     required this.scannedTargets,
     required this.totalTargets,
     required this.rangeTruncated,
+    this.scanMode = ScanMode.detailed,
     this.network,
     this.scanRange,
     this.elapsed,
@@ -35,6 +37,7 @@ class ScanState {
       scannedTargets = 0,
       totalTargets = 0,
       rangeTruncated = false,
+      scanMode = ScanMode.detailed,
       network = null,
       scanRange = null,
       elapsed = null,
@@ -47,6 +50,7 @@ class ScanState {
   final int scannedTargets;
   final int totalTargets;
   final bool rangeTruncated;
+  final ScanMode scanMode;
   final NetworkSnapshot? network;
   final String? scanRange;
   final Duration? elapsed;
@@ -68,6 +72,7 @@ class ScanState {
     int? scannedTargets,
     int? totalTargets,
     bool? rangeTruncated,
+    ScanMode? scanMode,
     NetworkSnapshot? network,
     String? scanRange,
     Duration? elapsed,
@@ -81,6 +86,7 @@ class ScanState {
       scannedTargets: scannedTargets ?? this.scannedTargets,
       totalTargets: totalTargets ?? this.totalTargets,
       rangeTruncated: rangeTruncated ?? this.rangeTruncated,
+      scanMode: scanMode ?? this.scanMode,
       network: network ?? this.network,
       scanRange: scanRange ?? this.scanRange,
       elapsed: elapsed ?? this.elapsed,

@@ -1,3 +1,5 @@
+import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
+
 enum DiscoveryMethod { reachability, tcp, mdns, ssdp, onvif, neighbor }
 
 extension DiscoveryMethodText on DiscoveryMethod {
@@ -75,6 +77,7 @@ enum DiscoveryMethodPhase {
   unavailable,
   failed,
   cancelled,
+  skipped,
 }
 
 extension DiscoveryMethodPhaseText on DiscoveryMethodPhase {
@@ -85,6 +88,7 @@ extension DiscoveryMethodPhaseText on DiscoveryMethodPhase {
     DiscoveryMethodPhase.unavailable => 'Kullanılamıyor',
     DiscoveryMethodPhase.failed => 'Başarısız',
     DiscoveryMethodPhase.cancelled => 'İptal edildi',
+    DiscoveryMethodPhase.skipped => 'Bu modda çalıştırılmadı',
   };
 }
 
@@ -139,10 +143,15 @@ class ScanReport {
     required this.startedAt,
     required Map<DiscoveryMethod, DiscoveryMethodResult> methods,
     this.completedAt,
+    this.scanMode = ScanMode.detailed,
   }) : methods = Map.unmodifiable(methods);
 
-  factory ScanReport.started(DateTime startedAt) => ScanReport(
+  factory ScanReport.started(
+    DateTime startedAt, {
+    ScanMode scanMode = ScanMode.detailed,
+  }) => ScanReport(
     startedAt: startedAt,
+    scanMode: scanMode,
     methods: {
       for (final method in DiscoveryMethod.values)
         method: DiscoveryMethodResult.waiting(method),
@@ -151,6 +160,7 @@ class ScanReport {
 
   final DateTime startedAt;
   final DateTime? completedAt;
+  final ScanMode scanMode;
   final Map<DiscoveryMethod, DiscoveryMethodResult> methods;
 
   bool get hasPresenceCoverage => const [
@@ -160,31 +170,40 @@ class ScanReport {
 
   bool get isPartial =>
       !hasPresenceCoverage ||
-      const [
-        DiscoveryMethod.tcp,
-        DiscoveryMethod.mdns,
-        DiscoveryMethod.ssdp,
-        DiscoveryMethod.onvif,
-      ].any(
-        (method) => methods[method]?.phase != DiscoveryMethodPhase.completed,
-      );
+      methods.values.any((result) {
+        return switch (result.phase) {
+          DiscoveryMethodPhase.completed ||
+          DiscoveryMethodPhase.skipped => false,
+          _ => true,
+        };
+      });
 
-  bool get canComparePresence => !isPartial;
+  bool get canComparePresence =>
+      !isPartial &&
+      DiscoveryMethod.values.every(
+        (method) => methods[method]?.phase == DiscoveryMethodPhase.completed,
+      );
 
   ScanReport withMethod(DiscoveryMethodResult result) {
     return ScanReport(
       startedAt: startedAt,
       completedAt: completedAt,
+      scanMode: scanMode,
       methods: {...methods, result.method: result},
     );
   }
 
-  ScanReport complete(DateTime time) =>
-      ScanReport(startedAt: startedAt, completedAt: time, methods: methods);
+  ScanReport complete(DateTime time) => ScanReport(
+    startedAt: startedAt,
+    completedAt: time,
+    methods: methods,
+    scanMode: scanMode,
+  );
 
   ScanReport cancelRunning() => ScanReport(
     startedAt: startedAt,
     completedAt: completedAt,
+    scanMode: scanMode,
     methods: {
       for (final entry in methods.entries)
         entry.key: entry.value.phase == DiscoveryMethodPhase.running

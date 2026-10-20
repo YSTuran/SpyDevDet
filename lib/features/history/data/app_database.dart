@@ -13,6 +13,8 @@ class KnownDevices extends Table {
   TextColumn get lastIpAddress => text()();
   TextColumn get lastMacAddress => text().nullable()();
   TextColumn get vendor => text().nullable()();
+  TextColumn get categoryOverride => text().nullable()();
+  BoolColumn get isOwned => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column<Object>> get primaryKey => {stableKey};
@@ -34,6 +36,7 @@ class DeviceIdentityAliases extends Table {
 
 class NetworkProfiles extends Table {
   TextColumn get networkKey => text()();
+  TextColumn get customName => text().nullable()();
   DateTimeColumn get firstSeenAt => dateTime()();
   DateTimeColumn get lastSeenAt => dateTime()();
 
@@ -68,6 +71,7 @@ class ScanSessions extends Table {
   TextColumn get missingDevicesJson => text()();
   BoolColumn get presenceComparable => boolean()();
   IntColumn get elapsedMillis => integer()();
+  TextColumn get scanMode => text().withDefault(const Constant('detailed'))();
 }
 
 class ScanObservations extends Table {
@@ -104,7 +108,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -115,6 +119,14 @@ class AppDatabase extends _$AppDatabase {
       if (from < 3) {
         await migrator.createTable(networkProfiles);
         await migrator.createTable(networkIdentityAliases);
+      }
+      if (from < 4) {
+        await migrator.addColumn(knownDevices, knownDevices.categoryOverride);
+        await migrator.addColumn(knownDevices, knownDevices.isOwned);
+        if (from >= 3) {
+          await migrator.addColumn(networkProfiles, networkProfiles.customName);
+        }
+        await migrator.addColumn(scanSessions, scanSessions.scanMode);
       }
     },
     beforeOpen: (details) async {

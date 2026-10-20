@@ -1,8 +1,24 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spy_dev_det/features/network/domain/network_snapshot.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
 
 void main() {
+  test('seçilen tarama modunu planda korur', () {
+    final plan = ScanPlan.fromNetwork(
+      const NetworkSnapshot(
+        localIpv4: '192.168.1.24',
+        prefixLength: 24,
+        interfaceName: 'wlan0',
+        gatewayIpv4: '192.168.1.1',
+        isWifi: true,
+        isVpn: false,
+      ),
+      mode: ScanMode.quick,
+    );
+
+    expect(plan.mode, ScanMode.quick);
+  });
   group('ScanPlan', () {
     test('/24 ağını hesaplar ve telefonun adresini dışarıda bırakır', () {
       final plan = ScanPlan.fromNetwork(_network('192.168.1.24', 24));

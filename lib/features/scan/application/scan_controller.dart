@@ -10,10 +10,12 @@ import 'package:spy_dev_det/features/network/domain/network_snapshot.dart';
 import 'package:spy_dev_det/features/scan/application/scan_state.dart';
 import 'package:spy_dev_det/features/scan/data/local_network_device_scanner.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
+import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/device_identity_resolver.dart';
 import 'package:spy_dev_det/features/scan/domain/device_scanner.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_cancellation_token.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_event.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
@@ -53,10 +55,11 @@ class ScanController extends Notifier<ScanState> {
     }
 
     final runId = ++_runId;
+    final scanMode = state.scanMode;
     _cancellationToken?.cancel();
     _cancellationToken = null;
     _stopNetworkMonitor();
-    state = const ScanState(
+    state = ScanState(
       phase: ScanPhase.preparing,
       progress: 0,
       devices: [],
@@ -64,6 +67,7 @@ class ScanController extends Notifier<ScanState> {
       scannedTargets: 0,
       totalTargets: 0,
       rangeTruncated: false,
+      scanMode: scanMode,
     );
 
     try {
@@ -73,7 +77,7 @@ class ScanController extends Notifier<ScanState> {
         return;
       }
 
-      final plan = ScanPlan.fromNetwork(network);
+      final plan = ScanPlan.fromNetwork(network, mode: scanMode);
       final cancellationToken = ScanCancellationToken();
       _cancellationToken = cancellationToken;
       _startNetworkMonitor(runId, network);
@@ -86,9 +90,10 @@ class ScanController extends Notifier<ScanState> {
         scannedTargets: 0,
         totalTargets: plan.targets.length,
         rangeTruncated: plan.isTruncated,
+        scanMode: scanMode,
         network: network,
         scanRange: plan.rangeLabel,
-        report: ScanReport.started(startedAt),
+        report: ScanReport.started(startedAt, scanMode: scanMode),
       );
 
       final scanner = ref.read(deviceScannerProvider);
@@ -147,6 +152,13 @@ class ScanController extends Notifier<ScanState> {
       statusMessage: message,
       report: state.report?.cancelRunning(),
     );
+  }
+
+  void selectScanMode(ScanMode mode) {
+    if (state.isBusy || state.scanMode == mode) {
+      return;
+    }
+    state = state.copyWith(scanMode: mode);
   }
 
   void _startNetworkMonitor(int runId, NetworkSnapshot expected) {
@@ -343,7 +355,8 @@ class ScanController extends Notifier<ScanState> {
     DiscoveryMethodPhase.completed ||
     DiscoveryMethodPhase.unavailable ||
     DiscoveryMethodPhase.failed ||
-    DiscoveryMethodPhase.cancelled => true,
+    DiscoveryMethodPhase.cancelled ||
+    DiscoveryMethodPhase.skipped => true,
     DiscoveryMethodPhase.waiting || DiscoveryMethodPhase.running => false,
   };
 
@@ -416,8 +429,10 @@ class ScanController extends Notifier<ScanState> {
   Future<void> updateDeviceProfile({
     required DeviceObservation device,
     required bool isKnown,
+    required bool isOwned,
     required String? customName,
     required String? note,
+    required DeviceCategory? categoryOverride,
   }) async {
     final stableKey = device.stableKey;
     if (stableKey == null) {
@@ -429,6 +444,9 @@ class ScanController extends Notifier<ScanState> {
       isKnown: isKnown,
       customName: customName,
       note: note,
+      isOwned: isOwned,
+      categoryOverride: categoryOverride,
+      clearCategoryOverride: categoryOverride == null,
     );
     final updatedDevices = state.devices
         .map(
@@ -438,6 +456,9 @@ class ScanController extends Notifier<ScanState> {
                   clearCustomName: customName?.trim().isEmpty != false,
                   note: note,
                   clearNote: note?.trim().isEmpty != false,
+                  categoryOverride: categoryOverride,
+                  clearCategoryOverride: categoryOverride == null,
+                  isOwned: isOwned,
                   familiarity: isKnown
                       ? DeviceFamiliarity.known
                       : DeviceFamiliarity.seenBefore,

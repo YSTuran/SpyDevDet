@@ -18,6 +18,18 @@ final scanHistoryProvider =
       (ref) => ref.watch(scanHistoryRepositoryProvider).getHistory(),
     );
 
+final networkProfilesProvider =
+    FutureProvider.autoDispose<List<NetworkProfileSummary>>(
+      (ref) => ref.watch(scanHistoryRepositoryProvider).getNetworkProfiles(),
+    );
+
+final networkScanHistoryProvider = FutureProvider.autoDispose
+    .family<List<ScanHistorySummary>, String>(
+      (ref, networkKey) => ref
+          .watch(scanHistoryRepositoryProvider)
+          .getHistory(networkKey: networkKey),
+    );
+
 final scanHistoryDetailsProvider = FutureProvider.autoDispose
     .family<ScanHistoryDetails?, int>(
       (ref, sessionId) =>

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:spy_dev_det/features/network/domain/ipv4_address.dart';
 import 'package:spy_dev_det/features/network/domain/network_snapshot.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
 
 class ScanPlan {
   ScanPlan._({
@@ -10,11 +11,13 @@ class ScanPlan {
     required this.broadcastAddress,
     required List<String> targets,
     required this.isTruncated,
+    required this.mode,
   }) : targets = List.unmodifiable(targets);
 
   factory ScanPlan.fromNetwork(
     NetworkSnapshot network, {
     int maxTargets = 254,
+    ScanMode mode = ScanMode.detailed,
   }) {
     if (maxTargets < 1 || maxTargets > 254) {
       throw RangeError.range(maxTargets, 1, 254, 'maxTargets');
@@ -91,6 +94,7 @@ class ScanPlan {
       broadcastAddress: Ipv4Address.format(broadcastValue),
       targets: targets,
       isTruncated: remoteHostCount > targets.length,
+      mode: mode,
     );
   }
 
@@ -99,6 +103,7 @@ class ScanPlan {
   final String broadcastAddress;
   final List<String> targets;
   final bool isTruncated;
+  final ScanMode mode;
 
   String get rangeLabel => '${targets.first} – ${targets.last}';
 
