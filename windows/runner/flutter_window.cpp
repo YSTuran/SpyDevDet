@@ -46,6 +46,7 @@ bool FlutterWindow::OnCreate() {
 
 void FlutterWindow::OnDestroy() {
   if (flutter_controller_) {
+    ShutdownNetworkInfoChannel();
     network_info_channel_.reset();
     flutter_controller_ = nullptr;
   }

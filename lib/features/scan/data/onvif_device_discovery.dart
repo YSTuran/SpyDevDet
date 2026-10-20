@@ -22,7 +22,8 @@ class OnvifDeviceDiscovery implements DeviceDiscovery {
     '239.255.255.250',
   );
   static const _port = 3702;
-  static const _maxDatagramBytes = 65535;
+  static const _maxDatagramBytes = 16384;
+  static const _maxReceivedResponses = 512;
   static const _maxAcceptedMatches = 128;
 
   final Duration listenDuration;
@@ -71,6 +72,11 @@ class OnvifDeviceDiscovery implements DeviceDiscovery {
         }
         Datagram? datagram;
         while ((datagram = socket?.receive()) != null) {
+          if (receivedResponses >= _maxReceivedResponses) {
+            ignoredResponses++;
+            finish();
+            break;
+          }
           receivedResponses++;
           final current = datagram!;
           if (current.data.length > _maxDatagramBytes ||
@@ -89,6 +95,7 @@ class OnvifDeviceDiscovery implements DeviceDiscovery {
           for (final match in matches) {
             if (acceptedResponses >= _maxAcceptedMatches) {
               ignoredResponses++;
+              finish();
               break;
             }
             acceptedResponses++;
@@ -208,7 +215,8 @@ class OnvifProbeResponse {
     List<int> bytes, {
     required Iterable<String> expectedRelatesTo,
   }) {
-    if (bytes.isEmpty || bytes.length > 65535) {
+    if (bytes.isEmpty ||
+        bytes.length > OnvifDeviceDiscovery._maxDatagramBytes) {
       return null;
     }
     final source = utf8.decode(bytes, allowMalformed: true);

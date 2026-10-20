@@ -33,14 +33,15 @@ class ScanController extends Notifier<ScanState> {
   int _runId = 0;
   ScanCancellationToken? _cancellationToken;
   Timer? _networkMonitor;
-  bool _networkCheckInProgress = false;
+  int _networkMonitorGeneration = 0;
+  int? _networkCheckInProgressGeneration;
   int _networkCheckFailures = 0;
 
   @override
   ScanState build() {
     ref.onDispose(() {
       _runId++;
-      _networkMonitor?.cancel();
+      _stopNetworkMonitor();
       _cancellationToken?.cancel();
     });
     return const ScanState.idle();
@@ -54,7 +55,7 @@ class ScanController extends Notifier<ScanState> {
     final runId = ++_runId;
     _cancellationToken?.cancel();
     _cancellationToken = null;
-    _networkCheckInProgress = false;
+    _stopNetworkMonitor();
     state = const ScanState(
       phase: ScanPhase.preparing,
       progress: 0,
@@ -97,11 +98,14 @@ class ScanController extends Notifier<ScanState> {
         }
         _handleEvent(event);
         if (event is ScanCompleted) {
-          _networkMonitor?.cancel();
+          _stopNetworkMonitor();
           if (!await _networkStillMatches(network)) {
             if (runId == _runId) {
               _invalidateScanForNetworkChange();
             }
+            return;
+          }
+          if (runId != _runId || state.phase != ScanPhase.saving) {
             return;
           }
           await _persistCompletedScan(plan: plan, event: event, runId: runId);
@@ -121,8 +125,7 @@ class ScanController extends Notifier<ScanState> {
       }
     } finally {
       if (runId == _runId) {
-        _networkMonitor?.cancel();
-        _networkMonitor = null;
+        _stopNetworkMonitor();
         _cancellationToken = null;
       }
     }
@@ -136,8 +139,7 @@ class ScanController extends Notifier<ScanState> {
     }
 
     _runId++;
-    _networkMonitor?.cancel();
-    _networkMonitor = null;
+    _stopNetworkMonitor();
     _cancellationToken?.cancel();
     _cancellationToken = null;
     state = state.copyWith(
@@ -148,27 +150,40 @@ class ScanController extends Notifier<ScanState> {
   }
 
   void _startNetworkMonitor(int runId, NetworkSnapshot expected) {
-    _networkMonitor?.cancel();
-    _networkCheckInProgress = false;
+    _stopNetworkMonitor();
+    final generation = ++_networkMonitorGeneration;
     _networkCheckFailures = 0;
     _networkMonitor = Timer.periodic(const Duration(seconds: 2), (_) {
-      unawaited(_verifyNetworkDuringScan(runId, expected));
+      unawaited(_verifyNetworkDuringScan(runId, generation, expected));
     });
+  }
+
+  void _stopNetworkMonitor() {
+    _networkMonitor?.cancel();
+    _networkMonitor = null;
+    _networkMonitorGeneration++;
+    _networkCheckFailures = 0;
   }
 
   Future<void> _verifyNetworkDuringScan(
     int runId,
+    int generation,
     NetworkSnapshot expected,
   ) async {
-    if (_networkCheckInProgress || runId != _runId || !state.canCancel) {
+    if (_networkCheckInProgressGeneration == generation ||
+        generation != _networkMonitorGeneration ||
+        runId != _runId ||
+        state.phase != ScanPhase.scanning) {
       return;
     }
-    _networkCheckInProgress = true;
+    _networkCheckInProgressGeneration = generation;
     try {
       final current = await ref
           .read(networkInfoRepositoryProvider)
           .getCurrentNetwork();
-      if (runId != _runId) {
+      if (runId != _runId ||
+          generation != _networkMonitorGeneration ||
+          state.phase != ScanPhase.scanning) {
         return;
       }
       if (_sameNetwork(expected, current)) {
@@ -177,14 +192,18 @@ class ScanController extends Notifier<ScanState> {
         _invalidateScanForNetworkChange();
       }
     } on Object {
-      if (runId == _runId) {
+      if (runId == _runId &&
+          generation == _networkMonitorGeneration &&
+          state.phase == ScanPhase.scanning) {
         _networkCheckFailures++;
         if (_networkCheckFailures >= 2) {
           _invalidateScanForNetworkChange();
         }
       }
     } finally {
-      _networkCheckInProgress = false;
+      if (_networkCheckInProgressGeneration == generation) {
+        _networkCheckInProgressGeneration = null;
+      }
     }
   }
 
@@ -210,8 +229,7 @@ class ScanController extends Notifier<ScanState> {
 
   void _invalidateScanForNetworkChange() {
     _runId++;
-    _networkMonitor?.cancel();
-    _networkMonitor = null;
+    _stopNetworkMonitor();
     _cancellationToken?.cancel();
     _cancellationToken = null;
     state = state.copyWith(
@@ -347,9 +365,11 @@ class ScanController extends Notifier<ScanState> {
     try {
       final repository = ref.read(scanHistoryRepositoryProvider);
       final gatewayMacAddress = _gatewayMacAddress(plan);
+      const identityResolver = DeviceIdentityResolver();
       final devices = await repository.recordCompletedScan(
         CompletedScanRecord(
-          networkKey: const DeviceIdentityResolver().networkKey(
+          networkKey: identityResolver.networkKey(plan),
+          networkIdentityKeys: identityResolver.networkIdentityKeys(
             plan,
             gatewayMacAddress: gatewayMacAddress,
           ),

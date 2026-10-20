@@ -53,13 +53,19 @@ class DeviceIdentityResolver {
     return List.unmodifiable(keys);
   }
 
-  String networkKey(ScanPlan plan, {String? gatewayMacAddress}) {
+  String networkKey(ScanPlan plan) =>
+      '${plan.networkAddress}/${plan.network.prefixLength}|'
+      'gateway:${plan.network.gatewayIpv4 ?? '-'}';
+
+  List<String> networkIdentityKeys(ScanPlan plan, {String? gatewayMacAddress}) {
+    final baseKey = networkKey(plan);
     final gatewayMac = gatewayMacAddress == null
         ? null
         : MacAddress.tryParse(gatewayMacAddress);
-    return '${plan.networkAddress}/${plan.network.prefixLength}|'
-        'gateway:${plan.network.gatewayIpv4 ?? '-'}'
-        '${gatewayMac == null ? '' : '|gateway-mac:${gatewayMac.value}'}';
+    return List.unmodifiable([
+      if (gatewayMac != null) '$baseKey|gateway-mac:${gatewayMac.value}',
+      baseKey,
+    ]);
   }
 
   String? _identifierFor(

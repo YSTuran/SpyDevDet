@@ -32,6 +32,29 @@ class DeviceIdentityAliases extends Table {
   Set<Column<Object>> get primaryKey => {aliasKey};
 }
 
+class NetworkProfiles extends Table {
+  TextColumn get networkKey => text()();
+  DateTimeColumn get firstSeenAt => dateTime()();
+  DateTimeColumn get lastSeenAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {networkKey};
+}
+
+@DataClassName('NetworkIdentityAlias')
+class NetworkIdentityAliases extends Table {
+  TextColumn get aliasKey => text()();
+  TextColumn get networkKey => text().references(
+    NetworkProfiles,
+    #networkKey,
+    onDelete: KeyAction.cascade,
+  )();
+  DateTimeColumn get lastSeenAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {aliasKey};
+}
+
 class ScanSessions extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get networkKey => text()();
@@ -66,7 +89,14 @@ class ScanObservations extends Table {
 }
 
 @DriftDatabase(
-  tables: [KnownDevices, DeviceIdentityAliases, ScanSessions, ScanObservations],
+  tables: [
+    KnownDevices,
+    DeviceIdentityAliases,
+    NetworkProfiles,
+    NetworkIdentityAliases,
+    ScanSessions,
+    ScanObservations,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(driftDatabase(name: 'spydevdet_history'));
@@ -74,13 +104,17 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onUpgrade: (migrator, from, to) async {
       if (from < 2) {
         await migrator.createTable(deviceIdentityAliases);
+      }
+      if (from < 3) {
+        await migrator.createTable(networkProfiles);
+        await migrator.createTable(networkIdentityAliases);
       }
     },
     beforeOpen: (details) async {

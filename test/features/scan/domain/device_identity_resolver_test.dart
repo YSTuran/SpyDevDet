@@ -171,7 +171,7 @@ void main() {
     ]);
   });
 
-  test('ağ geçidi MAC adresini ağ parmak izine ekler', () {
+  test('ağ kimliği için kararlı temel ve güçlü takma adlar üretir', () {
     final plan = ScanPlan.fromNetwork(
       const NetworkSnapshot(
         localIpv4: '192.168.1.20',
@@ -183,9 +183,16 @@ void main() {
       ),
     );
 
+    expect(resolver.networkKey(plan), '192.168.1.0/24|gateway:192.168.1.1');
     expect(
-      resolver.networkKey(plan, gatewayMacAddress: 'B8:27:EB:12:34:56'),
-      '192.168.1.0/24|gateway:192.168.1.1|gateway-mac:B8:27:EB:12:34:56',
+      resolver.networkIdentityKeys(
+        plan,
+        gatewayMacAddress: 'B8:27:EB:12:34:56',
+      ),
+      [
+        '192.168.1.0/24|gateway:192.168.1.1|gateway-mac:B8:27:EB:12:34:56',
+        '192.168.1.0/24|gateway:192.168.1.1',
+      ],
     );
   });
 }

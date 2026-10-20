@@ -312,6 +312,84 @@ void main() {
     expect(replacement.single.familiarity, DeviceFamiliarity.newDevice);
     expect(replacement.single.customName, isNull);
   });
+
+  test('gateway MAC geçici olarak kaybolsa da aynı ağı kullanır', () async {
+    const baseKey = '192.168.1.0/24|gateway:192.168.1.1';
+    const strongKey = '$baseKey|gateway-mac:B8:27:EB:12:34:56';
+    await repository.recordCompletedScan(
+      _record(
+        ipAddress: '192.168.1.20',
+        minute: 0,
+        networkIdentityKeys: const [strongKey, baseKey],
+      ),
+    );
+    await repository.recordCompletedScan(
+      _record(
+        ipAddress: '192.168.1.20',
+        minute: 5,
+        networkIdentityKeys: const [baseKey],
+      ),
+    );
+
+    final history = await repository.getHistory();
+    expect(history, hasLength(2));
+    expect(history.first.networkKey, strongKey);
+    expect(history.last.networkKey, strongKey);
+  });
+
+  test('eski sürümdeki güçlü ağ anahtarını geçişte yeniden kullanır', () async {
+    const baseKey = '192.168.1.0/24|gateway:192.168.1.1';
+    const strongKey = '$baseKey|gateway-mac:B8:27:EB:12:34:56';
+    await repository.recordCompletedScan(
+      _record(
+        ipAddress: '192.168.1.20',
+        minute: 0,
+        networkIdentityKeys: const [strongKey],
+      ),
+    );
+    await database.delete(database.networkIdentityAliases).go();
+    await database.delete(database.networkProfiles).go();
+
+    await repository.recordCompletedScan(
+      _record(
+        ipAddress: '192.168.1.20',
+        minute: 5,
+        networkIdentityKeys: const [baseKey],
+      ),
+    );
+
+    final history = await repository.getHistory();
+    expect(history, hasLength(2));
+    expect(history.first.networkKey, strongKey);
+    expect(history.last.networkKey, strongKey);
+  });
+
+  test(
+    'aynı alt ağdaki farklı gateway MAC için yeni ağ profili açar',
+    () async {
+      const baseKey = '192.168.1.0/24|gateway:192.168.1.1';
+      const firstStrongKey = '$baseKey|gateway-mac:B8:27:EB:12:34:56';
+      const secondStrongKey = '$baseKey|gateway-mac:00:17:88:12:34:56';
+      await repository.recordCompletedScan(
+        _record(
+          ipAddress: '192.168.1.20',
+          minute: 0,
+          networkIdentityKeys: const [firstStrongKey, baseKey],
+        ),
+      );
+      await repository.recordCompletedScan(
+        _record(
+          ipAddress: '192.168.1.20',
+          minute: 5,
+          networkIdentityKeys: const [secondStrongKey, baseKey],
+        ),
+      );
+
+      final history = await repository.getHistory();
+      expect(history.first.networkKey, secondStrongKey);
+      expect(history.last.networkKey, firstStrongKey);
+    },
+  );
 }
 
 CompletedScanRecord _record({
@@ -319,6 +397,7 @@ CompletedScanRecord _record({
   required int minute,
   List<({String ipAddress, String macAddress})>? devices,
   bool discoveryComplete = true,
+  List<String> networkIdentityKeys = const [],
 }) {
   final startedAt = DateTime(2026, 10, 15, 10, minute);
   final completedAt = startedAt.add(const Duration(seconds: 2));
@@ -335,6 +414,7 @@ CompletedScanRecord _record({
   };
   return CompletedScanRecord(
     networkKey: '192.168.1.0/24|gateway:192.168.1.1',
+    networkIdentityKeys: networkIdentityKeys,
     report: ScanReport(
       startedAt: startedAt,
       completedAt: completedAt,

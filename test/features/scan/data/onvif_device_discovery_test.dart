@@ -70,7 +70,7 @@ void main() {
     );
     expect(
       OnvifProbeResponse.tryParse(
-        List<int>.filled(65536, 65),
+        List<int>.filled(16385, 65),
         expectedRelatesTo: const [requestId],
       ),
       isNull,

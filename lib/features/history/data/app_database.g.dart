@@ -870,6 +870,568 @@ class DeviceIdentityAliasesCompanion
   }
 }
 
+class $NetworkProfilesTable extends NetworkProfiles
+    with TableInfo<$NetworkProfilesTable, NetworkProfile> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $NetworkProfilesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _networkKeyMeta = const VerificationMeta(
+    'networkKey',
+  );
+  @override
+  late final GeneratedColumn<String> networkKey = GeneratedColumn<String>(
+    'network_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _firstSeenAtMeta = const VerificationMeta(
+    'firstSeenAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> firstSeenAt = GeneratedColumn<DateTime>(
+    'first_seen_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lastSeenAtMeta = const VerificationMeta(
+    'lastSeenAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastSeenAt = GeneratedColumn<DateTime>(
+    'last_seen_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [networkKey, firstSeenAt, lastSeenAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'network_profiles';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<NetworkProfile> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('network_key')) {
+      context.handle(
+        _networkKeyMeta,
+        networkKey.isAcceptableOrUnknown(data['network_key']!, _networkKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_networkKeyMeta);
+    }
+    if (data.containsKey('first_seen_at')) {
+      context.handle(
+        _firstSeenAtMeta,
+        firstSeenAt.isAcceptableOrUnknown(
+          data['first_seen_at']!,
+          _firstSeenAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_firstSeenAtMeta);
+    }
+    if (data.containsKey('last_seen_at')) {
+      context.handle(
+        _lastSeenAtMeta,
+        lastSeenAt.isAcceptableOrUnknown(
+          data['last_seen_at']!,
+          _lastSeenAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_lastSeenAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {networkKey};
+  @override
+  NetworkProfile map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return NetworkProfile(
+      networkKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}network_key'],
+      )!,
+      firstSeenAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}first_seen_at'],
+      )!,
+      lastSeenAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_seen_at'],
+      )!,
+    );
+  }
+
+  @override
+  $NetworkProfilesTable createAlias(String alias) {
+    return $NetworkProfilesTable(attachedDatabase, alias);
+  }
+}
+
+class NetworkProfile extends DataClass implements Insertable<NetworkProfile> {
+  final String networkKey;
+  final DateTime firstSeenAt;
+  final DateTime lastSeenAt;
+  const NetworkProfile({
+    required this.networkKey,
+    required this.firstSeenAt,
+    required this.lastSeenAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['network_key'] = Variable<String>(networkKey);
+    map['first_seen_at'] = Variable<DateTime>(firstSeenAt);
+    map['last_seen_at'] = Variable<DateTime>(lastSeenAt);
+    return map;
+  }
+
+  NetworkProfilesCompanion toCompanion(bool nullToAbsent) {
+    return NetworkProfilesCompanion(
+      networkKey: Value(networkKey),
+      firstSeenAt: Value(firstSeenAt),
+      lastSeenAt: Value(lastSeenAt),
+    );
+  }
+
+  factory NetworkProfile.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return NetworkProfile(
+      networkKey: serializer.fromJson<String>(json['networkKey']),
+      firstSeenAt: serializer.fromJson<DateTime>(json['firstSeenAt']),
+      lastSeenAt: serializer.fromJson<DateTime>(json['lastSeenAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'networkKey': serializer.toJson<String>(networkKey),
+      'firstSeenAt': serializer.toJson<DateTime>(firstSeenAt),
+      'lastSeenAt': serializer.toJson<DateTime>(lastSeenAt),
+    };
+  }
+
+  NetworkProfile copyWith({
+    String? networkKey,
+    DateTime? firstSeenAt,
+    DateTime? lastSeenAt,
+  }) => NetworkProfile(
+    networkKey: networkKey ?? this.networkKey,
+    firstSeenAt: firstSeenAt ?? this.firstSeenAt,
+    lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+  );
+  NetworkProfile copyWithCompanion(NetworkProfilesCompanion data) {
+    return NetworkProfile(
+      networkKey: data.networkKey.present
+          ? data.networkKey.value
+          : this.networkKey,
+      firstSeenAt: data.firstSeenAt.present
+          ? data.firstSeenAt.value
+          : this.firstSeenAt,
+      lastSeenAt: data.lastSeenAt.present
+          ? data.lastSeenAt.value
+          : this.lastSeenAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NetworkProfile(')
+          ..write('networkKey: $networkKey, ')
+          ..write('firstSeenAt: $firstSeenAt, ')
+          ..write('lastSeenAt: $lastSeenAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(networkKey, firstSeenAt, lastSeenAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is NetworkProfile &&
+          other.networkKey == this.networkKey &&
+          other.firstSeenAt == this.firstSeenAt &&
+          other.lastSeenAt == this.lastSeenAt);
+}
+
+class NetworkProfilesCompanion extends UpdateCompanion<NetworkProfile> {
+  final Value<String> networkKey;
+  final Value<DateTime> firstSeenAt;
+  final Value<DateTime> lastSeenAt;
+  final Value<int> rowid;
+  const NetworkProfilesCompanion({
+    this.networkKey = const Value.absent(),
+    this.firstSeenAt = const Value.absent(),
+    this.lastSeenAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  NetworkProfilesCompanion.insert({
+    required String networkKey,
+    required DateTime firstSeenAt,
+    required DateTime lastSeenAt,
+    this.rowid = const Value.absent(),
+  }) : networkKey = Value(networkKey),
+       firstSeenAt = Value(firstSeenAt),
+       lastSeenAt = Value(lastSeenAt);
+  static Insertable<NetworkProfile> custom({
+    Expression<String>? networkKey,
+    Expression<DateTime>? firstSeenAt,
+    Expression<DateTime>? lastSeenAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (networkKey != null) 'network_key': networkKey,
+      if (firstSeenAt != null) 'first_seen_at': firstSeenAt,
+      if (lastSeenAt != null) 'last_seen_at': lastSeenAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  NetworkProfilesCompanion copyWith({
+    Value<String>? networkKey,
+    Value<DateTime>? firstSeenAt,
+    Value<DateTime>? lastSeenAt,
+    Value<int>? rowid,
+  }) {
+    return NetworkProfilesCompanion(
+      networkKey: networkKey ?? this.networkKey,
+      firstSeenAt: firstSeenAt ?? this.firstSeenAt,
+      lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (networkKey.present) {
+      map['network_key'] = Variable<String>(networkKey.value);
+    }
+    if (firstSeenAt.present) {
+      map['first_seen_at'] = Variable<DateTime>(firstSeenAt.value);
+    }
+    if (lastSeenAt.present) {
+      map['last_seen_at'] = Variable<DateTime>(lastSeenAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NetworkProfilesCompanion(')
+          ..write('networkKey: $networkKey, ')
+          ..write('firstSeenAt: $firstSeenAt, ')
+          ..write('lastSeenAt: $lastSeenAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $NetworkIdentityAliasesTable extends NetworkIdentityAliases
+    with TableInfo<$NetworkIdentityAliasesTable, NetworkIdentityAlias> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $NetworkIdentityAliasesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _aliasKeyMeta = const VerificationMeta(
+    'aliasKey',
+  );
+  @override
+  late final GeneratedColumn<String> aliasKey = GeneratedColumn<String>(
+    'alias_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _networkKeyMeta = const VerificationMeta(
+    'networkKey',
+  );
+  @override
+  late final GeneratedColumn<String> networkKey = GeneratedColumn<String>(
+    'network_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES network_profiles (network_key) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _lastSeenAtMeta = const VerificationMeta(
+    'lastSeenAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastSeenAt = GeneratedColumn<DateTime>(
+    'last_seen_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [aliasKey, networkKey, lastSeenAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'network_identity_aliases';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<NetworkIdentityAlias> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('alias_key')) {
+      context.handle(
+        _aliasKeyMeta,
+        aliasKey.isAcceptableOrUnknown(data['alias_key']!, _aliasKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_aliasKeyMeta);
+    }
+    if (data.containsKey('network_key')) {
+      context.handle(
+        _networkKeyMeta,
+        networkKey.isAcceptableOrUnknown(data['network_key']!, _networkKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_networkKeyMeta);
+    }
+    if (data.containsKey('last_seen_at')) {
+      context.handle(
+        _lastSeenAtMeta,
+        lastSeenAt.isAcceptableOrUnknown(
+          data['last_seen_at']!,
+          _lastSeenAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_lastSeenAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {aliasKey};
+  @override
+  NetworkIdentityAlias map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return NetworkIdentityAlias(
+      aliasKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}alias_key'],
+      )!,
+      networkKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}network_key'],
+      )!,
+      lastSeenAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_seen_at'],
+      )!,
+    );
+  }
+
+  @override
+  $NetworkIdentityAliasesTable createAlias(String alias) {
+    return $NetworkIdentityAliasesTable(attachedDatabase, alias);
+  }
+}
+
+class NetworkIdentityAlias extends DataClass
+    implements Insertable<NetworkIdentityAlias> {
+  final String aliasKey;
+  final String networkKey;
+  final DateTime lastSeenAt;
+  const NetworkIdentityAlias({
+    required this.aliasKey,
+    required this.networkKey,
+    required this.lastSeenAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['alias_key'] = Variable<String>(aliasKey);
+    map['network_key'] = Variable<String>(networkKey);
+    map['last_seen_at'] = Variable<DateTime>(lastSeenAt);
+    return map;
+  }
+
+  NetworkIdentityAliasesCompanion toCompanion(bool nullToAbsent) {
+    return NetworkIdentityAliasesCompanion(
+      aliasKey: Value(aliasKey),
+      networkKey: Value(networkKey),
+      lastSeenAt: Value(lastSeenAt),
+    );
+  }
+
+  factory NetworkIdentityAlias.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return NetworkIdentityAlias(
+      aliasKey: serializer.fromJson<String>(json['aliasKey']),
+      networkKey: serializer.fromJson<String>(json['networkKey']),
+      lastSeenAt: serializer.fromJson<DateTime>(json['lastSeenAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'aliasKey': serializer.toJson<String>(aliasKey),
+      'networkKey': serializer.toJson<String>(networkKey),
+      'lastSeenAt': serializer.toJson<DateTime>(lastSeenAt),
+    };
+  }
+
+  NetworkIdentityAlias copyWith({
+    String? aliasKey,
+    String? networkKey,
+    DateTime? lastSeenAt,
+  }) => NetworkIdentityAlias(
+    aliasKey: aliasKey ?? this.aliasKey,
+    networkKey: networkKey ?? this.networkKey,
+    lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+  );
+  NetworkIdentityAlias copyWithCompanion(NetworkIdentityAliasesCompanion data) {
+    return NetworkIdentityAlias(
+      aliasKey: data.aliasKey.present ? data.aliasKey.value : this.aliasKey,
+      networkKey: data.networkKey.present
+          ? data.networkKey.value
+          : this.networkKey,
+      lastSeenAt: data.lastSeenAt.present
+          ? data.lastSeenAt.value
+          : this.lastSeenAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NetworkIdentityAlias(')
+          ..write('aliasKey: $aliasKey, ')
+          ..write('networkKey: $networkKey, ')
+          ..write('lastSeenAt: $lastSeenAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(aliasKey, networkKey, lastSeenAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is NetworkIdentityAlias &&
+          other.aliasKey == this.aliasKey &&
+          other.networkKey == this.networkKey &&
+          other.lastSeenAt == this.lastSeenAt);
+}
+
+class NetworkIdentityAliasesCompanion
+    extends UpdateCompanion<NetworkIdentityAlias> {
+  final Value<String> aliasKey;
+  final Value<String> networkKey;
+  final Value<DateTime> lastSeenAt;
+  final Value<int> rowid;
+  const NetworkIdentityAliasesCompanion({
+    this.aliasKey = const Value.absent(),
+    this.networkKey = const Value.absent(),
+    this.lastSeenAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  NetworkIdentityAliasesCompanion.insert({
+    required String aliasKey,
+    required String networkKey,
+    required DateTime lastSeenAt,
+    this.rowid = const Value.absent(),
+  }) : aliasKey = Value(aliasKey),
+       networkKey = Value(networkKey),
+       lastSeenAt = Value(lastSeenAt);
+  static Insertable<NetworkIdentityAlias> custom({
+    Expression<String>? aliasKey,
+    Expression<String>? networkKey,
+    Expression<DateTime>? lastSeenAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (aliasKey != null) 'alias_key': aliasKey,
+      if (networkKey != null) 'network_key': networkKey,
+      if (lastSeenAt != null) 'last_seen_at': lastSeenAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  NetworkIdentityAliasesCompanion copyWith({
+    Value<String>? aliasKey,
+    Value<String>? networkKey,
+    Value<DateTime>? lastSeenAt,
+    Value<int>? rowid,
+  }) {
+    return NetworkIdentityAliasesCompanion(
+      aliasKey: aliasKey ?? this.aliasKey,
+      networkKey: networkKey ?? this.networkKey,
+      lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (aliasKey.present) {
+      map['alias_key'] = Variable<String>(aliasKey.value);
+    }
+    if (networkKey.present) {
+      map['network_key'] = Variable<String>(networkKey.value);
+    }
+    if (lastSeenAt.present) {
+      map['last_seen_at'] = Variable<DateTime>(lastSeenAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NetworkIdentityAliasesCompanion(')
+          ..write('aliasKey: $aliasKey, ')
+          ..write('networkKey: $networkKey, ')
+          ..write('lastSeenAt: $lastSeenAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $ScanSessionsTable extends ScanSessions
     with TableInfo<$ScanSessionsTable, ScanSession> {
   @override
@@ -2440,6 +3002,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $KnownDevicesTable knownDevices = $KnownDevicesTable(this);
   late final $DeviceIdentityAliasesTable deviceIdentityAliases =
       $DeviceIdentityAliasesTable(this);
+  late final $NetworkProfilesTable networkProfiles = $NetworkProfilesTable(
+    this,
+  );
+  late final $NetworkIdentityAliasesTable networkIdentityAliases =
+      $NetworkIdentityAliasesTable(this);
   late final $ScanSessionsTable scanSessions = $ScanSessionsTable(this);
   late final $ScanObservationsTable scanObservations = $ScanObservationsTable(
     this,
@@ -2451,6 +3018,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     knownDevices,
     deviceIdentityAliases,
+    networkProfiles,
+    networkIdentityAliases,
     scanSessions,
     scanObservations,
   ];
@@ -2462,6 +3031,15 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('device_identity_aliases', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'network_profiles',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [
+        TableUpdate('network_identity_aliases', kind: UpdateKind.delete),
+      ],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
@@ -3188,6 +3766,611 @@ typedef $$DeviceIdentityAliasesTableProcessedTableManager =
       (DeviceIdentityAlias, $$DeviceIdentityAliasesTableReferences),
       DeviceIdentityAlias,
       PrefetchHooks Function({bool stableKey})
+    >;
+typedef $$NetworkProfilesTableCreateCompanionBuilder =
+    NetworkProfilesCompanion Function({
+      required String networkKey,
+      required DateTime firstSeenAt,
+      required DateTime lastSeenAt,
+      Value<int> rowid,
+    });
+typedef $$NetworkProfilesTableUpdateCompanionBuilder =
+    NetworkProfilesCompanion Function({
+      Value<String> networkKey,
+      Value<DateTime> firstSeenAt,
+      Value<DateTime> lastSeenAt,
+      Value<int> rowid,
+    });
+
+final class $$NetworkProfilesTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $NetworkProfilesTable, NetworkProfile> {
+  $$NetworkProfilesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static MultiTypedResultKey<
+    $NetworkIdentityAliasesTable,
+    List<NetworkIdentityAlias>
+  >
+  _networkIdentityAliasesRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.networkIdentityAliases,
+        aliasName: $_aliasNameGenerator(
+          db.networkProfiles.networkKey,
+          db.networkIdentityAliases.networkKey,
+        ),
+      );
+
+  $$NetworkIdentityAliasesTableProcessedTableManager
+  get networkIdentityAliasesRefs {
+    final manager =
+        $$NetworkIdentityAliasesTableTableManager(
+          $_db,
+          $_db.networkIdentityAliases,
+        ).filter(
+          (f) => f.networkKey.networkKey.sqlEquals(
+            $_itemColumn<String>('network_key')!,
+          ),
+        );
+
+    final cache = $_typedResult.readTableOrNull(
+      _networkIdentityAliasesRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$NetworkProfilesTableFilterComposer
+    extends Composer<_$AppDatabase, $NetworkProfilesTable> {
+  $$NetworkProfilesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get networkKey => $composableBuilder(
+    column: $table.networkKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get firstSeenAt => $composableBuilder(
+    column: $table.firstSeenAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> networkIdentityAliasesRefs(
+    Expression<bool> Function($$NetworkIdentityAliasesTableFilterComposer f) f,
+  ) {
+    final $$NetworkIdentityAliasesTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.networkKey,
+          referencedTable: $db.networkIdentityAliases,
+          getReferencedColumn: (t) => t.networkKey,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$NetworkIdentityAliasesTableFilterComposer(
+                $db: $db,
+                $table: $db.networkIdentityAliases,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$NetworkProfilesTableOrderingComposer
+    extends Composer<_$AppDatabase, $NetworkProfilesTable> {
+  $$NetworkProfilesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get networkKey => $composableBuilder(
+    column: $table.networkKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get firstSeenAt => $composableBuilder(
+    column: $table.firstSeenAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$NetworkProfilesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NetworkProfilesTable> {
+  $$NetworkProfilesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get networkKey => $composableBuilder(
+    column: $table.networkKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get firstSeenAt => $composableBuilder(
+    column: $table.firstSeenAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => column,
+  );
+
+  Expression<T> networkIdentityAliasesRefs<T extends Object>(
+    Expression<T> Function($$NetworkIdentityAliasesTableAnnotationComposer a) f,
+  ) {
+    final $$NetworkIdentityAliasesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.networkKey,
+          referencedTable: $db.networkIdentityAliases,
+          getReferencedColumn: (t) => t.networkKey,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$NetworkIdentityAliasesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.networkIdentityAliases,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$NetworkProfilesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $NetworkProfilesTable,
+          NetworkProfile,
+          $$NetworkProfilesTableFilterComposer,
+          $$NetworkProfilesTableOrderingComposer,
+          $$NetworkProfilesTableAnnotationComposer,
+          $$NetworkProfilesTableCreateCompanionBuilder,
+          $$NetworkProfilesTableUpdateCompanionBuilder,
+          (NetworkProfile, $$NetworkProfilesTableReferences),
+          NetworkProfile,
+          PrefetchHooks Function({bool networkIdentityAliasesRefs})
+        > {
+  $$NetworkProfilesTableTableManager(
+    _$AppDatabase db,
+    $NetworkProfilesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$NetworkProfilesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$NetworkProfilesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$NetworkProfilesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> networkKey = const Value.absent(),
+                Value<DateTime> firstSeenAt = const Value.absent(),
+                Value<DateTime> lastSeenAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NetworkProfilesCompanion(
+                networkKey: networkKey,
+                firstSeenAt: firstSeenAt,
+                lastSeenAt: lastSeenAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String networkKey,
+                required DateTime firstSeenAt,
+                required DateTime lastSeenAt,
+                Value<int> rowid = const Value.absent(),
+              }) => NetworkProfilesCompanion.insert(
+                networkKey: networkKey,
+                firstSeenAt: firstSeenAt,
+                lastSeenAt: lastSeenAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$NetworkProfilesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({networkIdentityAliasesRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (networkIdentityAliasesRefs) db.networkIdentityAliases,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (networkIdentityAliasesRefs)
+                    await $_getPrefetchedData<
+                      NetworkProfile,
+                      $NetworkProfilesTable,
+                      NetworkIdentityAlias
+                    >(
+                      currentTable: table,
+                      referencedTable: $$NetworkProfilesTableReferences
+                          ._networkIdentityAliasesRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$NetworkProfilesTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).networkIdentityAliasesRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where(
+                            (e) => e.networkKey == item.networkKey,
+                          ),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$NetworkProfilesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $NetworkProfilesTable,
+      NetworkProfile,
+      $$NetworkProfilesTableFilterComposer,
+      $$NetworkProfilesTableOrderingComposer,
+      $$NetworkProfilesTableAnnotationComposer,
+      $$NetworkProfilesTableCreateCompanionBuilder,
+      $$NetworkProfilesTableUpdateCompanionBuilder,
+      (NetworkProfile, $$NetworkProfilesTableReferences),
+      NetworkProfile,
+      PrefetchHooks Function({bool networkIdentityAliasesRefs})
+    >;
+typedef $$NetworkIdentityAliasesTableCreateCompanionBuilder =
+    NetworkIdentityAliasesCompanion Function({
+      required String aliasKey,
+      required String networkKey,
+      required DateTime lastSeenAt,
+      Value<int> rowid,
+    });
+typedef $$NetworkIdentityAliasesTableUpdateCompanionBuilder =
+    NetworkIdentityAliasesCompanion Function({
+      Value<String> aliasKey,
+      Value<String> networkKey,
+      Value<DateTime> lastSeenAt,
+      Value<int> rowid,
+    });
+
+final class $$NetworkIdentityAliasesTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $NetworkIdentityAliasesTable,
+          NetworkIdentityAlias
+        > {
+  $$NetworkIdentityAliasesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $NetworkProfilesTable _networkKeyTable(_$AppDatabase db) =>
+      db.networkProfiles.createAlias(
+        $_aliasNameGenerator(
+          db.networkIdentityAliases.networkKey,
+          db.networkProfiles.networkKey,
+        ),
+      );
+
+  $$NetworkProfilesTableProcessedTableManager get networkKey {
+    final $_column = $_itemColumn<String>('network_key')!;
+
+    final manager = $$NetworkProfilesTableTableManager(
+      $_db,
+      $_db.networkProfiles,
+    ).filter((f) => f.networkKey.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_networkKeyTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$NetworkIdentityAliasesTableFilterComposer
+    extends Composer<_$AppDatabase, $NetworkIdentityAliasesTable> {
+  $$NetworkIdentityAliasesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get aliasKey => $composableBuilder(
+    column: $table.aliasKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$NetworkProfilesTableFilterComposer get networkKey {
+    final $$NetworkProfilesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.networkKey,
+      referencedTable: $db.networkProfiles,
+      getReferencedColumn: (t) => t.networkKey,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NetworkProfilesTableFilterComposer(
+            $db: $db,
+            $table: $db.networkProfiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$NetworkIdentityAliasesTableOrderingComposer
+    extends Composer<_$AppDatabase, $NetworkIdentityAliasesTable> {
+  $$NetworkIdentityAliasesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get aliasKey => $composableBuilder(
+    column: $table.aliasKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$NetworkProfilesTableOrderingComposer get networkKey {
+    final $$NetworkProfilesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.networkKey,
+      referencedTable: $db.networkProfiles,
+      getReferencedColumn: (t) => t.networkKey,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NetworkProfilesTableOrderingComposer(
+            $db: $db,
+            $table: $db.networkProfiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$NetworkIdentityAliasesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NetworkIdentityAliasesTable> {
+  $$NetworkIdentityAliasesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get aliasKey =>
+      $composableBuilder(column: $table.aliasKey, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => column,
+  );
+
+  $$NetworkProfilesTableAnnotationComposer get networkKey {
+    final $$NetworkProfilesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.networkKey,
+      referencedTable: $db.networkProfiles,
+      getReferencedColumn: (t) => t.networkKey,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$NetworkProfilesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.networkProfiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$NetworkIdentityAliasesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $NetworkIdentityAliasesTable,
+          NetworkIdentityAlias,
+          $$NetworkIdentityAliasesTableFilterComposer,
+          $$NetworkIdentityAliasesTableOrderingComposer,
+          $$NetworkIdentityAliasesTableAnnotationComposer,
+          $$NetworkIdentityAliasesTableCreateCompanionBuilder,
+          $$NetworkIdentityAliasesTableUpdateCompanionBuilder,
+          (NetworkIdentityAlias, $$NetworkIdentityAliasesTableReferences),
+          NetworkIdentityAlias,
+          PrefetchHooks Function({bool networkKey})
+        > {
+  $$NetworkIdentityAliasesTableTableManager(
+    _$AppDatabase db,
+    $NetworkIdentityAliasesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$NetworkIdentityAliasesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$NetworkIdentityAliasesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$NetworkIdentityAliasesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> aliasKey = const Value.absent(),
+                Value<String> networkKey = const Value.absent(),
+                Value<DateTime> lastSeenAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NetworkIdentityAliasesCompanion(
+                aliasKey: aliasKey,
+                networkKey: networkKey,
+                lastSeenAt: lastSeenAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String aliasKey,
+                required String networkKey,
+                required DateTime lastSeenAt,
+                Value<int> rowid = const Value.absent(),
+              }) => NetworkIdentityAliasesCompanion.insert(
+                aliasKey: aliasKey,
+                networkKey: networkKey,
+                lastSeenAt: lastSeenAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$NetworkIdentityAliasesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({networkKey = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (networkKey) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.networkKey,
+                                referencedTable:
+                                    $$NetworkIdentityAliasesTableReferences
+                                        ._networkKeyTable(db),
+                                referencedColumn:
+                                    $$NetworkIdentityAliasesTableReferences
+                                        ._networkKeyTable(db)
+                                        .networkKey,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$NetworkIdentityAliasesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $NetworkIdentityAliasesTable,
+      NetworkIdentityAlias,
+      $$NetworkIdentityAliasesTableFilterComposer,
+      $$NetworkIdentityAliasesTableOrderingComposer,
+      $$NetworkIdentityAliasesTableAnnotationComposer,
+      $$NetworkIdentityAliasesTableCreateCompanionBuilder,
+      $$NetworkIdentityAliasesTableUpdateCompanionBuilder,
+      (NetworkIdentityAlias, $$NetworkIdentityAliasesTableReferences),
+      NetworkIdentityAlias,
+      PrefetchHooks Function({bool networkKey})
     >;
 typedef $$ScanSessionsTableCreateCompanionBuilder =
     ScanSessionsCompanion Function({
@@ -4160,6 +5343,13 @@ class $AppDatabaseManager {
       $$KnownDevicesTableTableManager(_db, _db.knownDevices);
   $$DeviceIdentityAliasesTableTableManager get deviceIdentityAliases =>
       $$DeviceIdentityAliasesTableTableManager(_db, _db.deviceIdentityAliases);
+  $$NetworkProfilesTableTableManager get networkProfiles =>
+      $$NetworkProfilesTableTableManager(_db, _db.networkProfiles);
+  $$NetworkIdentityAliasesTableTableManager get networkIdentityAliases =>
+      $$NetworkIdentityAliasesTableTableManager(
+        _db,
+        _db.networkIdentityAliases,
+      );
   $$ScanSessionsTableTableManager get scanSessions =>
       $$ScanSessionsTableTableManager(_db, _db.scanSessions);
   $$ScanObservationsTableTableManager get scanObservations =>

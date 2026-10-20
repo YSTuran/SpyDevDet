@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cctype>
+#include <condition_variable>
 #include <cstdint>
 #include <cwctype>
 #include <iomanip>
@@ -43,6 +44,8 @@ struct ReachabilityJob {
 };
 
 std::mutex g_reachability_mutex;
+std::condition_variable g_reachability_condition;
+bool g_reachability_shutting_down = false;
 std::unordered_map<std::string, std::shared_ptr<ReachabilityJob>>
     g_reachability_jobs;
 
@@ -179,6 +182,11 @@ void StartReachability(
   const auto job = std::make_shared<ReachabilityJob>();
   {
     std::lock_guard<std::mutex> lock(g_reachability_mutex);
+    if (g_reachability_shutting_down) {
+      result->Error("REACHABILITY_SHUTTING_DOWN",
+                    "Erişilebilirlik servisi kapatılıyor.");
+      return;
+    }
     if (g_reachability_jobs.find(*request_id) != g_reachability_jobs.end()) {
       result->Error("DUPLICATE_REACHABILITY_REQUEST",
                     "Erişilebilirlik isteği zaten çalışıyor.");
@@ -221,6 +229,23 @@ void StartReachability(
       worker.join();
     }
 
+    flutter::EncodableList response;
+    if (!job->cancelled.load()) {
+      std::sort(reachable.begin(), reachable.end());
+      for (const auto& target : reachable) {
+        response.emplace_back(target);
+      }
+    }
+    bool should_reply = false;
+    {
+      std::lock_guard<std::mutex> lock(g_reachability_mutex);
+      should_reply = !g_reachability_shutting_down;
+    }
+    if (should_reply) {
+      result->Success(flutter::EncodableValue(response));
+    }
+    result.reset();
+
     {
       std::lock_guard<std::mutex> lock(g_reachability_mutex);
       const auto iterator = g_reachability_jobs.find(request_id);
@@ -229,15 +254,7 @@ void StartReachability(
         g_reachability_jobs.erase(iterator);
       }
     }
-
-    flutter::EncodableList response;
-    if (!job->cancelled.load()) {
-      std::sort(reachable.begin(), reachable.end());
-      for (const auto& target : reachable) {
-        response.emplace_back(target);
-      }
-    }
-    result->Success(flutter::EncodableValue(response));
+    g_reachability_condition.notify_all();
   }).detach();
 }
 
@@ -541,6 +558,10 @@ flutter::EncodableMap ReadNeighborSnapshot() {
 
 std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
 RegisterNetworkInfoChannel(flutter::BinaryMessenger* messenger) {
+  {
+    std::lock_guard<std::mutex> lock(g_reachability_mutex);
+    g_reachability_shutting_down = false;
+  }
   auto channel =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           messenger, kChannelName,
@@ -578,4 +599,14 @@ RegisterNetworkInfoChannel(flutter::BinaryMessenger* messenger) {
       });
 
   return channel;
+}
+
+void ShutdownNetworkInfoChannel() {
+  std::unique_lock<std::mutex> lock(g_reachability_mutex);
+  g_reachability_shutting_down = true;
+  for (const auto& entry : g_reachability_jobs) {
+    entry.second->cancelled.store(true);
+  }
+  g_reachability_condition.wait(
+      lock, [] { return g_reachability_jobs.empty(); });
 }

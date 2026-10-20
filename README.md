@@ -32,9 +32,10 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   beklemeden paralel çalışır; ilerleme göstergesi bütün yöntemlerin durumunu
   hesaba katar.
 - mDNS üzerinden yaygın servisler ve DNS-SD servis türü duyuruları keşfedilir.
-  Yalnız model/üretici gibi sınırlı TXT alanları temizlenerek kullanılır. SSDP
-  yanıtları sayısal ve boyutsal sınırlarla işlenir; bildirilen konum
-  adreslerinden içerik indirilmez.
+  Yalnız model/üretici gibi sınırlı TXT alanları temizlenerek kullanılır. mDNS
+  sorguları sınırlı eşzamanlılıkla çalıştırılır; SSDP ve ONVIF yanıtları sayısal
+  ve boyutsal sınırlarla işlenir. Bildirilen konum adreslerinden içerik
+  indirilmez.
 - Erişilebildiği platformlarda IP komşu tablosundaki geçerli kayıtlar hem cihaz
   keşfi hem de MAC zenginleştirmesi için kullanılır. Android 10 ve üzerinin
   `/proc/net` kısıtı nedeniyle MAC tablosu okunamazsa durum açıkça
@@ -65,10 +66,14 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   IP tabanlı düşük güvenli eşleştirmeye dönülür. Sonradan güçlü kimlik bulunan
   cihazlar kimlik takma adlarıyla önceki profiline bağlanır; aynı IP'yi alan
   farklı bir güçlü kimlik eski profili devralmaz.
-- Ağ geçidinin MAC adresi edinilebildiğinde ağ parmak izine katılır. Tarama
-  sırasında yerel IP, bağdaştırıcı veya ağ geçidi değişirse sonuçlar eski ağın
-  geçmişine yazılmadan tarama durdurulur. Uygulama arka plana geçtiğinde de
-  devam eden tarama güvenli biçimde iptal edilir.
+- Alt ağ ve ağ geçidi adresinden oluşan kararlı ağ kimliği her taramada
+  kullanılabilir. Ağ geçidinin MAC adresi edinilebildiğinde buna güçlü bir
+  kimlik takma adı eklenir; MAC bilgisinin geçici olarak alınamaması aynı ağın
+  geçmişini bölmez, aynı adresleri kullanan farklı ağ geçitleri ise ayrılır.
+  Tarama sırasında yerel IP, bağdaştırıcı veya ağ geçidi değişirse sonuçlar
+  eski ağın geçmişine yazılmadan tarama durdurulur. Tamamlanmış bir taramadan
+  geç dönen ağ kontrolü kaydedilmiş sonucu geçersiz kılamaz. Uygulama arka
+  plana geçtiğinde de devam eden tarama güvenli biçimde iptal edilir.
 - Kullanıcı cihazı bilinen olarak işaretleyebilir, özel ad ve not ekleyebilir.
   Sonraki taramalarda yeni, daha önce görülen ve bilinen cihazlar ayrılır.
 - TCP, mDNS, SSDP ve ONVIF aşamalarıyla birlikte erişilebilirlik veya komşu

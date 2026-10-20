@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +11,10 @@ import 'package:spy_dev_det/features/history/domain/scan_history_repository.dart
 import 'package:spy_dev_det/features/scan/application/scan_controller.dart';
 import 'package:spy_dev_det/features/scan/data/fake_device_scanner.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
+import 'package:spy_dev_det/features/scan/domain/device_scanner.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_cancellation_token.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_event.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
 
 void main() {
   testWidgets('tarama cihazları aşamalı olarak gösterir', (tester) async {
@@ -100,16 +106,58 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('tamamlanmış taramayı eski ağ kontrolü geçersiz kılmaz', (
+    tester,
+  ) async {
+    final networkRepository = _RacingNetworkRepository();
+    final historyRepository = _TestHistoryRepository();
+    await tester.pumpWidget(
+      _testApp(
+        repository: networkRepository,
+        scanner: const _DelayedScanner(),
+        historyRepository: historyRepository,
+      ),
+    );
+
+    await tester.tap(find.text('Yerel ağı tara'));
+    await tester.pump(const Duration(seconds: 2));
+    expect(networkRepository.requestCount, 2);
+
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(historyRepository.recordCount, 1);
+    expect(find.text('Tarama tamamlandı • geçmişe kaydedildi'), findsOneWidget);
+
+    networkRepository.completeStaleCheckWithChangedNetwork();
+    await tester.pump();
+
+    expect(historyRepository.recordCount, 1);
+    expect(find.text('Tarama tamamlandı • geçmişe kaydedildi'), findsOneWidget);
+    expect(
+      find.text(
+        'Ağ bağlantısı tarama sırasında değişti. Sonuçlar kaydedilmedi.',
+      ),
+      findsNothing,
+    );
+  });
 }
 
-Widget _testApp({NetworkInfoRepository? repository}) {
+Widget _testApp({
+  NetworkInfoRepository? repository,
+  DeviceScanner? scanner,
+  _TestHistoryRepository? historyRepository,
+}) {
   return ProviderScope(
     overrides: [
       networkInfoRepositoryProvider.overrideWithValue(
         repository ?? const _TestNetworkRepository(),
       ),
-      deviceScannerProvider.overrideWithValue(const FakeDeviceScanner()),
-      scanHistoryRepositoryProvider.overrideWithValue(_TestHistoryRepository()),
+      deviceScannerProvider.overrideWithValue(
+        scanner ?? const FakeDeviceScanner(),
+      ),
+      scanHistoryRepositoryProvider.overrideWithValue(
+        historyRepository ?? _TestHistoryRepository(),
+      ),
     ],
     child: const SpyDevDetApp(),
   );
@@ -117,11 +165,13 @@ Widget _testApp({NetworkInfoRepository? repository}) {
 
 class _TestHistoryRepository implements ScanHistoryRepository {
   final Set<String> _seen = {};
+  var recordCount = 0;
 
   @override
   Future<List<DeviceObservation>> recordCompletedScan(
     CompletedScanRecord record,
   ) async {
+    recordCount++;
     return record.devices
         .map((device) {
           final stableKey = 'test:${device.ipAddress}';
@@ -161,6 +211,27 @@ class _TestHistoryRepository implements ScanHistoryRepository {
     required String? customName,
     required String? note,
   }) async {}
+}
+
+class _DelayedScanner implements DeviceScanner {
+  const _DelayedScanner();
+
+  @override
+  Stream<ScanEvent> scan(
+    ScanPlan plan,
+    ScanCancellationToken cancellationToken,
+  ) async* {
+    yield ScanStarted(totalTargets: plan.targets.length);
+    await Future<void>.delayed(const Duration(milliseconds: 2100));
+    if (cancellationToken.isCancelled) {
+      yield const ScanCancelled();
+      return;
+    }
+    yield ScanCompleted(
+      completedTargets: plan.targets.length,
+      elapsed: const Duration(milliseconds: 2100),
+    );
+  }
 }
 
 class _TestNetworkRepository implements NetworkInfoRepository {
@@ -206,4 +277,40 @@ class _ChangingNetworkRepository implements NetworkInfoRepository {
       isVpn: false,
     );
   }
+}
+
+class _RacingNetworkRepository implements NetworkInfoRepository {
+  final Completer<NetworkSnapshot> _staleCheck = Completer();
+  var requestCount = 0;
+
+  @override
+  Future<NetworkSnapshot> getCurrentNetwork() {
+    requestCount++;
+    if (requestCount == 2) {
+      return _staleCheck.future;
+    }
+    return Future.value(_primaryNetwork);
+  }
+
+  void completeStaleCheckWithChangedNetwork() {
+    _staleCheck.complete(
+      const NetworkSnapshot(
+        localIpv4: '192.168.1.25',
+        prefixLength: 24,
+        interfaceName: 'wlan0',
+        gatewayIpv4: '192.168.1.1',
+        isWifi: true,
+        isVpn: false,
+      ),
+    );
+  }
+
+  static const _primaryNetwork = NetworkSnapshot(
+    localIpv4: '192.168.1.24',
+    prefixLength: 24,
+    interfaceName: 'wlan0',
+    gatewayIpv4: '192.168.1.1',
+    isWifi: true,
+    isVpn: false,
+  );
 }

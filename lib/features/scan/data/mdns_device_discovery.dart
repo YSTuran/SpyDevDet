@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:multicast_dns/multicast_dns.dart';
 import 'package:spy_dev_det/features/scan/domain/device_discovery.dart';
@@ -15,6 +16,7 @@ class MdnsDeviceDiscovery implements DeviceDiscovery {
   });
 
   static const _serviceEnumeration = '_services._dns-sd._udp.local';
+  static const _maxConcurrentLookups = 12;
   static const _defaultServiceTypes = [
     '_http._tcp.local',
     '_https._tcp.local',
@@ -41,6 +43,18 @@ class MdnsDeviceDiscovery implements DeviceDiscovery {
 
     final client = MDnsClient();
     var started = false;
+    var stopped = false;
+
+    void stopClient() {
+      if (started && !stopped) {
+        stopped = true;
+        client.stop();
+      }
+    }
+
+    final removeCancelListener = cancellationToken.addCancelListener(
+      stopClient,
+    );
     try {
       await client.start(
         interfacesFactory: (type) =>
@@ -67,56 +81,72 @@ class MdnsDeviceDiscovery implements DeviceDiscovery {
         ...advertisedTypes,
       }.take(42).toList(growable: false);
 
-      final pointerGroups = await Future.wait(
-        serviceTypes.map(
-          (serviceType) => client
-              .lookup<PtrResourceRecord>(
-                ResourceRecordQuery.serverPointer(serviceType),
-                timeout: queryTimeout,
-              )
-              .toList(),
-        ),
+      final pointerGroups = await _boundedMap(
+        serviceTypes,
+        maxConcurrent: _maxConcurrentLookups,
+        cancellationToken: cancellationToken,
+        operation: (serviceType) => client
+            .lookup<PtrResourceRecord>(
+              ResourceRecordQuery.serverPointer(serviceType),
+              timeout: queryTimeout,
+            )
+            .toList(),
       );
+      if (cancellationToken.isCancelled) {
+        return const DeviceDiscoveryResult.empty();
+      }
 
       final pointers = <String, _ServicePointer>{};
-      for (var index = 0; index < pointerGroups.length; index++) {
-        for (final pointer in pointerGroups[index]) {
+      for (final group in pointerGroups) {
+        for (final pointer in group.value) {
           if (pointers.length >= 96) {
             break;
           }
-          pointers['${serviceTypes[index]}|${pointer.domainName}'] =
-              _ServicePointer(
-                serviceType: serviceTypes[index],
-                domainName: pointer.domainName,
-              );
+          pointers['${group.item}|${pointer.domainName}'] = _ServicePointer(
+            serviceType: group.item,
+            domainName: pointer.domainName,
+          );
         }
       }
 
       final selectedPointers = pointers.values.take(48).toList(growable: false);
-      final recordGroups = await Future.wait(
-        selectedPointers.map((pointer) => _resolveService(client, pointer)),
+      final recordGroups = await _boundedMap(
+        selectedPointers,
+        maxConcurrent: _maxConcurrentLookups,
+        cancellationToken: cancellationToken,
+        operation: (pointer) => _resolveService(client, pointer),
       );
-      final services = recordGroups.expand((group) => group).take(64).toList();
-      final addressGroups = await Future.wait(
-        services.map(
-          (service) => client
-              .lookup<IPAddressResourceRecord>(
-                ResourceRecordQuery.addressIPv4(service.record.target),
-                timeout: queryTimeout,
-              )
-              .toList(),
-        ),
+      if (cancellationToken.isCancelled) {
+        return const DeviceDiscoveryResult.empty();
+      }
+      final services = recordGroups
+          .expand((group) => group.value)
+          .take(64)
+          .toList();
+      final addressGroups = await _boundedMap(
+        services,
+        maxConcurrent: _maxConcurrentLookups,
+        cancellationToken: cancellationToken,
+        operation: (service) => client
+            .lookup<IPAddressResourceRecord>(
+              ResourceRecordQuery.addressIPv4(service.record.target),
+              timeout: queryTimeout,
+            )
+            .toList(),
       );
+      if (cancellationToken.isCancelled) {
+        return const DeviceDiscoveryResult.empty();
+      }
 
       final observations = <String, DeviceObservation>{};
       var ignoredResponses = 0;
       var addressRecordCount = 0;
-      for (var index = 0; index < services.length; index++) {
+      for (final group in addressGroups) {
         if (cancellationToken.isCancelled) {
           break;
         }
-        final service = services[index];
-        for (final addressRecord in addressGroups[index]) {
+        final service = group.item;
+        for (final addressRecord in group.value) {
           addressRecordCount++;
           final ipAddress = addressRecord.address.address;
           if (!_isAllowed(ipAddress, plan)) {
@@ -151,10 +181,14 @@ class MdnsDeviceDiscovery implements DeviceDiscovery {
           detail: '${pointers.length} servis duyurusu çözümlendi',
         ),
       );
-    } finally {
-      if (started) {
-        client.stop();
+    } on Object {
+      if (cancellationToken.isCancelled) {
+        return const DeviceDiscoveryResult.empty();
       }
+      rethrow;
+    } finally {
+      removeCancelListener();
+      stopClient();
     }
   }
 
@@ -269,6 +303,38 @@ class MdnsDeviceDiscovery implements DeviceDiscovery {
     }
     return sanitized.length <= 80 ? sanitized : sanitized.substring(0, 80);
   }
+}
+
+Future<List<({T item, R value})>> _boundedMap<T, R>(
+  List<T> items, {
+  required int maxConcurrent,
+  required ScanCancellationToken cancellationToken,
+  required Future<R> Function(T item) operation,
+}) async {
+  if (items.isEmpty || cancellationToken.isCancelled) {
+    return const [];
+  }
+  final values = List<Object?>.filled(items.length, null);
+  final completed = List<bool>.filled(items.length, false);
+  var nextIndex = 0;
+
+  Future<void> worker() async {
+    while (!cancellationToken.isCancelled) {
+      final index = nextIndex++;
+      if (index >= items.length) {
+        return;
+      }
+      values[index] = await operation(items[index]);
+      completed[index] = true;
+    }
+  }
+
+  final workerCount = math.min(maxConcurrent, items.length);
+  await Future.wait(List.generate(workerCount, (_) => worker()));
+  return [
+    for (var index = 0; index < items.length; index++)
+      if (completed[index]) (item: items[index], value: values[index] as R),
+  ];
 }
 
 class _ServicePointer {

@@ -4,12 +4,14 @@ import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 class CompletedScanRecord {
   const CompletedScanRecord({
     required this.networkKey,
+    this.networkIdentityKeys = const [],
     required this.report,
     required this.elapsed,
     required this.devices,
   });
 
   final String networkKey;
+  final List<String> networkIdentityKeys;
   final ScanReport report;
   final Duration elapsed;
   final List<DeviceObservation> devices;

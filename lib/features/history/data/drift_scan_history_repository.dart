@@ -26,11 +26,20 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
     return database.transaction(() async {
       final completedAt = record.report.completedAt ?? DateTime.now();
       final decoratedDevices = <DeviceObservation>[];
+      final networkIdentityKeys = record.networkIdentityKeys.isEmpty
+          ? [record.networkKey]
+          : record.networkIdentityKeys;
+      final networkKey = await _resolveNetworkKey(networkIdentityKeys);
+      await _rememberNetworkIdentity(
+        candidateKeys: networkIdentityKeys,
+        networkKey: networkKey,
+        observedAt: completedAt,
+      );
 
       for (final device in record.devices) {
         final candidateKeys = identityResolver.candidateKeys(
           device,
-          networkKey: record.networkKey,
+          networkKey: networkKey,
         );
         final stableKey = await _resolveStableKey(
           candidateKeys,
@@ -80,7 +89,7 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
           .length;
       final missingDevices = record.report.canComparePresence
           ? await _missingSincePreviousComparableScan(
-              networkKey: record.networkKey,
+              networkKey: networkKey,
               currentKeys: decoratedDevices
                   .map((device) => device.stableKey!)
                   .toSet(),
@@ -90,7 +99,7 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
           .into(database.scanSessions)
           .insert(
             ScanSessionsCompanion.insert(
-              networkKey: record.networkKey,
+              networkKey: networkKey,
               startedAt: record.report.startedAt,
               completedAt: completedAt,
               outcome: record.report.isPartial ? 'partial' : 'completed',
@@ -200,8 +209,140 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
       await database.delete(database.scanSessions).go();
       await database.delete(database.deviceIdentityAliases).go();
       await database.delete(database.knownDevices).go();
+      await database.delete(database.networkIdentityAliases).go();
+      await database.delete(database.networkProfiles).go();
     });
   }
+
+  Future<String> _resolveNetworkKey(List<String> candidateKeys) async {
+    final keys = candidateKeys.toSet().toList(growable: false);
+    final strongKeys = keys.where(_isStrongNetworkKey).toList(growable: false);
+    final weakKeys = keys
+        .where((key) => !_isStrongNetworkKey(key))
+        .toList(growable: false);
+
+    for (final key in strongKeys) {
+      final alias = await _networkIdentityAlias(key);
+      if (alias != null && await _networkProfileExists(alias.networkKey)) {
+        return alias.networkKey;
+      }
+      if (await _networkProfileExists(key)) {
+        return key;
+      }
+    }
+
+    for (final key in weakKeys) {
+      final alias = await _networkIdentityAlias(key);
+      if (alias != null && await _networkProfileExists(alias.networkKey)) {
+        if (strongKeys.isEmpty ||
+            !await _hasDifferentStrongNetworkAlias(
+              alias.networkKey,
+              strongKeys.toSet(),
+            )) {
+          return alias.networkKey;
+        }
+      }
+      if (await _networkProfileExists(key) &&
+          (strongKeys.isEmpty ||
+              !await _hasDifferentStrongNetworkAlias(
+                key,
+                strongKeys.toSet(),
+              ))) {
+        return key;
+      }
+    }
+
+    if (strongKeys.isEmpty) {
+      for (final key in weakKeys) {
+        final legacyStrongKey = await _legacyStrongNetworkKeyForBase(key);
+        if (legacyStrongKey != null) {
+          return legacyStrongKey;
+        }
+      }
+    }
+
+    return strongKeys.isNotEmpty ? strongKeys.first : keys.first;
+  }
+
+  Future<void> _rememberNetworkIdentity({
+    required List<String> candidateKeys,
+    required String networkKey,
+    required DateTime observedAt,
+  }) async {
+    final existing = await _networkProfile(networkKey);
+    await database
+        .into(database.networkProfiles)
+        .insertOnConflictUpdate(
+          NetworkProfilesCompanion.insert(
+            networkKey: networkKey,
+            firstSeenAt: existing?.firstSeenAt ?? observedAt,
+            lastSeenAt: observedAt,
+          ),
+        );
+    for (final aliasKey in candidateKeys.toSet()) {
+      await database
+          .into(database.networkIdentityAliases)
+          .insertOnConflictUpdate(
+            NetworkIdentityAliasesCompanion.insert(
+              aliasKey: aliasKey,
+              networkKey: networkKey,
+              lastSeenAt: observedAt,
+            ),
+          );
+    }
+  }
+
+  Future<NetworkProfile?> _networkProfile(String networkKey) {
+    return (database.select(
+      database.networkProfiles,
+    )..where((table) => table.networkKey.equals(networkKey))).getSingleOrNull();
+  }
+
+  Future<NetworkIdentityAlias?> _networkIdentityAlias(String aliasKey) {
+    return (database.select(
+      database.networkIdentityAliases,
+    )..where((table) => table.aliasKey.equals(aliasKey))).getSingleOrNull();
+  }
+
+  Future<bool> _networkProfileExists(String networkKey) async {
+    if (await _networkProfile(networkKey) != null) {
+      return true;
+    }
+    final existingSession =
+        await (database.select(database.scanSessions)
+              ..where((table) => table.networkKey.equals(networkKey))
+              ..limit(1))
+            .getSingleOrNull();
+    return existingSession != null;
+  }
+
+  Future<bool> _hasDifferentStrongNetworkAlias(
+    String networkKey,
+    Set<String> currentStrongKeys,
+  ) async {
+    final aliases = await (database.select(
+      database.networkIdentityAliases,
+    )..where((table) => table.networkKey.equals(networkKey))).get();
+    return aliases.any(
+      (alias) =>
+          _isStrongNetworkKey(alias.aliasKey) &&
+          !currentStrongKeys.contains(alias.aliasKey),
+    );
+  }
+
+  Future<String?> _legacyStrongNetworkKeyForBase(String baseKey) async {
+    final sessions =
+        await (database.select(database.scanSessions)
+              ..where(
+                (table) => table.networkKey.like('$baseKey|gateway-mac:%'),
+              )
+              ..orderBy([(table) => OrderingTerm.desc(table.completedAt)]))
+            .get();
+    final matchingKeys = sessions.map((session) => session.networkKey).toSet();
+    return matchingKeys.length == 1 ? matchingKeys.single : null;
+  }
+
+  bool _isStrongNetworkKey(String key) => key.contains('|gateway-mac:');
 
   Future<String> _resolveStableKey(
     List<String> candidateKeys, {
