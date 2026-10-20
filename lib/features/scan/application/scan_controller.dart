@@ -353,6 +353,7 @@ class ScanController extends Notifier<ScanState> {
 
   bool _isTerminal(DiscoveryMethodPhase phase) => switch (phase) {
     DiscoveryMethodPhase.completed ||
+    DiscoveryMethodPhase.platformRestricted ||
     DiscoveryMethodPhase.unavailable ||
     DiscoveryMethodPhase.failed ||
     DiscoveryMethodPhase.cancelled ||
@@ -379,12 +380,16 @@ class ScanController extends Notifier<ScanState> {
       final repository = ref.read(scanHistoryRepositoryProvider);
       final gatewayMacAddress = _gatewayMacAddress(plan);
       const identityResolver = DeviceIdentityResolver();
+      final gatewayServiceIdentity = identityResolver.gatewayServiceIdentity(
+        _gatewayObservation(plan),
+      );
       final devices = await repository.recordCompletedScan(
         CompletedScanRecord(
           networkKey: identityResolver.networkKey(plan),
           networkIdentityKeys: identityResolver.networkIdentityKeys(
             plan,
             gatewayMacAddress: gatewayMacAddress,
+            gatewayServiceIdentity: gatewayServiceIdentity,
           ),
           report: report,
           elapsed: event.elapsed,
@@ -417,10 +422,16 @@ class ScanController extends Notifier<ScanState> {
   }
 
   String? _gatewayMacAddress(ScanPlan plan) {
+    final gateway = _gatewayObservation(plan);
+    return gateway?.macStatus == MacStatus.available
+        ? gateway?.macAddress
+        : null;
+  }
+
+  DeviceObservation? _gatewayObservation(ScanPlan plan) {
     for (final device in state.devices) {
-      if (device.ipAddress == plan.network.gatewayIpv4 &&
-          device.macStatus == MacStatus.available) {
-        return device.macAddress;
+      if (device.ipAddress == plan.network.gatewayIpv4) {
+        return device;
       }
     }
     return null;

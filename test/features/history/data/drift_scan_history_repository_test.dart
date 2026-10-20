@@ -392,6 +392,33 @@ void main() {
     },
   );
 
+  test(
+    'aynı adresleri kullanan farklı gateway servis kimliklerini ayırır',
+    () async {
+      const baseKey = '192.168.1.0/24|gateway:192.168.1.1';
+      const firstStrongKey = '$baseKey|gateway-service:ssdp%3Auuid%3Arouter-1';
+      const secondStrongKey = '$baseKey|gateway-service:ssdp%3Auuid%3Arouter-2';
+      await repository.recordCompletedScan(
+        _record(
+          ipAddress: '192.168.1.20',
+          minute: 0,
+          networkIdentityKeys: const [firstStrongKey, baseKey],
+        ),
+      );
+      await repository.recordCompletedScan(
+        _record(
+          ipAddress: '192.168.1.20',
+          minute: 5,
+          networkIdentityKeys: const [secondStrongKey, baseKey],
+        ),
+      );
+
+      final history = await repository.getHistory();
+      expect(history.first.networkKey, secondStrongKey);
+      expect(history.last.networkKey, firstStrongKey);
+    },
+  );
+
   test('sahiplik ve kategori düzeltmesini sonraki taramada korur', () async {
     final first = await repository.recordCompletedScan(
       _record(ipAddress: '192.168.1.20', minute: 0),
@@ -452,6 +479,20 @@ void main() {
     final history = await repository.getHistory();
 
     expect(history.single.scanMode, ScanMode.quick);
+  });
+
+  test('her ağ için yalnız en yeni 100 taramayı saklar', () async {
+    for (var index = 0; index < 103; index++) {
+      await repository.recordCompletedScan(
+        _record(ipAddress: '192.168.1.20', minute: index),
+      );
+    }
+
+    final history = await repository.getHistory(limit: 200);
+
+    expect(history, hasLength(100));
+    expect(history.first.startedAt, DateTime(2026, 10, 15, 11, 42));
+    expect(history.last.startedAt, DateTime(2026, 10, 15, 10, 3));
   });
 }
 

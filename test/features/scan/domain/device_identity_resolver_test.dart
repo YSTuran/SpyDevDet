@@ -188,11 +188,32 @@ void main() {
       resolver.networkIdentityKeys(
         plan,
         gatewayMacAddress: 'B8:27:EB:12:34:56',
+        gatewayServiceIdentity: 'ssdp:uuid:router-1',
       ),
       [
         '192.168.1.0/24|gateway:192.168.1.1|gateway-mac:B8:27:EB:12:34:56',
+        '192.168.1.0/24|gateway:192.168.1.1|gateway-service:ssdp%3Auuid%3Arouter-1',
         '192.168.1.0/24|gateway:192.168.1.1',
       ],
     );
+  });
+
+  test('yönlendiricinin servis kimliğini ağ kanıtı olarak çıkarır', () {
+    const gateway = DeviceObservation(
+      id: 'gateway',
+      ipAddress: '192.168.1.1',
+      displayName: 'Yönlendirici',
+      macStatus: MacStatus.platformRestricted,
+      services: [],
+      evidence: [
+        DeviceEvidence(
+          source: DeviceEvidenceSource.ssdp,
+          description: 'SSDP duyurusu',
+          identifier: 'UUID:ROUTER-1',
+        ),
+      ],
+    );
+
+    expect(resolver.gatewayServiceIdentity(gateway), 'ssdp:uuid:router-1');
   });
 }

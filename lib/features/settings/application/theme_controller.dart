@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:spy_dev_det/features/settings/data/theme_preferences_repository.dart';
 import 'package:spy_dev_det/features/settings/domain/theme_preferences.dart';
@@ -8,32 +6,19 @@ final themePreferencesRepositoryProvider = Provider<ThemePreferencesRepository>(
   (ref) => SharedThemePreferencesRepository(),
 );
 
+final initialThemePreferencesProvider = Provider<ThemePreferences>(
+  (ref) => const ThemePreferences(),
+);
+
 final themeControllerProvider =
     NotifierProvider<ThemeController, ThemePreferences>(ThemeController.new);
 
 class ThemeController extends Notifier<ThemePreferences> {
   var _revision = 0;
+  Future<void> _saveQueue = Future<void>.value();
 
   @override
-  ThemePreferences build() {
-    unawaited(_restore());
-    return const ThemePreferences();
-  }
-
-  Future<void> _restore() async {
-    final revision = _revision;
-    try {
-      final restored = await ref
-          .read(themePreferencesRepositoryProvider)
-          .load();
-      if (revision == _revision) {
-        state = restored;
-      }
-    } on Object {
-      // Görünüm tercihleri kritik veri değildir; depolama kullanılamazsa
-      // güvenli varsayılan olan Aydınlık + Material korunur.
-    }
-  }
+  ThemePreferences build() => ref.watch(initialThemePreferencesProvider);
 
   Future<void> selectMode(AppThemeMode mode) =>
       _update(state.copyWith(mode: mode));
@@ -42,8 +27,29 @@ class ThemeController extends Notifier<ThemePreferences> {
       _update(state.copyWith(preset: preset));
 
   Future<void> _update(ThemePreferences next) async {
-    _revision++;
+    final previous = state;
+    final revision = ++_revision;
     state = next;
-    await ref.read(themePreferencesRepositoryProvider).save(next);
+    final operation = _ignoreFailure(
+      _saveQueue,
+    ).then((_) => ref.read(themePreferencesRepositoryProvider).save(next));
+    _saveQueue = operation;
+    try {
+      await operation;
+    } on Object {
+      if (revision == _revision) {
+        state = previous;
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _ignoreFailure(Future<void> operation) async {
+    try {
+      await operation;
+    } on Object {
+      // A later preference still needs to be persisted after an earlier
+      // platform storage failure.
+    }
   }
 }

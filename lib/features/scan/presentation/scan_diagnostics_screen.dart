@@ -195,6 +195,7 @@ class _MethodDiagnostics extends StatelessWidget {
 
   IconData get _icon => switch (result.phase) {
     DiscoveryMethodPhase.completed => Icons.check_circle_outline,
+    DiscoveryMethodPhase.platformRestricted => Icons.info_outline,
     DiscoveryMethodPhase.running => Icons.sync,
     DiscoveryMethodPhase.failed ||
     DiscoveryMethodPhase.unavailable => Icons.warning_amber_outlined,
@@ -205,6 +206,7 @@ class _MethodDiagnostics extends StatelessWidget {
 
   Color _color(BuildContext context) => switch (result.phase) {
     DiscoveryMethodPhase.completed => Colors.green,
+    DiscoveryMethodPhase.platformRestricted => Colors.orange,
     DiscoveryMethodPhase.running => Theme.of(context).colorScheme.primary,
     DiscoveryMethodPhase.failed ||
     DiscoveryMethodPhase.unavailable => Theme.of(context).colorScheme.error,

@@ -16,16 +16,6 @@ class NeighborEnricher {
     DeviceObservation device,
     NeighborSnapshot snapshot,
   ) {
-    if (!snapshot.available) {
-      return device.copyWith(
-        macStatus:
-            snapshot.unavailableReason ==
-                NeighborSnapshotUnavailableReason.androidRestricted
-            ? MacStatus.platformRestricted
-            : MacStatus.restrictedOrUnavailable,
-      );
-    }
-
     NeighborEntry? entry;
     for (final candidate in snapshot.entries) {
       if (candidate.ipAddress == device.ipAddress) {
@@ -34,6 +24,15 @@ class NeighborEnricher {
       }
     }
     if (entry == null) {
+      if (!snapshot.available) {
+        return device.copyWith(
+          macStatus:
+              snapshot.unavailableReason ==
+                  NeighborSnapshotUnavailableReason.androidRestricted
+              ? MacStatus.platformRestricted
+              : MacStatus.restrictedOrUnavailable,
+        );
+      }
       return device.copyWith(macStatus: MacStatus.notObserved);
     }
 

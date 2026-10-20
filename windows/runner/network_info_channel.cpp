@@ -516,25 +516,6 @@ flutter::EncodableMap ReadNeighborSnapshot() {
              flutter::EncodableValue(flutter::EncodableList())}};
   }
 
-  ULONG buffer_size = 0;
-  DWORD status = GetIpNetTable(nullptr, &buffer_size, FALSE);
-  if (status != ERROR_INSUFFICIENT_BUFFER || buffer_size == 0) {
-    return {{flutter::EncodableValue("available"),
-             flutter::EncodableValue(false)},
-            {flutter::EncodableValue("entries"),
-             flutter::EncodableValue(flutter::EncodableList())}};
-  }
-
-  std::vector<unsigned char> buffer(buffer_size);
-  auto* table = reinterpret_cast<MIB_IPNETTABLE*>(buffer.data());
-  status = GetIpNetTable(table, &buffer_size, FALSE);
-  if (status != NO_ERROR) {
-    return {{flutter::EncodableValue("available"),
-             flutter::EncodableValue(false)},
-            {flutter::EncodableValue("entries"),
-             flutter::EncodableValue(flutter::EncodableList())}};
-  }
-
   flutter::EncodableList entries;
   if (active_network->physical_address.has_value()) {
     entries.push_back(flutter::EncodableValue(flutter::EncodableMap{
@@ -544,6 +525,33 @@ flutter::EncodableMap ReadNeighborSnapshot() {
          flutter::EncodableValue(active_network->physical_address.value())},
     }));
   }
+  const auto build_result = [&entries](bool available) {
+    return flutter::EncodableMap{
+        {flutter::EncodableValue("available"),
+         flutter::EncodableValue(available)},
+        {flutter::EncodableValue("entries"),
+         flutter::EncodableValue(entries)}};
+  };
+
+  ULONG buffer_size = 0;
+  DWORD status = GetIpNetTable(nullptr, &buffer_size, FALSE);
+  if (status == ERROR_NO_DATA) {
+    return build_result(true);
+  }
+  if (status != ERROR_INSUFFICIENT_BUFFER || buffer_size == 0) {
+    return build_result(false);
+  }
+
+  std::vector<unsigned char> buffer(buffer_size);
+  auto* table = reinterpret_cast<MIB_IPNETTABLE*>(buffer.data());
+  status = GetIpNetTable(table, &buffer_size, FALSE);
+  if (status == ERROR_NO_DATA) {
+    return build_result(true);
+  }
+  if (status != NO_ERROR) {
+    return build_result(false);
+  }
+
   for (DWORD index = 0; index < table->dwNumEntries; ++index) {
     const MIB_IPNETROW& row = table->table[index];
     if (row.dwIndex != active_network->interface_index ||
@@ -589,10 +597,7 @@ flutter::EncodableMap ReadNeighborSnapshot() {
     }));
   }
 
-  return {{flutter::EncodableValue("available"),
-           flutter::EncodableValue(true)},
-          {flutter::EncodableValue("entries"),
-           flutter::EncodableValue(entries)}};
+  return build_result(true);
 }
 
 }  // namespace

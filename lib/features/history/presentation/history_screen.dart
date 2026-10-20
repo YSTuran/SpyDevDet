@@ -42,7 +42,7 @@ class HistoryScreen extends ConsumerWidget {
                     ),
                     PopupMenuItem(
                       value: _HistoryAction.clearAllData,
-                      child: Text('Tüm yerel verileri sil'),
+                      child: Text('Tüm tarama verilerini sil'),
                     ),
                   ],
                 ),
@@ -138,7 +138,7 @@ class HistoryScreen extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Tüm yerel veriler silinsin mi?'),
+        title: const Text('Tüm tarama verileri silinsin mi?'),
         content: const Text(
           'Tarama geçmişi, bilinen cihaz işaretleri, özel adlar ve notlar '
           'kalıcı olarak silinir.',
@@ -165,13 +165,13 @@ class HistoryScreen extends ConsumerWidget {
       ref.invalidate(networkProfilesProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tüm yerel veriler silindi')),
+          const SnackBar(content: Text('Tüm tarama verileri silindi')),
         );
       }
     } on Object {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Yerel veriler silinemedi')),
+          const SnackBar(content: Text('Tarama verileri silinemedi')),
         );
       }
     }

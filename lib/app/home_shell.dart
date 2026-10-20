@@ -13,6 +13,7 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   var _selectedIndex = 0;
+  final List<Widget?> _pages = [const ScanScreen(), null, null, null];
 
   static const _destinations = [
     _ShellDestination(
@@ -37,78 +38,96 @@ class _HomeShellState extends State<HomeShell> {
     ),
   ];
 
-  static const _pages = [
-    ScanScreen(),
-    NetworkProfilesScreen(),
-    HistoryScreen(),
-    SettingsScreen(),
-  ];
-
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final content = IndexedStack(index: _selectedIndex, children: _pages);
-        if (constraints.maxWidth < 760) {
+    return PopScope<void>(
+      canPop: _selectedIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _selectedIndex != 0) {
+          _select(0);
+        }
+      },
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final content = IndexedStack(
+            index: _selectedIndex,
+            children: [
+              for (var index = 0; index < _pages.length; index++)
+                _pages[index] ?? const SizedBox.shrink(),
+            ],
+          );
+          if (constraints.maxWidth < 760) {
+            return Scaffold(
+              body: content,
+              bottomNavigationBar: NavigationBar(
+                selectedIndex: _selectedIndex,
+                onDestinationSelected: _select,
+                destinations: _destinations
+                    .map(
+                      (destination) => NavigationDestination(
+                        icon: Icon(destination.icon),
+                        selectedIcon: Icon(destination.selectedIcon),
+                        label: destination.label,
+                      ),
+                    )
+                    .toList(growable: false),
+              ),
+            );
+          }
+
+          final extended = constraints.maxWidth >= 1100;
           return Scaffold(
-            body: content,
-            bottomNavigationBar: NavigationBar(
-              selectedIndex: _selectedIndex,
-              onDestinationSelected: _select,
-              destinations: _destinations
-                  .map(
-                    (destination) => NavigationDestination(
-                      icon: Icon(destination.icon),
-                      selectedIcon: Icon(destination.selectedIcon),
-                      label: destination.label,
+            body: Row(
+              children: [
+                SafeArea(
+                  child: NavigationRail(
+                    extended: extended,
+                    selectedIndex: _selectedIndex,
+                    onDestinationSelected: _select,
+                    labelType: extended
+                        ? NavigationRailLabelType.none
+                        : NavigationRailLabelType.all,
+                    leading: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Icon(
+                        Icons.security_outlined,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: 30,
+                      ),
                     ),
-                  )
-                  .toList(growable: false),
+                    destinations: _destinations
+                        .map(
+                          (destination) => NavigationRailDestination(
+                            icon: Icon(destination.icon),
+                            selectedIcon: Icon(destination.selectedIcon),
+                            label: Text(destination.label),
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(child: content),
+              ],
             ),
           );
-        }
-
-        final extended = constraints.maxWidth >= 1100;
-        return Scaffold(
-          body: Row(
-            children: [
-              SafeArea(
-                child: NavigationRail(
-                  extended: extended,
-                  selectedIndex: _selectedIndex,
-                  onDestinationSelected: _select,
-                  labelType: extended
-                      ? NavigationRailLabelType.none
-                      : NavigationRailLabelType.all,
-                  leading: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Icon(
-                      Icons.security_outlined,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 30,
-                    ),
-                  ),
-                  destinations: _destinations
-                      .map(
-                        (destination) => NavigationRailDestination(
-                          icon: Icon(destination.icon),
-                          selectedIcon: Icon(destination.selectedIcon),
-                          label: Text(destination.label),
-                        ),
-                      )
-                      .toList(growable: false),
-                ),
-              ),
-              const VerticalDivider(width: 1),
-              Expanded(child: content),
-            ],
-          ),
-        );
-      },
+        },
+      ),
     );
   }
 
-  void _select(int value) => setState(() => _selectedIndex = value);
+  void _select(int value) {
+    setState(() {
+      _pages[value] ??= switch (value) {
+        0 => const ScanScreen(),
+        1 => const NetworkProfilesScreen(),
+        2 => const HistoryScreen(),
+        3 => const SettingsScreen(),
+        _ => throw RangeError.index(value, _pages),
+      };
+      _selectedIndex = value;
+    });
+  }
 }
 
 class _ShellDestination {

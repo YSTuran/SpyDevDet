@@ -95,4 +95,33 @@ void main() {
     expect(result.macStatus, MacStatus.platformRestricted);
     expect(result.macStatus.label, contains('Android 10'));
   });
+
+  test(
+    'tablo kullanılamasa da sağlanan yerel bağdaştırıcı MAC adresini kullanır',
+    () {
+      const snapshot = NeighborSnapshot(
+        available: false,
+        entries: [
+          NeighborEntry(
+            ipAddress: '192.168.1.20',
+            macAddress: 'B8:27:EB:12:34:56',
+          ),
+        ],
+        unavailableReason:
+            NeighborSnapshotUnavailableReason.operatingSystemUnavailable,
+      );
+      const device = DeviceObservation(
+        id: 'self',
+        ipAddress: '192.168.1.20',
+        displayName: 'Bu cihaz',
+        macStatus: MacStatus.notObserved,
+        services: [],
+      );
+
+      final result = const NeighborEnricher().enrich(device, snapshot);
+
+      expect(result.macStatus, MacStatus.available);
+      expect(result.macAddress, 'B8:27:EB:12:34:56');
+    },
+  );
 }

@@ -38,23 +38,27 @@ class SettingsScreen extends ConsumerWidget {
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         const SizedBox(height: 14),
-                        SizedBox(
-                          width: double.infinity,
-                          child: SegmentedButton<AppThemeMode>(
-                            showSelectedIcon: false,
-                            segments: AppThemeMode.values
-                                .map(
-                                  (mode) => ButtonSegment(
-                                    value: mode,
-                                    icon: Icon(mode.icon),
-                                    label: Text(mode.label),
-                                  ),
-                                )
-                                .toList(growable: false),
-                            selected: {preferences.mode},
-                            onSelectionChanged: (selection) => _save(
-                              context,
-                              controller.selectMode(selection.first),
+                        LayoutBuilder(
+                          builder: (context, constraints) => SizedBox(
+                            width: double.infinity,
+                            child: SegmentedButton<AppThemeMode>(
+                              showSelectedIcon: false,
+                              segments: AppThemeMode.values
+                                  .map(
+                                    (mode) => ButtonSegment(
+                                      value: mode,
+                                      icon: constraints.maxWidth < 400
+                                          ? null
+                                          : Icon(mode.icon),
+                                      label: Text(mode.label),
+                                    ),
+                                  )
+                                  .toList(growable: false),
+                              selected: {preferences.mode},
+                              onSelectionChanged: (selection) => _save(
+                                context,
+                                controller.selectMode(selection.first),
+                              ),
                             ),
                           ),
                         ),
@@ -196,42 +200,47 @@ class _ColorPresetTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: selected
-          ? Theme.of(context).colorScheme.secondaryContainer
-          : Theme.of(context).colorScheme.surfaceContainer,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '${preset.label} renk teması',
+      child: Material(
+        color: selected
+            ? Theme.of(context).colorScheme.secondaryContainer
+            : Theme.of(context).colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              CircleAvatar(backgroundColor: preset.seedColor, radius: 15),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      preset.label,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    Text(
-                      preset.description,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                CircleAvatar(backgroundColor: preset.seedColor, radius: 15),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        preset.label,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        preset.description,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              Icon(
-                selected ? Icons.check_circle : Icons.circle_outlined,
-                color: selected
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.outline,
-              ),
-            ],
+                Icon(
+                  selected ? Icons.check_circle : Icons.circle_outlined,
+                  color: selected
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.outline,
+                ),
+              ],
+            ),
           ),
         ),
       ),

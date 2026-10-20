@@ -71,10 +71,12 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   IP tabanlı düşük güvenli eşleştirmeye dönülür. Sonradan güçlü kimlik bulunan
   cihazlar kimlik takma adlarıyla önceki profiline bağlanır; aynı IP'yi alan
   farklı bir güçlü kimlik eski profili devralmaz.
-- Alt ağ ve ağ geçidi adresinden oluşan kararlı ağ kimliği her taramada
-  kullanılabilir. Ağ geçidinin MAC adresi edinilebildiğinde buna güçlü bir
-  kimlik takma adı eklenir; MAC bilgisinin geçici olarak alınamaması aynı ağın
-  geçmişini bölmez, aynı adresleri kullanan farklı ağ geçitleri ise ayrılır.
+- Alt ağ ve ağ geçidi adresinden oluşan temel ağ kimliği her taramada
+  kullanılabilir. Ağ geçidinin MAC adresi veya güvenilir SSDP/ONVIF servis
+  kimliği edinilebildiğinde buna güçlü bir kimlik takma adı eklenir; güçlü kanıt
+  bulunamazsa profil sınırlı kimlik olarak işaretlenir. MAC bilgisinin geçici
+  olarak alınamaması aynı ağın geçmişini bölmez, aynı adresleri kullanan farklı
+  ağ geçitleri güçlü kanıt bulunduğunda ayrılır.
   Tarama sırasında yerel IP, bağdaştırıcı veya ağ geçidi değişirse sonuçlar
   eski ağın geçmişine yazılmadan tarama durdurulur. Tamamlanmış bir taramadan
   geç dönen ağ kontrolü kaydedilmiş sonucu geçersiz kılamaz. Uygulama arka
@@ -94,11 +96,15 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   gezinme çubuğu kullanılır. Varsayılan Aydınlık + Material görünümünün yanında
   karanlık/sistem modu ve Okyanus, Zümrüt, Menekşe, Kehribar renk paletleri
   seçilebilir. Görünüm tercihleri yalnız cihazda saklanır.
-- Yalnız bütün ayrıntılı keşif yöntemlerinin başarıyla tamamlandığı taramalarda
-  önceki taramada olup bu taramada görülmeyen cihazlar listelenir. Hızlı veya
-  kısmi tarama hatalı "görülmedi" sonucu üretmez. Tarama geçmişi kullanıcı tarafından
+- Ayrıntılı keşif yöntemleri başarıyla tamamlandığında önceki taramada olup bu
+  taramada görülmeyen cihazlar listelenir. Android'in beklenen komşu tablosu
+  kısıtı ayrıca raporlanır ancak diğer yöntemler tamamsa karşılaştırmayı tek
+  başına engellemez. Hızlı veya gerçekten kısmi tarama hatalı "görülmedi"
+  sonucu üretmez. Tarama geçmişi kullanıcı tarafından
   tek tek veya topluca silinebilir; ayrıca bilinen cihaz profilleri, özel adlar
-  ve notlar dahil bütün yerel veriler de temizlenebilir.
+  ve notlar dahil bütün yerel tarama verileri de temizlenebilir. Görünüm
+  tercihleri bu işlemden etkilenmez. Veritabanının sınırsız büyümemesi için her
+  ağın en yeni 100 taraması saklanır; cihaz profilleri bu temizlikten etkilenmez.
 
 Bu yöntemlerin hiçbiri bütün cihazları bulmayı veya bir cihazın amacını kesin
 olarak belirlemeyi garanti etmez. Özellikle "kamera adayı" etiketi, cihazın
@@ -135,3 +141,11 @@ dart run tool/update_oui_registry.dart
 ```
 
 Kaynak ve veri kullanım notları `assets/data/README.md` dosyasındadır.
+
+## Android imzalama
+
+Yerel kontrol APK'ları `android/key.properties` bulunmadığında geliştirme
+anahtarıyla üretilebilir. Başka kullanıcılara kalıcı bir APK vermeden önce
+`android/key.properties.example` örneğini `android/key.properties` adıyla
+kopyalayıp yalnız sana ait bir JKS anahtarı tanımla. Gerçek parola ve JKS
+dosyaları Git tarafından yok sayılır; bu dosyaları depoya ekleme veya paylaşma.

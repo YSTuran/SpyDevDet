@@ -137,7 +137,8 @@ class _NetworkProfileCard extends StatelessWidget {
         leading: const Icon(Icons.router_outlined),
         title: Text(profile.displayName),
         subtitle: Text(
-          '${_safeNetworkLabel(profile.networkKey)}\n'
+          '${_safeNetworkLabel(profile.networkKey)} • '
+          'kimlik ${profile.hasStrongIdentity ? 'güçlü' : 'sınırlı'}\n'
           '${profile.scanCount} tarama • son taramada '
           '${profile.lastDeviceCount} cihaz\n'
           'Son görülme: ${_formatDateTime(profile.lastSeenAt)}',
@@ -153,7 +154,11 @@ class _NetworkProfileCard extends StatelessWidget {
   }
 
   String _safeNetworkLabel(String key) {
-    final base = key.split('|gateway-mac:').first;
+    final base = key
+        .split('|gateway-mac:')
+        .first
+        .split('|gateway-service:')
+        .first;
     return base.replaceFirst('|gateway:', ' • ağ geçidi ');
   }
 

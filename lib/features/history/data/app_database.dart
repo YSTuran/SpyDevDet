@@ -131,6 +131,26 @@ class AppDatabase extends _$AppDatabase {
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
+      await customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_scan_sessions_network_completed '
+        'ON scan_sessions (network_key, completed_at DESC)',
+      );
+      await customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_scan_sessions_comparable '
+        'ON scan_sessions (network_key, presence_comparable, completed_at DESC)',
+      );
+      await customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_scan_observations_session '
+        'ON scan_observations (scan_session_id)',
+      );
+      await customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_device_aliases_stable '
+        'ON device_identity_aliases (stable_key)',
+      );
+      await customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_network_aliases_network '
+        'ON network_identity_aliases (network_key)',
+      );
     },
   );
 }

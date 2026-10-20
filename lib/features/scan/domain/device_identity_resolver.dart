@@ -57,15 +57,44 @@ class DeviceIdentityResolver {
       '${plan.networkAddress}/${plan.network.prefixLength}|'
       'gateway:${plan.network.gatewayIpv4 ?? '-'}';
 
-  List<String> networkIdentityKeys(ScanPlan plan, {String? gatewayMacAddress}) {
+  List<String> networkIdentityKeys(
+    ScanPlan plan, {
+    String? gatewayMacAddress,
+    String? gatewayServiceIdentity,
+  }) {
     final baseKey = networkKey(plan);
     final gatewayMac = gatewayMacAddress == null
         ? null
         : MacAddress.tryParse(gatewayMacAddress);
+    final serviceIdentity = gatewayServiceIdentity?.trim().toLowerCase();
+    final boundedServiceIdentity = serviceIdentity == null
+        ? null
+        : serviceIdentity.length <= 256
+        ? serviceIdentity
+        : serviceIdentity.substring(0, 256);
     return List.unmodifiable([
       if (gatewayMac != null) '$baseKey|gateway-mac:${gatewayMac.value}',
+      if (boundedServiceIdentity != null && boundedServiceIdentity.isNotEmpty)
+        '$baseKey|gateway-service:'
+            '${Uri.encodeComponent(boundedServiceIdentity)}',
       baseKey,
     ]);
+  }
+
+  String? gatewayServiceIdentity(DeviceObservation? gateway) {
+    if (gateway == null) {
+      return null;
+    }
+    for (final source in const [
+      DeviceEvidenceSource.onvif,
+      DeviceEvidenceSource.ssdp,
+    ]) {
+      final identifier = _identifierFor(gateway, source);
+      if (identifier != null) {
+        return '${source.name}:$identifier';
+      }
+    }
+    return null;
   }
 
   String? _identifierFor(

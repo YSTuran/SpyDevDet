@@ -144,21 +144,19 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
     final neighborStopwatch = Stopwatch()..start();
     final vendorDatabaseStatus = await vendorDatabaseStatusFuture;
     final neighborSnapshot = await neighborRepository.getSnapshot();
-    if (neighborSnapshot.available) {
-      for (final entry in neighborSnapshot.entries) {
-        if (entry.ipAddress == plan.network.localIpv4 ||
-            (!plan.targets.contains(entry.ipAddress) &&
-                entry.ipAddress != plan.network.gatewayIpv4) ||
-            MacAddress.tryParse(entry.macAddress) == null) {
-          continue;
-        }
-        _storeAndEmit(
-          observations,
-          _neighborObservation(entry, plan),
-          plan,
-          controller,
-        );
+    for (final entry in neighborSnapshot.entries) {
+      if (entry.ipAddress == plan.network.localIpv4 ||
+          (!plan.targets.contains(entry.ipAddress) &&
+              entry.ipAddress != plan.network.gatewayIpv4) ||
+          MacAddress.tryParse(entry.macAddress) == null) {
+        continue;
       }
+      _storeAndEmit(
+        observations,
+        _neighborObservation(entry, plan),
+        plan,
+        controller,
+      );
     }
     var enrichedDeviceCount = 0;
     for (final entry in observations.entries.toList()) {
@@ -179,6 +177,9 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
           method: DiscoveryMethod.neighbor,
           phase: neighborSnapshot.available
               ? DiscoveryMethodPhase.completed
+              : neighborSnapshot.unavailableReason ==
+                    NeighborSnapshotUnavailableReason.androidRestricted
+              ? DiscoveryMethodPhase.platformRestricted
               : DiscoveryMethodPhase.unavailable,
           deviceCount: enrichedDeviceCount,
           elapsed: neighborStopwatch.elapsed,

@@ -448,62 +448,73 @@ class _DeviceFilters extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<DeviceFilterOption>(
-                    initialValue: filter,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Filtre',
-                      prefixIcon: Icon(Icons.filter_list),
-                    ),
-                    items: DeviceFilterOption.values
-                        .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(
-                              value.label,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        )
-                        .toList(growable: false),
-                    onChanged: (value) {
-                      if (value != null) {
-                        onFilterChanged(value);
-                      }
-                    },
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final filterField = DropdownButtonFormField<DeviceFilterOption>(
+                  initialValue: filter,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Filtre',
+                    prefixIcon: Icon(Icons.filter_list),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButtonFormField<DeviceSortOption>(
-                    initialValue: sort,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Sırala',
-                      prefixIcon: Icon(Icons.sort),
-                    ),
-                    items: DeviceSortOption.values
-                        .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(
-                              value.label,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                  items: DeviceFilterOption.values
+                      .map(
+                        (value) => DropdownMenuItem(
+                          value: value,
+                          child: Text(
+                            value.label,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        )
-                        .toList(growable: false),
-                    onChanged: (value) {
-                      if (value != null) {
-                        onSortChanged(value);
-                      }
-                    },
+                        ),
+                      )
+                      .toList(growable: false),
+                  onChanged: (value) {
+                    if (value != null) {
+                      onFilterChanged(value);
+                    }
+                  },
+                );
+                final sortField = DropdownButtonFormField<DeviceSortOption>(
+                  initialValue: sort,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Sırala',
+                    prefixIcon: Icon(Icons.sort),
                   ),
-                ),
-              ],
+                  items: DeviceSortOption.values
+                      .map(
+                        (value) => DropdownMenuItem(
+                          value: value,
+                          child: Text(
+                            value.label,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(growable: false),
+                  onChanged: (value) {
+                    if (value != null) {
+                      onSortChanged(value);
+                    }
+                  },
+                );
+                if (constraints.maxWidth < 520) {
+                  return Column(
+                    children: [
+                      filterField,
+                      const SizedBox(height: 12),
+                      sortField,
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: filterField),
+                    const SizedBox(width: 12),
+                    Expanded(child: sortField),
+                  ],
+                );
+              },
             ),
           ],
         ),
@@ -754,6 +765,7 @@ class _MethodResultRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = switch (result.phase) {
       DiscoveryMethodPhase.completed => Colors.green,
+      DiscoveryMethodPhase.platformRestricted => Colors.orange,
       DiscoveryMethodPhase.unavailable ||
       DiscoveryMethodPhase.failed => Theme.of(context).colorScheme.error,
       DiscoveryMethodPhase.running => Theme.of(context).colorScheme.primary,
@@ -769,6 +781,8 @@ class _MethodResultRow extends StatelessWidget {
                 ? Icons.sync
                 : result.phase == DiscoveryMethodPhase.completed
                 ? Icons.check_circle_outline
+                : result.phase == DiscoveryMethodPhase.platformRestricted
+                ? Icons.info_outline
                 : result.phase == DiscoveryMethodPhase.skipped
                 ? Icons.skip_next_outlined
                 : result.isProblem

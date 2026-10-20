@@ -50,4 +50,23 @@ void main() {
     expect(explanations.join(' '), contains('olabilir'));
     expect(explanations.join(' '), contains('MAC ve üretici'));
   });
+
+  test('Android platform kısıtının açıklamasını korur', () {
+    final methods = {
+      for (final method in DiscoveryMethod.values)
+        method: DiscoveryMethodResult(
+          method: method,
+          phase: method == DiscoveryMethod.neighbor
+              ? DiscoveryMethodPhase.platformRestricted
+              : DiscoveryMethodPhase.completed,
+          userMessage: method == DiscoveryMethod.neighbor
+              ? 'Android komşu MAC tablosunu gizler.'
+              : null,
+        ),
+    };
+
+    final explanations = advisor.explain(methods: methods);
+
+    expect(explanations, contains('Android komşu MAC tablosunu gizler.'));
+  });
 }

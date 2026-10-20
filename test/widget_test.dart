@@ -169,6 +169,89 @@ void main() {
     expect(themeRepository.current.preset, ColorThemePreset.ocean);
   });
 
+  testWidgets('kayıtlı tema ilk Flutter karesinde uygulanır', (tester) async {
+    const initialTheme = ThemePreferences(
+      mode: AppThemeMode.dark,
+      preset: ColorThemePreset.violet,
+    );
+
+    await tester.pumpWidget(
+      _testApp(
+        themeRepository: _TestThemePreferencesRepository(),
+        initialTheme: initialTheme,
+      ),
+    );
+
+    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(app.themeMode, ThemeMode.dark);
+    expect(app.theme?.colorScheme.brightness, Brightness.light);
+    expect(app.darkTheme?.colorScheme.brightness, Brightness.dark);
+  });
+
+  testWidgets('tema kaydı başarısızsa son kalıcı seçime döner', (tester) async {
+    await tester.pumpWidget(
+      _testApp(themeRepository: _FailingThemePreferencesRepository()),
+    );
+    await tester.tap(find.text('Ayarlar'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Karanlık'));
+    await tester.pumpAndSettle();
+
+    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(app.themeMode, ThemeMode.light);
+    expect(find.text('Tema tercihi kaydedilemedi'), findsOneWidget);
+  });
+
+  testWidgets('dar ekranda tema ve cihaz filtreleri taşmadan yerleşir', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      _testApp(themeRepository: _TestThemePreferencesRepository()),
+    );
+    await tester.tap(find.text('Ayarlar'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Aydınlık'), findsOneWidget);
+    expect(find.text('Karanlık'), findsOneWidget);
+    expect(find.text('Sistem'), findsOneWidget);
+
+    await tester.tap(find.text('Tarama'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Yerel ağı tara'));
+    for (var index = 0; index < 5; index++) {
+      await tester.pump(const Duration(milliseconds: 310));
+    }
+    await tester.scrollUntilVisible(
+      find.text('Cihazlarda ara'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(tester.takeException(), isNull);
+    final filterTop = tester.getTopLeft(find.text('Filtre')).dy;
+    final sortTop = tester.getTopLeft(find.text('Sırala')).dy;
+    expect(sortTop, greaterThan(filterTop));
+  });
+
+  testWidgets('geri tuşu önce tarama sekmesine döner', (tester) async {
+    await tester.pumpWidget(
+      _testApp(themeRepository: _TestThemePreferencesRepository()),
+    );
+    await tester.tap(find.text('Ayarlar'));
+    await tester.pumpAndSettle();
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Yerel ağı tara'), findsOneWidget);
+    expect(find.text('Görünüm modu'), findsNothing);
+  });
+
   testWidgets('geniş ekranda NavigationRail kullanır', (tester) async {
     tester.view.physicalSize = const Size(1200, 800);
     tester.view.devicePixelRatio = 1;
@@ -190,6 +273,7 @@ Widget _testApp({
   DeviceScanner? scanner,
   _TestHistoryRepository? historyRepository,
   ThemePreferencesRepository? themeRepository,
+  ThemePreferences? initialTheme,
 }) {
   return ProviderScope(
     overrides: [
@@ -204,6 +288,8 @@ Widget _testApp({
       ),
       if (themeRepository != null)
         themePreferencesRepositoryProvider.overrideWithValue(themeRepository),
+      if (initialTheme != null)
+        initialThemePreferencesProvider.overrideWithValue(initialTheme),
     ],
     child: const SpyDevDetApp(),
   );
@@ -219,6 +305,15 @@ class _TestThemePreferencesRepository implements ThemePreferencesRepository {
   Future<void> save(ThemePreferences preferences) async {
     current = preferences;
   }
+}
+
+class _FailingThemePreferencesRepository implements ThemePreferencesRepository {
+  @override
+  Future<ThemePreferences> load() async => const ThemePreferences();
+
+  @override
+  Future<void> save(ThemePreferences preferences) =>
+      Future<void>.error(StateError('Test depolama hatası'));
 }
 
 class _TestHistoryRepository implements ScanHistoryRepository {

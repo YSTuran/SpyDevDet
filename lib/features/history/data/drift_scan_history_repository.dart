@@ -19,6 +19,7 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
   final AppDatabase database;
   final DeviceIdentityResolver identityResolver;
   static const _weakIdentityReuseWindow = Duration(days: 7);
+  static const _maxSessionsPerNetwork = 100;
 
   @override
   Future<List<DeviceObservation>> recordCompletedScan(
@@ -151,6 +152,8 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
             );
       }
 
+      await _pruneOldSessions(networkKey);
+
       return List.unmodifiable(decoratedDevices);
     });
   }
@@ -203,26 +206,41 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
     final profiles = await (database.select(
       database.networkProfiles,
     )..orderBy([(table) => OrderingTerm.desc(table.lastSeenAt)])).get();
-    final sessions = await database.select(database.scanSessions).get();
+    final statistics = await database
+        .customSelect(
+          '''
+      SELECT sessions.network_key,
+             COUNT(*) AS scan_count,
+             COALESCE((
+               SELECT latest.total_device_count
+               FROM scan_sessions AS latest
+               WHERE latest.network_key = sessions.network_key
+               ORDER BY latest.completed_at DESC, latest.id DESC
+               LIMIT 1
+             ), 0) AS last_device_count
+      FROM scan_sessions AS sessions
+      GROUP BY sessions.network_key
+      ''',
+          readsFrom: {database.scanSessions},
+        )
+        .get();
+    final statisticsByNetwork = {
+      for (final row in statistics)
+        row.read<String>('network_key'): (
+          scanCount: row.read<int>('scan_count'),
+          lastDeviceCount: row.read<int>('last_device_count'),
+        ),
+    };
     return List.unmodifiable(
       profiles.map((profile) {
-        final matching =
-            sessions
-                .where((session) => session.networkKey == profile.networkKey)
-                .toList()
-              ..sort(
-                (first, second) =>
-                    second.completedAt.compareTo(first.completedAt),
-              );
+        final profileStatistics = statisticsByNetwork[profile.networkKey];
         return NetworkProfileSummary(
           networkKey: profile.networkKey,
           customName: profile.customName,
           firstSeenAt: profile.firstSeenAt,
           lastSeenAt: profile.lastSeenAt,
-          scanCount: matching.length,
-          lastDeviceCount: matching.isEmpty
-              ? 0
-              : matching.first.totalDeviceCount,
+          scanCount: profileStatistics?.scanCount ?? 0,
+          lastDeviceCount: profileStatistics?.lastDeviceCount ?? 0,
         );
       }),
     );
@@ -253,11 +271,12 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
     final rows = await (database.select(
       database.scanObservations,
     )..where((table) => table.scanSessionId.equals(sessionId))).get();
-    final devices = <DeviceObservation>[];
-    for (final row in rows) {
-      final profile = await _knownDevice(row.stableKey);
-      devices.add(_observationFromRow(row, profile));
-    }
+    final profiles = await _knownDevices(
+      rows.map((row) => row.stableKey).toSet(),
+    );
+    final devices = rows
+        .map((row) => _observationFromRow(row, profiles[row.stableKey]))
+        .toList();
     devices.sort(
       (first, second) => Ipv4Address.compare(first.ipAddress, second.ipAddress),
     );
@@ -411,7 +430,9 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
     final sessions =
         await (database.select(database.scanSessions)
               ..where(
-                (table) => table.networkKey.like('$baseKey|gateway-mac:%'),
+                (table) =>
+                    table.networkKey.like('$baseKey|gateway-mac:%') |
+                    table.networkKey.like('$baseKey|gateway-service:%'),
               )
               ..orderBy([(table) => OrderingTerm.desc(table.completedAt)]))
             .get();
@@ -419,7 +440,8 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
     return matchingKeys.length == 1 ? matchingKeys.single : null;
   }
 
-  bool _isStrongNetworkKey(String key) => key.contains('|gateway-mac:');
+  bool _isStrongNetworkKey(String key) =>
+      key.contains('|gateway-mac:') || key.contains('|gateway-service:');
 
   Future<String> _resolveStableKey(
     List<String> candidateKeys, {
@@ -523,6 +545,34 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
     )..where((table) => table.stableKey.equals(stableKey))).getSingleOrNull();
   }
 
+  Future<Map<String, KnownDevice>> _knownDevices(Set<String> stableKeys) async {
+    if (stableKeys.isEmpty) {
+      return const {};
+    }
+    final profiles = await (database.select(
+      database.knownDevices,
+    )..where((table) => table.stableKey.isIn(stableKeys))).get();
+    return {for (final profile in profiles) profile.stableKey: profile};
+  }
+
+  Future<void> _pruneOldSessions(String networkKey) async {
+    final sessions =
+        await (database.select(database.scanSessions)
+              ..where((table) => table.networkKey.equals(networkKey))
+              ..orderBy([
+                (table) => OrderingTerm.desc(table.completedAt),
+                (table) => OrderingTerm.desc(table.id),
+              ]))
+            .get();
+    final oldSessions = sessions.skip(_maxSessionsPerNetwork).toList();
+    if (oldSessions.isEmpty) {
+      return;
+    }
+    await (database.delete(
+      database.scanSessions,
+    )..where((table) => table.id.isIn(oldSessions.map((row) => row.id)))).go();
+  }
+
   ScanHistorySummary _summaryFromRow(ScanSession row) {
     return ScanHistorySummary(
       id: row.id,
@@ -559,12 +609,15 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
     final previousRows = await (database.select(
       database.scanObservations,
     )..where((table) => table.scanSessionId.equals(previousSession.id))).get();
+    final profiles = await _knownDevices(
+      previousRows.map((row) => row.stableKey).toSet(),
+    );
     final missing = <MissingDeviceSummary>[];
     for (final row in previousRows) {
       if (currentKeys.contains(row.stableKey)) {
         continue;
       }
-      final profile = await _knownDevice(row.stableKey);
+      final profile = profiles[row.stableKey];
       missing.add(
         MissingDeviceSummary(
           stableKey: row.stableKey,

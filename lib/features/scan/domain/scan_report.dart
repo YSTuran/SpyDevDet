@@ -74,6 +74,7 @@ enum DiscoveryMethodPhase {
   waiting,
   running,
   completed,
+  platformRestricted,
   unavailable,
   failed,
   cancelled,
@@ -85,6 +86,7 @@ extension DiscoveryMethodPhaseText on DiscoveryMethodPhase {
     DiscoveryMethodPhase.waiting => 'Bekliyor',
     DiscoveryMethodPhase.running => 'Çalışıyor',
     DiscoveryMethodPhase.completed => 'Tamamlandı',
+    DiscoveryMethodPhase.platformRestricted => 'Platform tarafından kısıtlı',
     DiscoveryMethodPhase.unavailable => 'Kullanılamıyor',
     DiscoveryMethodPhase.failed => 'Başarısız',
     DiscoveryMethodPhase.cancelled => 'İptal edildi',
@@ -119,6 +121,12 @@ class DiscoveryMethodResult {
   bool get isProblem =>
       phase == DiscoveryMethodPhase.unavailable ||
       phase == DiscoveryMethodPhase.failed;
+
+  bool get degradesPresenceCoverage =>
+      (phase != DiscoveryMethodPhase.completed &&
+          phase != DiscoveryMethodPhase.skipped &&
+          phase != DiscoveryMethodPhase.platformRestricted) ||
+      metrics.multicastLockAcquired == false;
 
   DiscoveryMethodResult copyWith({
     DiscoveryMethodPhase? phase,
@@ -170,19 +178,17 @@ class ScanReport {
 
   bool get isPartial =>
       !hasPresenceCoverage ||
-      methods.values.any((result) {
-        return switch (result.phase) {
-          DiscoveryMethodPhase.completed ||
-          DiscoveryMethodPhase.skipped => false,
-          _ => true,
-        };
-      });
+      methods.values.any((result) => result.degradesPresenceCoverage);
 
   bool get canComparePresence =>
+      scanMode == ScanMode.detailed &&
       !isPartial &&
-      DiscoveryMethod.values.every(
-        (method) => methods[method]?.phase == DiscoveryMethodPhase.completed,
-      );
+      DiscoveryMethod.values.every((method) {
+        final phase = methods[method]?.phase;
+        return phase == DiscoveryMethodPhase.completed ||
+            method == DiscoveryMethod.neighbor &&
+                phase == DiscoveryMethodPhase.platformRestricted;
+      });
 
   ScanReport withMethod(DiscoveryMethodResult result) {
     return ScanReport(

@@ -28,6 +28,22 @@ void main() {
             )
           ''')
           ..execute('''
+            CREATE TABLE device_identity_aliases (
+              alias_key TEXT NOT NULL PRIMARY KEY,
+              stable_key TEXT NOT NULL REFERENCES known_devices(stable_key)
+                ON DELETE CASCADE,
+              last_seen_at INTEGER NOT NULL
+            )
+          ''')
+          ..execute('''
+            CREATE TABLE network_identity_aliases (
+              alias_key TEXT NOT NULL PRIMARY KEY,
+              network_key TEXT NOT NULL REFERENCES network_profiles(network_key)
+                ON DELETE CASCADE,
+              last_seen_at INTEGER NOT NULL
+            )
+          ''')
+          ..execute('''
             CREATE TABLE scan_sessions (
               id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
               network_key TEXT NOT NULL,
@@ -41,6 +57,25 @@ void main() {
               missing_devices_json TEXT NOT NULL,
               presence_comparable INTEGER NOT NULL,
               elapsed_millis INTEGER NOT NULL
+            )
+          ''')
+          ..execute('''
+            CREATE TABLE scan_observations (
+              id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+              scan_session_id INTEGER NOT NULL REFERENCES scan_sessions(id)
+                ON DELETE CASCADE,
+              stable_key TEXT NOT NULL,
+              ip_address TEXT NOT NULL,
+              display_name TEXT NOT NULL,
+              mac_address TEXT NULL,
+              mac_status TEXT NOT NULL,
+              vendor TEXT NULL,
+              category TEXT NOT NULL,
+              confidence TEXT NOT NULL,
+              discovery_method TEXT NOT NULL,
+              services_json TEXT NOT NULL,
+              evidence_json TEXT NOT NULL,
+              was_new INTEGER NOT NULL
             )
           ''')
           ..execute('''

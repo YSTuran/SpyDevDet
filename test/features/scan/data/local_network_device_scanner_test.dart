@@ -147,6 +147,40 @@ void main() {
       DiscoveryMethodPhase.completed,
     );
   });
+
+  test(
+    'Android komşu tablosu kısıtını platform kısıtı olarak raporlar',
+    () async {
+      final plan = ScanPlan.fromNetwork(
+        const NetworkSnapshot(
+          localIpv4: '192.168.1.2',
+          prefixLength: 30,
+          interfaceName: 'test',
+          gatewayIpv4: '192.168.1.1',
+          isWifi: true,
+          isVpn: false,
+        ),
+      );
+      final scanner = LocalNetworkDeviceScanner(
+        tcpScanner: const _TcpScanner(),
+        reachabilityDiscovery: const _ReachabilityDiscovery(),
+        mdnsDiscovery: const _EmptyDiscovery(),
+        ssdpDiscovery: const _EmptyDiscovery(),
+        onvifDiscovery: const _EmptyDiscovery(),
+        neighborRepository: const _AndroidRestrictedNeighborRepository(),
+        multicastLock: const _MulticastLock(),
+      );
+
+      final events = await scanner.scan(plan, ScanCancellationToken()).toList();
+      final neighborResult = events
+          .whereType<ScanMethodStatusChanged>()
+          .map((event) => event.result)
+          .lastWhere((result) => result.method == DiscoveryMethod.neighbor);
+
+      expect(neighborResult.phase, DiscoveryMethodPhase.platformRestricted);
+      expect(neighborResult.userMessage, contains('Android 10'));
+    },
+  );
 }
 
 class _TcpWaitsForDiscovery implements DeviceScanner {
@@ -312,6 +346,16 @@ class _NeighborRepository implements NeighborRepository {
       NeighborEntry(ipAddress: '192.168.1.3', macAddress: 'B8:27:EB:12:34:56'),
     ],
   );
+}
+
+class _AndroidRestrictedNeighborRepository implements NeighborRepository {
+  const _AndroidRestrictedNeighborRepository();
+
+  @override
+  Future<NeighborSnapshot> getSnapshot() async =>
+      const NeighborSnapshot.unavailable(
+        unavailableReason: NeighborSnapshotUnavailableReason.androidRestricted,
+      );
 }
 
 class _MulticastLock extends NativeMulticastLock {

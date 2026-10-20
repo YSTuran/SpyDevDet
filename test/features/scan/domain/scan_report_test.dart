@@ -108,4 +108,44 @@ void main() {
     expect(report.canComparePresence, isFalse);
     expect(report.scanMode, ScanMode.quick);
   });
+
+  test(
+    'Android platform kısıtı ayrıntılı taramayı kısmi veya kıyaslanamaz yapmaz',
+    () {
+      var report = ScanReport.started(DateTime(2026, 10, 20));
+      for (final method in DiscoveryMethod.values) {
+        report = report.withMethod(
+          DiscoveryMethodResult(
+            method: method,
+            phase: method == DiscoveryMethod.neighbor
+                ? DiscoveryMethodPhase.platformRestricted
+                : DiscoveryMethodPhase.completed,
+          ),
+        );
+      }
+
+      expect(report.isPartial, isFalse);
+      expect(report.canComparePresence, isTrue);
+    },
+  );
+
+  test('başarısız multicast kilidi karşılaştırmayı engeller', () {
+    var report = ScanReport.started(DateTime(2026, 10, 20));
+    for (final method in DiscoveryMethod.values) {
+      report = report.withMethod(
+        DiscoveryMethodResult(
+          method: method,
+          phase: method == DiscoveryMethod.neighbor
+              ? DiscoveryMethodPhase.platformRestricted
+              : DiscoveryMethodPhase.completed,
+          metrics: method == DiscoveryMethod.mdns
+              ? const DiscoveryMetrics(multicastLockAcquired: false)
+              : const DiscoveryMetrics(),
+        ),
+      );
+    }
+
+    expect(report.isPartial, isTrue);
+    expect(report.canComparePresence, isFalse);
+  });
 }

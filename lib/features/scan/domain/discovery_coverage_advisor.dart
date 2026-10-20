@@ -30,7 +30,8 @@ class DiscoveryCoverageAdvisor {
         'portu bulunmayan cihazlar gözlemlenmemiş olabilir.',
       );
     }
-    if (_isUnavailable(neighbor)) {
+    if (_isUnavailable(neighbor) ||
+        neighbor?.phase == DiscoveryMethodPhase.platformRestricted) {
       explanations.add(
         neighbor?.userMessage ??
             'Komşu tablosuna erişilemediği için bazı cihazların MAC ve '

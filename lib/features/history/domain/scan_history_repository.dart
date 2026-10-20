@@ -66,6 +66,10 @@ class NetworkProfileSummary {
 
   String get displayName =>
       customName?.trim().isNotEmpty == true ? customName!.trim() : 'Yerel ağ';
+
+  bool get hasStrongIdentity =>
+      networkKey.contains('|gateway-mac:') ||
+      networkKey.contains('|gateway-service:');
 }
 
 class MissingDeviceSummary {
