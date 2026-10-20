@@ -184,7 +184,7 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
           elapsed: neighborStopwatch.elapsed,
           userMessage: neighborSnapshot.available
               ? null
-              : 'İşletim sistemi MAC komşu tablosuna erişim sağlamadı.',
+              : _neighborUnavailableMessage(neighborSnapshot),
           metrics: DiscoveryMetrics(
             attemptedTargets: plan.targets.length,
             receivedResponses: neighborSnapshot.entries.length,
@@ -193,6 +193,7 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
                 neighborSnapshot.entries.length - enrichedDeviceCount,
             detail:
                 'Etkin ağ bağdaştırıcısının komşu tablosu • '
+                '${_neighborTechnicalDetail(neighborSnapshot)} • '
                 '${vendorDatabaseStatus.description} '
                 '(${vendorDatabaseStatus.entryCount} kayıt)',
           ),
@@ -535,6 +536,28 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
       DiscoveryMethod.neighbor => 'Komşu tablosu',
     };
     return '$prefix keşfi bu ağda kullanılamadı.';
+  }
+
+  String _neighborUnavailableMessage(NeighborSnapshot snapshot) =>
+      switch (snapshot.unavailableReason) {
+        NeighborSnapshotUnavailableReason.androidRestricted =>
+          'Android 10 ve üzeri, yerel ağ komşu MAC tablosunu normal '
+              'uygulamalardan gizler. Bu bir izin hatası değildir; cihazlar '
+              'servis kimlikleri ve IP bilgileriyle izlenmeye devam eder.',
+        _ => 'İşletim sistemi etkin ağın MAC komşu tablosuna erişim sağlamadı.',
+      };
+
+  String _neighborTechnicalDetail(NeighborSnapshot snapshot) {
+    if (snapshot.available) {
+      return snapshot.entries.isEmpty
+          ? 'Tablo okundu; geçerli eşleşme yok'
+          : '${snapshot.entries.length} geçerli eşleşme';
+    }
+    return switch (snapshot.unavailableReason) {
+      NeighborSnapshotUnavailableReason.androidRestricted =>
+        'Android /proc/net erişim kısıtı',
+      _ => 'Komşu tablosu kullanılamıyor',
+    };
   }
 
   DeviceObservation _selfObservation(ScanPlan plan) {

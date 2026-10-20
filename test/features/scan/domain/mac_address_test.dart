@@ -77,4 +77,22 @@ void main() {
     expect(result.vendor, 'Raspberry Pi Foundation');
     expect(result.evidence, isNotEmpty);
   });
+
+  test('Android komşu tablosu kısıtını genel hatadan ayırır', () {
+    const device = DeviceObservation(
+      id: 'android-device',
+      ipAddress: '192.168.1.30',
+      displayName: 'Ağ cihazı',
+      macStatus: MacStatus.notObserved,
+      services: [],
+    );
+    const snapshot = NeighborSnapshot.unavailable(
+      unavailableReason: NeighborSnapshotUnavailableReason.androidRestricted,
+    );
+
+    final result = const NeighborEnricher().enrich(device, snapshot);
+
+    expect(result.macStatus, MacStatus.platformRestricted);
+    expect(result.macStatus.label, contains('Android 10'));
+  });
 }

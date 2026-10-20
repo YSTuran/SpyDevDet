@@ -17,7 +17,13 @@ class NeighborEnricher {
     NeighborSnapshot snapshot,
   ) {
     if (!snapshot.available) {
-      return device.copyWith(macStatus: MacStatus.restrictedOrUnavailable);
+      return device.copyWith(
+        macStatus:
+            snapshot.unavailableReason ==
+                NeighborSnapshotUnavailableReason.androidRestricted
+            ? MacStatus.platformRestricted
+            : MacStatus.restrictedOrUnavailable,
+      );
     }
 
     NeighborEntry? entry;

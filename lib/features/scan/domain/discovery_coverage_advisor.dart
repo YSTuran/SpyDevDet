@@ -32,8 +32,9 @@ class DiscoveryCoverageAdvisor {
     }
     if (_isUnavailable(neighbor)) {
       explanations.add(
-        'Komşu tablosuna erişilemediği için bazı cihazların MAC ve üretici '
-        'bilgileri alınamamış olabilir.',
+        neighbor?.userMessage ??
+            'Komşu tablosuna erişilemediği için bazı cihazların MAC ve '
+                'üretici bilgileri alınamamış olabilir.',
       );
     }
     if (multicastMethods.any((method) => _isUnavailable(methods[method]))) {

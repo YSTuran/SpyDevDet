@@ -57,6 +57,7 @@ struct NetworkCandidate {
   bool is_wifi;
   bool is_ethernet;
   bool is_vpn;
+  std::optional<std::string> physical_address;
   ULONG interface_index;
   ULONG metric;
 };
@@ -333,6 +334,34 @@ bool IsVpnAdapter(const IP_ADAPTER_ADDRESSES* adapter) {
   return ContainsAny(identity, kVpnTerms);
 }
 
+std::optional<std::string> PhysicalAddress(
+    const IP_ADAPTER_ADDRESSES* adapter) {
+  if (adapter->PhysicalAddressLength != 6) {
+    return std::nullopt;
+  }
+  bool all_zero = true;
+  bool all_broadcast = true;
+  for (ULONG index = 0; index < adapter->PhysicalAddressLength; ++index) {
+    all_zero = all_zero && adapter->PhysicalAddress[index] == 0;
+    all_broadcast =
+        all_broadcast && adapter->PhysicalAddress[index] == 0xff;
+  }
+  if (all_zero || all_broadcast) {
+    return std::nullopt;
+  }
+
+  std::ostringstream mac;
+  mac << std::uppercase << std::hex << std::setfill('0');
+  for (ULONG index = 0; index < adapter->PhysicalAddressLength; ++index) {
+    if (index > 0) {
+      mac << ':';
+    }
+    mac << std::setw(2)
+        << static_cast<int>(adapter->PhysicalAddress[index]);
+  }
+  return mac.str();
+}
+
 std::optional<ULONG> DefaultRouteInterfaceIndex() {
   IN_ADDR destination = {};
   if (InetPtonA(AF_INET, "1.1.1.1", &destination) != 1) {
@@ -413,6 +442,7 @@ std::optional<NetworkCandidate> ReadNetworkSnapshot(std::string* error_code,
           is_wifi,
           is_ethernet,
           is_vpn,
+          PhysicalAddress(adapter),
           adapter->IfIndex,
           adapter->Ipv4Metric,
       });
@@ -506,6 +536,14 @@ flutter::EncodableMap ReadNeighborSnapshot() {
   }
 
   flutter::EncodableList entries;
+  if (active_network->physical_address.has_value()) {
+    entries.push_back(flutter::EncodableValue(flutter::EncodableMap{
+        {flutter::EncodableValue("ipAddress"),
+         flutter::EncodableValue(active_network->local_ipv4)},
+        {flutter::EncodableValue("macAddress"),
+         flutter::EncodableValue(active_network->physical_address.value())},
+    }));
+  }
   for (DWORD index = 0; index < table->dwNumEntries; ++index) {
     const MIB_IPNETROW& row = table->table[index];
     if (row.dwIndex != active_network->interface_index ||
@@ -529,6 +567,9 @@ flutter::EncodableMap ReadNeighborSnapshot() {
     char address_buffer[INET_ADDRSTRLEN] = {};
     if (InetNtopA(AF_INET, &address, address_buffer, INET_ADDRSTRLEN) ==
         nullptr) {
+      continue;
+    }
+    if (std::string(address_buffer) == active_network->local_ipv4) {
       continue;
     }
 

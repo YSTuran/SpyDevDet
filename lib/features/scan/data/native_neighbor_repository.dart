@@ -34,6 +34,13 @@ class NativeNeighborRepository implements NeighborRepository {
       return NeighborSnapshot(
         available: raw['available'] == true,
         entries: List.unmodifiable(entries),
+        unavailableReason: switch (raw['unavailableReason']) {
+          'androidRestricted' =>
+            NeighborSnapshotUnavailableReason.androidRestricted,
+          _ when raw['available'] != true =>
+            NeighborSnapshotUnavailableReason.operatingSystemUnavailable,
+          _ => null,
+        },
       );
     } on PlatformException {
       return const NeighborSnapshot.unavailable();

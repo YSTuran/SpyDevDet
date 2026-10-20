@@ -12,8 +12,6 @@ import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 import 'package:spy_dev_det/features/scan/domain/service_catalog.dart';
 import 'package:spy_dev_det/features/scan/presentation/scan_diagnostics_screen.dart';
-import 'package:spy_dev_det/features/history/presentation/history_screen.dart';
-import 'package:spy_dev_det/features/history/presentation/network_profiles_screen.dart';
 
 class ScanScreen extends ConsumerStatefulWidget {
   const ScanScreen({super.key});
@@ -70,24 +68,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
       appBar: AppBar(
         title: const Text('SpyDevDet'),
         actions: [
-          IconButton(
-            tooltip: 'Ağ profilleri',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (context) => const NetworkProfilesScreen(),
-              ),
-            ),
-            icon: const Icon(Icons.router_outlined),
-          ),
-          IconButton(
-            tooltip: 'Tarama geçmişi',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (context) => const HistoryScreen(),
-              ),
-            ),
-            icon: const Icon(Icons.history),
-          ),
           IconButton(
             tooltip: 'Uygulama bilgisi',
             onPressed: () => _showAppInfo(context),
@@ -473,6 +453,7 @@ class _DeviceFilters extends StatelessWidget {
                 Expanded(
                   child: DropdownButtonFormField<DeviceFilterOption>(
                     initialValue: filter,
+                    isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Filtre',
                       prefixIcon: Icon(Icons.filter_list),
@@ -481,7 +462,10 @@ class _DeviceFilters extends StatelessWidget {
                         .map(
                           (value) => DropdownMenuItem(
                             value: value,
-                            child: Text(value.label),
+                            child: Text(
+                              value.label,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         )
                         .toList(growable: false),
@@ -496,6 +480,7 @@ class _DeviceFilters extends StatelessWidget {
                 Expanded(
                   child: DropdownButtonFormField<DeviceSortOption>(
                     initialValue: sort,
+                    isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Sırala',
                       prefixIcon: Icon(Icons.sort),
@@ -504,7 +489,10 @@ class _DeviceFilters extends StatelessWidget {
                         .map(
                           (value) => DropdownMenuItem(
                             value: value,
-                            child: Text(value.label),
+                            child: Text(
+                              value.label,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         )
                         .toList(growable: false),

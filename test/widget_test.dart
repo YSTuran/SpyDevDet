@@ -16,6 +16,9 @@ import 'package:spy_dev_det/features/scan/domain/device_scanner.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_cancellation_token.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_event.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
+import 'package:spy_dev_det/features/settings/application/theme_controller.dart';
+import 'package:spy_dev_det/features/settings/data/theme_preferences_repository.dart';
+import 'package:spy_dev_det/features/settings/domain/theme_preferences.dart';
 
 void main() {
   testWidgets('tarama cihazları aşamalı olarak gösterir', (tester) async {
@@ -141,12 +144,52 @@ void main() {
       findsNothing,
     );
   });
+
+  testWidgets('tema varsayılanı aydınlık Material ve seçimler kalıcıdır', (
+    tester,
+  ) async {
+    final themeRepository = _TestThemePreferencesRepository();
+    await tester.pumpWidget(_testApp(themeRepository: themeRepository));
+    await tester.pump();
+
+    var app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(app.themeMode, ThemeMode.light);
+    expect(themeRepository.current.preset, ColorThemePreset.material);
+
+    await tester.tap(find.text('Ayarlar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Karanlık'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Okyanus').last);
+    await tester.pumpAndSettle();
+
+    app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(app.themeMode, ThemeMode.dark);
+    expect(themeRepository.current.mode, AppThemeMode.dark);
+    expect(themeRepository.current.preset, ColorThemePreset.ocean);
+  });
+
+  testWidgets('geniş ekranda NavigationRail kullanır', (tester) async {
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      _testApp(themeRepository: _TestThemePreferencesRepository()),
+    );
+    await tester.pump();
+
+    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+  });
 }
 
 Widget _testApp({
   NetworkInfoRepository? repository,
   DeviceScanner? scanner,
   _TestHistoryRepository? historyRepository,
+  ThemePreferencesRepository? themeRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -159,9 +202,23 @@ Widget _testApp({
       scanHistoryRepositoryProvider.overrideWithValue(
         historyRepository ?? _TestHistoryRepository(),
       ),
+      if (themeRepository != null)
+        themePreferencesRepositoryProvider.overrideWithValue(themeRepository),
     ],
     child: const SpyDevDetApp(),
   );
+}
+
+class _TestThemePreferencesRepository implements ThemePreferencesRepository {
+  ThemePreferences current = const ThemePreferences();
+
+  @override
+  Future<ThemePreferences> load() async => current;
+
+  @override
+  Future<void> save(ThemePreferences preferences) async {
+    current = preferences;
+  }
 }
 
 class _TestHistoryRepository implements ScanHistoryRepository {

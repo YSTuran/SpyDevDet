@@ -41,8 +41,10 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   indirilmez.
 - Erişilebildiği platformlarda IP komşu tablosundaki geçerli kayıtlar hem cihaz
   keşfi hem de MAC zenginleştirmesi için kullanılır. Android 10 ve üzerinin
-  `/proc/net` kısıtı nedeniyle MAC tablosu okunamazsa durum açıkça
-  "edinilemedi" olarak gösterilir.
+  `/proc/net` kısıtı nedeniyle MAC tablosu okunamadığında bunun bir izin hatası
+  olmadığı açıkça belirtilir; cihazlar servis kimliği ve IP kanıtlarıyla
+  izlenmeye devam eder. Windows'ta etkin ağ bağdaştırıcısının fiziksel adresi
+  "Bu cihaz" kaydına eklenir.
 - IEEE MA-L, MA-M, MA-S ve IAB genel kayıtlarından geliştirme sırasında
   üretilen çevrimdışı OUI asset'i 24, 28 ve 36 bit en uzun prefix eşleşmesiyle
   üretici adını gösterebilir. Yerel/rastgele MAC adreslerinde üretici tahmin
@@ -88,6 +90,10 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   izolasyonu ve kullanılamayan keşif yöntemleri gibi olası nedenler açıklanır.
 - Ağlar ayrı yerel profillerde tutulur, kullanıcı tarafından adlandırılabilir
   ve her ağın tarama geçmişi ayrıca görüntülenebilir.
+- Mobil görünümde Material 3 alt gezinme çubuğu, geniş Windows görünümünde yan
+  gezinme çubuğu kullanılır. Varsayılan Aydınlık + Material görünümünün yanında
+  karanlık/sistem modu ve Okyanus, Zümrüt, Menekşe, Kehribar renk paletleri
+  seçilebilir. Görünüm tercihleri yalnız cihazda saklanır.
 - Yalnız bütün ayrıntılı keşif yöntemlerinin başarıyla tamamlandığı taramalarda
   önceki taramada olup bu taramada görülmeyen cihazlar listelenir. Hızlı veya
   kısmi tarama hatalı "görülmedi" sonucu üretmez. Tarama geçmişi kullanıcı tarafından

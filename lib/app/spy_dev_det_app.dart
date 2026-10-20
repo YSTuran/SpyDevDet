@@ -1,30 +1,29 @@
 import 'package:flutter/material.dart';
-import 'package:spy_dev_det/features/scan/presentation/scan_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:spy_dev_det/app/app_theme.dart';
+import 'package:spy_dev_det/app/home_shell.dart';
+import 'package:spy_dev_det/features/settings/application/theme_controller.dart';
+import 'package:spy_dev_det/features/settings/domain/theme_preferences.dart';
 
-class SpyDevDetApp extends StatelessWidget {
+class SpyDevDetApp extends ConsumerWidget {
   const SpyDevDetApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final preferences = ref.watch(themeControllerProvider);
     return MaterialApp(
       title: 'SpyDevDet',
       debugShowCheckedModeBanner: false,
-      theme: _theme(Brightness.light),
-      darkTheme: _theme(Brightness.dark),
-      themeMode: ThemeMode.system,
-      home: const ScanScreen(),
+      theme: buildAppTheme(
+        brightness: Brightness.light,
+        preset: preferences.preset,
+      ),
+      darkTheme: buildAppTheme(
+        brightness: Brightness.dark,
+        preset: preferences.preset,
+      ),
+      themeMode: preferences.mode.materialMode,
+      home: const HomeShell(),
     );
   }
-
-  ThemeData _theme(Brightness brightness) => ThemeData(
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: const Color(0xFF155E75),
-      brightness: brightness,
-    ),
-    useMaterial3: true,
-    cardTheme: const CardThemeData(
-      clipBehavior: Clip.antiAlias,
-      margin: EdgeInsets.zero,
-    ),
-  );
 }

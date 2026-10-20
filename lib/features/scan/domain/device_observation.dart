@@ -1,6 +1,12 @@
 import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 
-enum MacStatus { available, notObserved, restrictedOrUnavailable, invalid }
+enum MacStatus {
+  available,
+  notObserved,
+  platformRestricted,
+  restrictedOrUnavailable,
+  invalid,
+}
 
 enum DeviceFamiliarity { unclassified, newDevice, seenBefore, known }
 
@@ -17,8 +23,10 @@ extension MacStatusText on MacStatus {
   String get label => switch (this) {
     MacStatus.available => 'MAC adresi bulundu',
     MacStatus.notObserved => 'MAC adresi bu taramada gözlemlenmedi',
+    MacStatus.platformRestricted =>
+      'Android 10 ve üzeri, komşu MAC tablosunu uygulamalardan gizler',
     MacStatus.restrictedOrUnavailable =>
-      'MAC adresi ağ veya Android kısıtı nedeniyle edinilemedi',
+      'MAC adresi işletim sistemi veya ağ kısıtı nedeniyle edinilemedi',
     MacStatus.invalid => 'Geçersiz MAC adresi kullanılmadı',
   };
 }

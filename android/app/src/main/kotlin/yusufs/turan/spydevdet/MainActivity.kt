@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import io.flutter.embedding.android.FlutterActivity
@@ -79,6 +80,16 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun readNeighborSnapshot(result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            result.success(
+                mapOf(
+                    "available" to false,
+                    "entries" to emptyList<Any>(),
+                    "unavailableReason" to "androidRestricted",
+                ),
+            )
+            return
+        }
         val entries = mutableListOf<Map<String, String>>()
         try {
             File("/proc/net/arp").useLines { lines ->
@@ -99,7 +110,13 @@ class MainActivity : FlutterActivity() {
             }
             result.success(mapOf("available" to true, "entries" to entries))
         } catch (_: Exception) {
-            result.success(mapOf("available" to false, "entries" to emptyList<Any>()))
+            result.success(
+                mapOf(
+                    "available" to false,
+                    "entries" to emptyList<Any>(),
+                    "unavailableReason" to "operatingSystemUnavailable",
+                ),
+            )
         }
     }
 
