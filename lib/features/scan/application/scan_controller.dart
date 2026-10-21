@@ -383,7 +383,7 @@ class ScanController extends Notifier<ScanState> {
       final gatewayServiceIdentity = identityResolver.gatewayServiceIdentity(
         _gatewayObservation(plan),
       );
-      final devices = await repository.recordCompletedScan(
+      final saved = await repository.recordCompletedScan(
         CompletedScanRecord(
           networkKey: identityResolver.networkKey(plan),
           networkIdentityKeys: identityResolver.networkIdentityKeys(
@@ -399,16 +399,17 @@ class ScanController extends Notifier<ScanState> {
       if (runId != _runId) {
         return;
       }
-      final newDeviceCount = devices
+      final newDeviceCount = saved.devices
           .where((device) => device.familiarity == DeviceFamiliarity.newDevice)
           .length;
       state = state.copyWith(
         phase: ScanPhase.completed,
-        devices: List.unmodifiable(devices),
-        statusMessage: devices.isEmpty
+        devices: saved.devices,
+        referenceComparison: saved.referenceComparison,
+        statusMessage: saved.devices.isEmpty
             ? 'Tarama tamamlandı • geçmişe kaydedildi'
-            : 'Tarama tamamlandı • ${devices.length} cihaz • '
-                  '$newDeviceCount yeni',
+            : 'Tarama tamamlandı • ${saved.devices.length} cihaz • '
+                  '$newDeviceCount uygulamada ilk kez',
       );
       ref.invalidate(scanHistoryProvider);
       ref.invalidate(networkProfilesProvider);

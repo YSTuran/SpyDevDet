@@ -1,18 +1,8 @@
-import java.io.FileInputStream
-import java.util.Properties
-
 plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-}
-
-val keystoreProperties = Properties()
-val keystorePropertiesFile = rootProject.file("key.properties")
-val hasReleaseSigning = keystorePropertiesFile.exists()
-if (hasReleaseSigning) {
-    FileInputStream(keystorePropertiesFile).use(keystoreProperties::load)
 }
 
 android {
@@ -39,24 +29,10 @@ android {
         versionName = flutter.versionName
     }
 
-    signingConfigs {
-        if (hasReleaseSigning) {
-            create("release") {
-                keyAlias = keystoreProperties.getProperty("keyAlias")
-                keyPassword = keystoreProperties.getProperty("keyPassword")
-                storeFile = file(keystoreProperties.getProperty("storeFile"))
-                storePassword = keystoreProperties.getProperty("storePassword")
-            }
-        }
-    }
-
     buildTypes {
         release {
-            // Local checkpoint APKs keep working without a private keystore.
-            // When key.properties exists, distributable builds use that key.
-            signingConfig = signingConfigs.getByName(
-                if (hasReleaseSigning) "release" else "debug",
-            )
+            // Bu proje yerel kontrol APK'ları için geliştirme anahtarını kullanır.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 }

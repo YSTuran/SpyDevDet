@@ -27,9 +27,9 @@ void main() {
       _record(ipAddress: '192.168.1.45', minute: 5),
     );
 
-    expect(first.single.familiarity, DeviceFamiliarity.newDevice);
-    expect(second.single.familiarity, DeviceFamiliarity.seenBefore);
-    expect(first.single.stableKey, second.single.stableKey);
+    expect(first.devices.single.familiarity, DeviceFamiliarity.newDevice);
+    expect(second.devices.single.familiarity, DeviceFamiliarity.seenBefore);
+    expect(first.devices.single.stableKey, second.devices.single.stableKey);
 
     final history = await repository.getHistory();
     expect(history, hasLength(2));
@@ -42,7 +42,7 @@ void main() {
       _record(ipAddress: '192.168.1.20', minute: 0),
     );
     await repository.updateDeviceProfile(
-      stableKey: first.single.stableKey!,
+      stableKey: first.devices.single.stableKey!,
       isKnown: true,
       customName: 'Salon cihazı',
       note: 'Bana ait',
@@ -52,9 +52,9 @@ void main() {
       _record(ipAddress: '192.168.1.21', minute: 10),
     );
 
-    expect(next.single.familiarity, DeviceFamiliarity.known);
-    expect(next.single.effectiveDisplayName, 'Salon cihazı');
-    expect(next.single.note, 'Bana ait');
+    expect(next.devices.single.familiarity, DeviceFamiliarity.known);
+    expect(next.devices.single.effectiveDisplayName, 'Salon cihazı');
+    expect(next.devices.single.note, 'Bana ait');
 
     final history = await repository.getHistory();
     final details = await repository.getDetails(history.first.id);
@@ -112,6 +112,48 @@ void main() {
     },
   );
 
+  test(
+    'referansa göre eklenen, görülmeyen ve değişen cihazları ayrıntılandırır',
+    () async {
+      await repository.recordCompletedScan(
+        _record(
+          ipAddress: '192.168.1.20',
+          minute: 0,
+          devices: const [
+            (ipAddress: '192.168.1.20', macAddress: 'B8:27:EB:12:34:56'),
+            (ipAddress: '192.168.1.30', macAddress: '00:17:88:12:34:56'),
+          ],
+        ),
+      );
+      final reference = (await repository.getHistory()).single;
+      await repository.setReferenceScan(reference.id);
+
+      await repository.recordCompletedScan(
+        _record(
+          ipAddress: '192.168.1.25',
+          minute: 5,
+          devices: const [
+            (ipAddress: '192.168.1.25', macAddress: 'B8:27:EB:12:34:56'),
+            (ipAddress: '192.168.1.40', macAddress: '3C:5A:B4:12:34:56'),
+          ],
+        ),
+      );
+      final latest = (await repository.getHistory()).first;
+
+      final details = await repository.getDetails(latest.id);
+      final comparison = details!.referenceComparison;
+
+      expect(comparison.usesExplicitReference, isTrue);
+      expect(comparison.baselineSessionId, reference.id);
+      expect(comparison.addedDevices, hasLength(1));
+      expect(comparison.addedDevices.single.ipAddress, '192.168.1.40');
+      expect(comparison.missingDevices, hasLength(1));
+      expect(comparison.missingDevices.single.ipAddress, '192.168.1.30');
+      expect(comparison.changedDevices, hasLength(1));
+      expect(comparison.changedDevices.single.ipChanged, isTrue);
+    },
+  );
+
   test('hızlı tarama ağ referansı yapılamaz', () async {
     await repository.recordCompletedScan(
       _record(ipAddress: '192.168.1.20', minute: 0, scanMode: ScanMode.quick),
@@ -129,7 +171,7 @@ void main() {
       _record(ipAddress: '192.168.1.20', minute: 0),
     );
     await repository.updateDeviceProfile(
-      stableKey: first.single.stableKey!,
+      stableKey: first.devices.single.stableKey!,
       isKnown: true,
       customName: 'Kişisel cihaz',
       note: null,
@@ -141,8 +183,8 @@ void main() {
     final next = await repository.recordCompletedScan(
       _record(ipAddress: '192.168.1.21', minute: 5),
     );
-    expect(next.single.familiarity, DeviceFamiliarity.known);
-    expect(next.single.effectiveDisplayName, 'Kişisel cihaz');
+    expect(next.devices.single.familiarity, DeviceFamiliarity.known);
+    expect(next.devices.single.effectiveDisplayName, 'Kişisel cihaz');
   });
 
   test('tüm yerel veriler silinince cihaz profili de unutulur', () async {
@@ -150,7 +192,7 @@ void main() {
       _record(ipAddress: '192.168.1.20', minute: 0),
     );
     await repository.updateDeviceProfile(
-      stableKey: first.single.stableKey!,
+      stableKey: first.devices.single.stableKey!,
       isKnown: true,
       customName: 'Silinecek cihaz',
       note: 'Yerel not',
@@ -162,9 +204,9 @@ void main() {
     final next = await repository.recordCompletedScan(
       _record(ipAddress: '192.168.1.21', minute: 5),
     );
-    expect(next.single.familiarity, DeviceFamiliarity.newDevice);
-    expect(next.single.customName, isNull);
-    expect(next.single.note, isNull);
+    expect(next.devices.single.familiarity, DeviceFamiliarity.newDevice);
+    expect(next.devices.single.customName, isNull);
+    expect(next.devices.single.note, isNull);
   });
 
   test('taramayı çalıştıran cihaz ilk kayıtta bilinen sayılır', () async {
@@ -193,8 +235,8 @@ void main() {
       ),
     );
 
-    expect(saved.single.stableKey, 'local:this-installation');
-    expect(saved.single.familiarity, DeviceFamiliarity.known);
+    expect(saved.devices.single.stableKey, 'local:this-installation');
+    expect(saved.devices.single.familiarity, DeviceFamiliarity.known);
     expect((await repository.getHistory()).single.newDeviceCount, 0);
   });
 
@@ -274,7 +316,7 @@ void main() {
         ),
       );
       await repository.updateDeviceProfile(
-        stableKey: first.single.stableKey!,
+        stableKey: first.devices.single.stableKey!,
         isKnown: true,
         customName: 'Salon cihazı',
         note: null,
@@ -287,10 +329,19 @@ void main() {
         _record(ipAddress: '192.168.1.45', minute: 10),
       );
 
-      expect(withMac.single.stableKey, first.single.stableKey);
-      expect(afterDhcpChange.single.stableKey, first.single.stableKey);
-      expect(afterDhcpChange.single.familiarity, DeviceFamiliarity.known);
-      expect(afterDhcpChange.single.effectiveDisplayName, 'Salon cihazı');
+      expect(withMac.devices.single.stableKey, first.devices.single.stableKey);
+      expect(
+        afterDhcpChange.devices.single.stableKey,
+        first.devices.single.stableKey,
+      );
+      expect(
+        afterDhcpChange.devices.single.familiarity,
+        DeviceFamiliarity.known,
+      );
+      expect(
+        afterDhcpChange.devices.single.effectiveDisplayName,
+        'Salon cihazı',
+      );
     },
   );
 
@@ -299,7 +350,7 @@ void main() {
       _record(ipAddress: '192.168.1.20', minute: 0),
     );
     await repository.updateDeviceProfile(
-      stableKey: first.single.stableKey!,
+      stableKey: first.devices.single.stableKey!,
       isKnown: true,
       customName: 'Eski cihaz',
       note: null,
@@ -315,9 +366,12 @@ void main() {
       ),
     );
 
-    expect(replacement.single.stableKey, isNot(first.single.stableKey));
-    expect(replacement.single.familiarity, DeviceFamiliarity.newDevice);
-    expect(replacement.single.customName, isNull);
+    expect(
+      replacement.devices.single.stableKey,
+      isNot(first.devices.single.stableKey),
+    );
+    expect(replacement.devices.single.familiarity, DeviceFamiliarity.newDevice);
+    expect(replacement.devices.single.customName, isNull);
   });
 
   test('eski IP tabanlı kimlik yeni cihaza süresiz aktarılmaz', () async {
@@ -341,7 +395,7 @@ void main() {
 
     final first = await repository.recordCompletedScan(ipOnlyRecord(0));
     await repository.updateDeviceProfile(
-      stableKey: first.single.stableKey!,
+      stableKey: first.devices.single.stableKey!,
       isKnown: true,
       customName: 'Önceki cihaz',
       note: null,
@@ -351,9 +405,12 @@ void main() {
       ipOnlyRecord(8 * 24 * 60),
     );
 
-    expect(replacement.single.stableKey, isNot(first.single.stableKey));
-    expect(replacement.single.familiarity, DeviceFamiliarity.newDevice);
-    expect(replacement.single.customName, isNull);
+    expect(
+      replacement.devices.single.stableKey,
+      isNot(first.devices.single.stableKey),
+    );
+    expect(replacement.devices.single.familiarity, DeviceFamiliarity.newDevice);
+    expect(replacement.devices.single.customName, isNull);
   });
 
   test('gateway MAC geçici olarak kaybolsa da aynı ağı kullanır', () async {
@@ -466,7 +523,7 @@ void main() {
       _record(ipAddress: '192.168.1.20', minute: 0),
     );
     await repository.updateDeviceProfile(
-      stableKey: first.single.stableKey!,
+      stableKey: first.devices.single.stableKey!,
       isKnown: false,
       isOwned: true,
       categoryOverride: DeviceCategory.mediaDevice,
@@ -478,10 +535,10 @@ void main() {
       _record(ipAddress: '192.168.1.21', minute: 5),
     );
 
-    expect(next.single.isOwned, isTrue);
-    expect(next.single.familiarity, DeviceFamiliarity.known);
-    expect(next.single.categoryOverride, DeviceCategory.mediaDevice);
-    expect(next.single.effectiveCategory, DeviceCategory.mediaDevice);
+    expect(next.devices.single.isOwned, isTrue);
+    expect(next.devices.single.familiarity, DeviceFamiliarity.known);
+    expect(next.devices.single.categoryOverride, DeviceCategory.mediaDevice);
+    expect(next.devices.single.effectiveCategory, DeviceCategory.mediaDevice);
   });
 
   test('cihaz profillerini listeler ve seçilen profili unutur', () async {
@@ -489,7 +546,7 @@ void main() {
       _record(ipAddress: '192.168.1.20', minute: 0),
     );
     await repository.updateDeviceProfile(
-      stableKey: saved.single.stableKey!,
+      stableKey: saved.devices.single.stableKey!,
       isKnown: true,
       customName: 'Kayıtlı cihaz',
       note: 'Yerel not',

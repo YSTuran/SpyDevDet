@@ -7,6 +7,7 @@ import 'package:spy_dev_det/app/spy_dev_det_app.dart';
 import 'package:spy_dev_det/features/network/domain/network_info_repository.dart';
 import 'package:spy_dev_det/features/network/domain/network_snapshot.dart';
 import 'package:spy_dev_det/features/history/application/history_providers.dart';
+import 'package:spy_dev_det/features/history/domain/reference_scan_comparison.dart';
 import 'package:spy_dev_det/features/history/domain/scan_history_repository.dart';
 import 'package:spy_dev_det/features/scan/application/scan_controller.dart';
 import 'package:spy_dev_det/features/scan/data/fake_device_scanner.dart';
@@ -40,7 +41,10 @@ void main() {
       await tester.pump(const Duration(milliseconds: 310));
     }
 
-    expect(find.text('Tarama tamamlandı • 3 cihaz • 3 yeni'), findsOneWidget);
+    expect(
+      find.text('Tarama tamamlandı • 3 cihaz • 3 uygulamada ilk kez'),
+      findsOneWidget,
+    );
     await tester.scrollUntilVisible(
       find.text('Gözlemlenen cihazlar (3)'),
       200,
@@ -371,11 +375,11 @@ class _TestHistoryRepository implements ScanHistoryRepository {
   var recordCount = 0;
 
   @override
-  Future<List<DeviceObservation>> recordCompletedScan(
+  Future<RecordedScanResult> recordCompletedScan(
     CompletedScanRecord record,
   ) async {
     recordCount++;
-    return record.devices
+    final devices = record.devices
         .map((device) {
           final stableKey = 'test:${device.ipAddress}';
           final isNew = _seen.add(stableKey);
@@ -389,6 +393,12 @@ class _TestHistoryRepository implements ScanHistoryRepository {
           );
         })
         .toList(growable: false);
+    return RecordedScanResult(
+      sessionId: recordCount,
+      networkKey: record.networkKey,
+      devices: devices,
+      referenceComparison: const ReferenceScanComparison.noBaseline(),
+    );
   }
 
   @override

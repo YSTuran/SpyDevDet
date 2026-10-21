@@ -1,3 +1,4 @@
+import 'package:spy_dev_det/features/history/domain/reference_scan_comparison.dart';
 import 'package:spy_dev_det/features/network/domain/network_snapshot.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
@@ -27,6 +28,7 @@ class ScanState {
     this.scanRange,
     this.elapsed,
     this.report,
+    this.referenceComparison,
   });
 
   const ScanState.idle()
@@ -41,7 +43,8 @@ class ScanState {
       network = null,
       scanRange = null,
       elapsed = null,
-      report = null;
+      report = null,
+      referenceComparison = null;
 
   final ScanPhase phase;
   final double progress;
@@ -55,6 +58,7 @@ class ScanState {
   final String? scanRange;
   final Duration? elapsed;
   final ScanReport? report;
+  final ReferenceScanComparison? referenceComparison;
 
   bool get isBusy =>
       phase == ScanPhase.preparing ||
@@ -77,6 +81,8 @@ class ScanState {
     String? scanRange,
     Duration? elapsed,
     ScanReport? report,
+    ReferenceScanComparison? referenceComparison,
+    bool clearReferenceComparison = false,
   }) {
     return ScanState(
       phase: phase ?? this.phase,
@@ -91,6 +97,9 @@ class ScanState {
       scanRange: scanRange ?? this.scanRange,
       elapsed: elapsed ?? this.elapsed,
       report: report ?? this.report,
+      referenceComparison: clearReferenceComparison
+          ? null
+          : referenceComparison ?? this.referenceComparison,
     );
   }
 }

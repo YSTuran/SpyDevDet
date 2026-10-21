@@ -102,11 +102,14 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   seçilebilir. Görünüm tercihleri yalnız cihazda saklanır.
 - Ayrıntılı keşif yöntemleri başarıyla tamamlandığında kullanıcı bir taramayı
   ağ referansı olarak seçebilir. Sonraki karşılaştırılabilir taramalarda
-  görülmeyen cihazlar bu sabit referansa göre listelenir; referans yoksa en son
-  karşılaştırılabilir tarama kullanılır. Android'in beklenen komşu tablosu
-  kısıtı ayrıca raporlanır ancak diğer yöntemler tamamsa karşılaştırmayı tek
-  başına engellemez. Hızlı veya gerçekten kısmi tarama hatalı "görülmedi"
-  sonucu üretmez. Tarama geçmişi kullanıcı tarafından
+  eklenen ve görülmeyen cihazların yanı sıra IP, servis, üretici, otomatik tür,
+  sınıflandırma güveni ve gözlemlenen kimlik kalitesi değişiklikleri gösterilir.
+  "Uygulamada ilk kez görüldü" durumu, "referanstan sonra eklendi" durumundan
+  ayrı tutulur. Sabit referans yoksa en son karşılaştırılabilir tarama geçici
+  temel olarak kullanılır. Android'in beklenen komşu tablosu kısıtı ayrıca
+  raporlanır ancak diğer yöntemler tamamsa karşılaştırmayı tek başına
+  engellemez. Hızlı veya gerçekten kısmi tarama hatalı değişiklik sonucu
+  üretmez. Tarama geçmişi kullanıcı tarafından
   tek tek veya topluca silinebilir; ayrıca bilinen cihaz profilleri, özel adlar
   ve notlar dahil bütün yerel tarama verileri de temizlenebilir. Görünüm
   tercihleri bu işlemden etkilenmez. Veritabanının sınırsız büyümemesi için her
@@ -149,10 +152,21 @@ dart run tool/update_oui_registry.dart
 
 Kaynak ve veri kullanım notları `assets/data/README.md` dosyasındadır.
 
-## Android imzalama
+## Yerel Android APK'sı
 
-Yerel kontrol APK'ları `android/key.properties` bulunmadığında geliştirme
-anahtarıyla üretilebilir. Başka kullanıcılara kalıcı bir APK vermeden önce
-`android/key.properties.example` örneğini `android/key.properties` adıyla
-kopyalayıp yalnız sana ait bir JKS anahtarı tanımla. Gerçek parola ve JKS
-dosyaları Git tarafından yok sayılır; bu dosyaları depoya ekleme veya paylaşma.
+Proje mağaza dağıtımı veya AAB yayını hedeflemez. Telefon kontrolleri için
+geliştirme anahtarıyla imzalanan yerel APK şu komutla üretilebilir:
+
+```powershell
+flutter build apk --release
+```
+
+Üretilen dosya `build/app/outputs/flutter-apk/app-release.apk` konumundadır.
+
+## Kod yapısı
+
+Tarama yaşam döngüsü ile ekran bileşenleri ayrılmıştır. Tarama kontrolleri,
+durum/özet alanları ve cihaz kartları ayrı sunum dosyalarında tutulur. Geçmiş
+ayrıntıları, referans karşılaştırması ve SQLite JSON dönüştürmeleri de bağımsız
+modüllerdir; böylece arayüz, karşılaştırma kuralları ve veri saklama kodu
+birbirine karışmadan geliştirilebilir.

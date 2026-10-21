@@ -1,3 +1,4 @@
+import 'package:spy_dev_det/features/history/domain/reference_scan_comparison.dart';
 import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
@@ -17,6 +18,22 @@ class CompletedScanRecord {
   final ScanReport report;
   final Duration elapsed;
   final List<DeviceObservation> devices;
+}
+
+class RecordedScanResult {
+  RecordedScanResult({
+    required this.sessionId,
+    required this.networkKey,
+    required List<DeviceObservation> devices,
+    required this.referenceComparison,
+  }) : _devices = List.unmodifiable(devices);
+
+  final int sessionId;
+  final String networkKey;
+  final ReferenceScanComparison referenceComparison;
+  final List<DeviceObservation> _devices;
+
+  List<DeviceObservation> get devices => _devices;
 }
 
 class ScanHistorySummary {
@@ -122,16 +139,19 @@ class MissingDeviceSummary {
 }
 
 class ScanHistoryDetails {
-  const ScanHistoryDetails({required this.summary, required this.devices});
+  const ScanHistoryDetails({
+    required this.summary,
+    required this.devices,
+    this.referenceComparison = const ReferenceScanComparison.noBaseline(),
+  });
 
   final ScanHistorySummary summary;
   final List<DeviceObservation> devices;
+  final ReferenceScanComparison referenceComparison;
 }
 
 abstract interface class ScanHistoryRepository {
-  Future<List<DeviceObservation>> recordCompletedScan(
-    CompletedScanRecord record,
-  );
+  Future<RecordedScanResult> recordCompletedScan(CompletedScanRecord record);
 
   Future<void> updateDeviceProfile({
     required String stableKey,
