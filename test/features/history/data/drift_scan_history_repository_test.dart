@@ -82,6 +82,48 @@ void main() {
     expect(history.first.missingDevices.single.lastIpAddress, '192.168.1.30');
   });
 
+  test(
+    'referans tarama sonraki karşılaştırmalarda kalıcı olarak kullanılır',
+    () async {
+      await repository.recordCompletedScan(
+        _record(
+          ipAddress: '192.168.1.20',
+          minute: 0,
+          devices: const [
+            (ipAddress: '192.168.1.20', macAddress: 'B8:27:EB:12:34:56'),
+            (ipAddress: '192.168.1.30', macAddress: '00:17:88:12:34:56'),
+          ],
+        ),
+      );
+      final firstSession = (await repository.getHistory()).single;
+      await repository.setReferenceScan(firstSession.id);
+
+      await repository.recordCompletedScan(
+        _record(ipAddress: '192.168.1.20', minute: 5),
+      );
+      await repository.recordCompletedScan(
+        _record(ipAddress: '192.168.1.20', minute: 10),
+      );
+
+      final history = await repository.getHistory();
+      expect(history.first.missingDevices, hasLength(1));
+      expect(history.last.isReference, isTrue);
+      expect(history.last.isPresenceComparable, isTrue);
+    },
+  );
+
+  test('hızlı tarama ağ referansı yapılamaz', () async {
+    await repository.recordCompletedScan(
+      _record(ipAddress: '192.168.1.20', minute: 0, scanMode: ScanMode.quick),
+    );
+    final session = (await repository.getHistory()).single;
+
+    expect(
+      () => repository.setReferenceScan(session.id),
+      throwsA(isA<StateError>()),
+    );
+  });
+
   test('geçmiş silinse de bilinen cihaz profili korunur', () async {
     final first = await repository.recordCompletedScan(
       _record(ipAddress: '192.168.1.20', minute: 0),
@@ -442,6 +484,26 @@ void main() {
     expect(next.single.effectiveCategory, DeviceCategory.mediaDevice);
   });
 
+  test('cihaz profillerini listeler ve seçilen profili unutur', () async {
+    final saved = await repository.recordCompletedScan(
+      _record(ipAddress: '192.168.1.20', minute: 0),
+    );
+    await repository.updateDeviceProfile(
+      stableKey: saved.single.stableKey!,
+      isKnown: true,
+      customName: 'Kayıtlı cihaz',
+      note: 'Yerel not',
+    );
+
+    final profiles = await repository.getKnownDevices();
+    expect(profiles.single.effectiveDisplayName, 'Kayıtlı cihaz');
+    expect(profiles.single.isKnown, isTrue);
+
+    await repository.forgetDevice(profiles.single.stableKey);
+    expect(await repository.getKnownDevices(), isEmpty);
+    expect(await repository.getHistory(), hasLength(1));
+  });
+
   test('ağ profillerini adlandırır ve geçmişi ağa göre filtreler', () async {
     const firstNetwork = '192.168.1.0/24|gateway:192.168.1.1';
     const secondNetwork = '10.0.0.0/24|gateway:10.0.0.1';
@@ -471,6 +533,30 @@ void main() {
     expect(filteredHistory.single.networkKey, firstNetwork);
   });
 
+  test(
+    'tek ağın profilini ve geçmişini diğer ağlara dokunmadan siler',
+    () async {
+      const firstNetwork = '192.168.1.0/24|gateway:192.168.1.1';
+      const secondNetwork = '10.0.0.0/24|gateway:10.0.0.1';
+      await repository.recordCompletedScan(
+        _record(ipAddress: '192.168.1.20', minute: 0, networkKey: firstNetwork),
+      );
+      await repository.recordCompletedScan(
+        _record(ipAddress: '10.0.0.20', minute: 5, networkKey: secondNetwork),
+      );
+
+      await repository.deleteNetworkData(firstNetwork);
+
+      final profiles = await repository.getNetworkProfiles();
+      expect(profiles.map((profile) => profile.networkKey), [secondNetwork]);
+      expect(await repository.getHistory(networkKey: firstNetwork), isEmpty);
+      expect(
+        await repository.getHistory(networkKey: secondNetwork),
+        hasLength(1),
+      );
+    },
+  );
+
   test('tarama modunu geçmişte saklar', () async {
     await repository.recordCompletedScan(
       _record(ipAddress: '192.168.1.20', minute: 0, scanMode: ScanMode.quick),
@@ -481,17 +567,22 @@ void main() {
     expect(history.single.scanMode, ScanMode.quick);
   });
 
-  test('her ağ için yalnız en yeni 100 taramayı saklar', () async {
-    for (var index = 0; index < 103; index++) {
+  test('saklama sınırı değişince eski taramaları hemen temizler', () async {
+    for (var index = 0; index < 28; index++) {
       await repository.recordCompletedScan(
         _record(ipAddress: '192.168.1.20', minute: index),
       );
     }
+    repository = DriftScanHistoryRepository(
+      database,
+      maxSessionsPerNetwork: 25,
+    );
+    await repository.applyRetentionLimit();
 
     final history = await repository.getHistory(limit: 200);
 
-    expect(history, hasLength(100));
-    expect(history.first.startedAt, DateTime(2026, 10, 15, 11, 42));
+    expect(history, hasLength(25));
+    expect(history.first.startedAt, DateTime(2026, 10, 15, 10, 27));
     expect(history.last.startedAt, DateTime(2026, 10, 15, 10, 3));
   });
 }

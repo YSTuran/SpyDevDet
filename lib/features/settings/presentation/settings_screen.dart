@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:spy_dev_det/features/history/application/history_providers.dart';
+import 'package:spy_dev_det/features/history/presentation/history_screen.dart';
+import 'package:spy_dev_det/features/history/presentation/known_devices_screen.dart';
+import 'package:spy_dev_det/features/history/presentation/network_profiles_screen.dart';
+import 'package:spy_dev_det/features/settings/application/history_preferences_controller.dart';
 import 'package:spy_dev_det/features/settings/application/theme_controller.dart';
+import 'package:spy_dev_det/features/settings/domain/history_preferences.dart';
 import 'package:spy_dev_det/features/settings/domain/theme_preferences.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -10,8 +16,12 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final preferences = ref.watch(themeControllerProvider);
     final controller = ref.read(themeControllerProvider.notifier);
+    final historyPreferences = ref.watch(historyPreferencesControllerProvider);
+    final historyController = ref.read(
+      historyPreferencesControllerProvider.notifier,
+    );
     return Scaffold(
-      appBar: AppBar(title: const Text('Görünüm ayarları')),
+      appBar: AppBar(title: const Text('Ayarlar')),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -118,11 +128,103 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 16),
                 Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Tarama geçmişi',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Her ağ için saklanacak en yeni tarama sayısını '
+                          'belirle. Seçili ağ referansı bu sınır içinde korunur.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 14),
+                        InputDecorator(
+                          decoration: const InputDecoration(
+                            labelText: 'Ağ başına tarama sayısı',
+                            prefixIcon: Icon(Icons.history),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<int>(
+                              isExpanded: true,
+                              value: historyPreferences.maxScansPerNetwork,
+                              items: HistoryPreferences.supportedLimits
+                                  .map(
+                                    (limit) => DropdownMenuItem(
+                                      value: limit,
+                                      child: Text('$limit tarama'),
+                                    ),
+                                  )
+                                  .toList(growable: false),
+                              onChanged: (value) {
+                                if (value != null) {
+                                  _changeRetentionLimit(
+                                    context,
+                                    ref,
+                                    currentLimit:
+                                        historyPreferences.maxScansPerNetwork,
+                                    nextLimit: value,
+                                    controller: historyController,
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Card(
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.devices_outlined),
+                        title: const Text('Cihaz profillerini yönet'),
+                        subtitle: const Text(
+                          'Cihaz adlarını, notları ve tanıma durumlarını düzenle.',
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _open(context, const KnownDevicesScreen()),
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.router_outlined),
+                        title: const Text('Ağ profillerini yönet'),
+                        subtitle: const Text(
+                          'Ağları adlandır veya bir ağın geçmişini sil.',
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () =>
+                            _open(context, const NetworkProfilesScreen()),
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.manage_history_outlined),
+                        title: const Text('Tarama geçmişini yönet'),
+                        subtitle: const Text(
+                          'Taramaları incele, referans seç veya verileri temizle.',
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _open(context, const HistoryScreen()),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Card(
                   child: ListTile(
                     leading: const Icon(Icons.lock_outline),
                     title: const Text('Yalnız bu cihazda saklanır'),
                     subtitle: const Text(
-                      'Tema seçimin bir hesaba veya sunucuya gönderilmez.',
+                      'Tema seçimi, tarama geçmişi, cihaz adları ve notlar bir '
+                      'hesaba veya sunucuya gönderilmez.',
                     ),
                   ),
                 ),
@@ -144,6 +246,80 @@ class SettingsScreen extends ConsumerWidget {
         );
       }
     }
+  }
+
+  Future<void> _saveHistoryPreference(
+    BuildContext context,
+    WidgetRef ref,
+    Future<void> operation,
+  ) async {
+    try {
+      await operation;
+      await ref.read(scanHistoryRepositoryProvider).applyRetentionLimit();
+      ref.invalidate(scanHistoryProvider);
+      ref.invalidate(networkScanHistoryProvider);
+      ref.invalidate(networkProfilesProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Geçmiş ayarı kaydedildi')),
+        );
+      }
+    } on Object {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Geçmiş ayarı kaydedilemedi')),
+        );
+      }
+    }
+  }
+
+  Future<void> _changeRetentionLimit(
+    BuildContext context,
+    WidgetRef ref, {
+    required int currentLimit,
+    required int nextLimit,
+    required HistoryPreferencesController controller,
+  }) async {
+    if (nextLimit == currentLimit) {
+      return;
+    }
+    if (nextLimit < currentLimit) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Eski taramalar temizlensin mi?'),
+          content: Text(
+            'Her ağda yalnız en yeni $nextLimit tarama saklanacak. Sınırı '
+            'aşan eski oturumlar kalıcı olarak silinir; seçili ağ referansı '
+            've cihaz profilleri korunur.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Vazgeç'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Sınırı uygula'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !context.mounted) {
+        return;
+      }
+    }
+    await _saveHistoryPreference(
+      context,
+      ref,
+      controller.selectRetentionLimit(nextLimit),
+    );
+  }
+
+  void _open(BuildContext context, Widget screen) {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (context) => screen));
   }
 }
 

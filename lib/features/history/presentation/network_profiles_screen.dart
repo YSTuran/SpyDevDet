@@ -39,6 +39,7 @@ class NetworkProfilesScreen extends ConsumerWidget {
                           return _NetworkProfileCard(
                             profile: profile,
                             onRename: () => _rename(context, ref, profile),
+                            onDelete: () => _delete(context, ref, profile),
                             onOpen: () => Navigator.of(context).push(
                               MaterialPageRoute<void>(
                                 builder: (context) => HistoryScreen(
@@ -116,17 +117,69 @@ class NetworkProfilesScreen extends ConsumerWidget {
       controller.dispose();
     }
   }
+
+  Future<void> _delete(
+    BuildContext context,
+    WidgetRef ref,
+    NetworkProfileSummary profile,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Ağ profili silinsin mi?'),
+        content: Text(
+          '${profile.displayName} için saklanan bütün tarama oturumları ve '
+          'ağ kimliği silinir. Cihaz adları ve notları korunur.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Ağı sil'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+    try {
+      await ref
+          .read(scanHistoryRepositoryProvider)
+          .deleteNetworkData(profile.networkKey);
+      ref.invalidate(networkProfilesProvider);
+      ref.invalidate(scanHistoryProvider);
+      ref.invalidate(networkScanHistoryProvider);
+      ref.invalidate(knownDevicesProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ağ profili ve geçmişi silindi')),
+        );
+      }
+    } on Object {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Ağ profili silinemedi')));
+      }
+    }
+  }
 }
 
 class _NetworkProfileCard extends StatelessWidget {
   const _NetworkProfileCard({
     required this.profile,
     required this.onRename,
+    required this.onDelete,
     required this.onOpen,
   });
 
   final NetworkProfileSummary profile;
   final VoidCallback onRename;
+  final VoidCallback onDelete;
   final VoidCallback onOpen;
 
   @override
@@ -144,10 +197,22 @@ class _NetworkProfileCard extends StatelessWidget {
           'Son görülme: ${_formatDateTime(profile.lastSeenAt)}',
         ),
         isThreeLine: true,
-        trailing: IconButton(
-          tooltip: 'Ağ adını değiştir',
-          onPressed: onRename,
-          icon: const Icon(Icons.edit_outlined),
+        trailing: PopupMenuButton<_NetworkAction>(
+          tooltip: 'Ağ seçenekleri',
+          onSelected: (action) => switch (action) {
+            _NetworkAction.rename => onRename(),
+            _NetworkAction.delete => onDelete(),
+          },
+          itemBuilder: (context) => const [
+            PopupMenuItem(
+              value: _NetworkAction.rename,
+              child: Text('Ağı adlandır'),
+            ),
+            PopupMenuItem(
+              value: _NetworkAction.delete,
+              child: Text('Ağı ve geçmişini sil'),
+            ),
+          ],
         ),
       ),
     );
@@ -169,6 +234,8 @@ class _NetworkProfileCard extends StatelessWidget {
         '${two(local.hour)}:${two(local.minute)}';
   }
 }
+
+enum _NetworkAction { rename, delete }
 
 class _EmptyNetworkProfiles extends StatelessWidget {
   const _EmptyNetworkProfiles();

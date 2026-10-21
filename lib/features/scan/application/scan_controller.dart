@@ -411,6 +411,8 @@ class ScanController extends Notifier<ScanState> {
                   '$newDeviceCount yeni',
       );
       ref.invalidate(scanHistoryProvider);
+      ref.invalidate(networkProfilesProvider);
+      ref.invalidate(knownDevicesProvider);
     } on Object {
       if (runId == _runId) {
         state = state.copyWith(
@@ -479,6 +481,8 @@ class ScanController extends Notifier<ScanState> {
         .toList(growable: false);
     state = state.copyWith(devices: List.unmodifiable(updatedDevices));
     ref.invalidate(scanHistoryProvider);
+    ref.invalidate(knownDevicesProvider);
+    ref.invalidate(scanHistoryDetailsProvider);
   }
 
   List<DeviceObservation> _upsertDevice(

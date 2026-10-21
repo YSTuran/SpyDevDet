@@ -17,7 +17,10 @@ import 'package:spy_dev_det/features/scan/domain/scan_cancellation_token.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_event.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
 import 'package:spy_dev_det/features/settings/application/theme_controller.dart';
+import 'package:spy_dev_det/features/settings/application/history_preferences_controller.dart';
+import 'package:spy_dev_det/features/settings/data/history_preferences_repository.dart';
 import 'package:spy_dev_det/features/settings/data/theme_preferences_repository.dart';
+import 'package:spy_dev_det/features/settings/domain/history_preferences.dart';
 import 'package:spy_dev_det/features/settings/domain/theme_preferences.dart';
 
 void main() {
@@ -266,6 +269,35 @@ void main() {
     expect(find.byType(NavigationRail), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
   });
+
+  testWidgets('saklama sınırını düşürmeden önce onay ister', (tester) async {
+    final historyPreferences = _TestHistoryPreferencesRepository();
+    await tester.pumpWidget(
+      _testApp(
+        themeRepository: _TestThemePreferencesRepository(),
+        historyPreferencesRepository: historyPreferences,
+      ),
+    );
+    await tester.tap(find.text('Ayarlar'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Tarama geçmişi'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.drag(find.byType(ListView), const Offset(0, -160));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('100 tarama'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('25 tarama').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Eski taramalar temizlensin mi?'), findsOneWidget);
+    await tester.tap(find.text('Sınırı uygula'));
+    await tester.pumpAndSettle();
+    expect(historyPreferences.current.maxScansPerNetwork, 25);
+  });
 }
 
 Widget _testApp({
@@ -273,6 +305,7 @@ Widget _testApp({
   DeviceScanner? scanner,
   _TestHistoryRepository? historyRepository,
   ThemePreferencesRepository? themeRepository,
+  HistoryPreferencesRepository? historyPreferencesRepository,
   ThemePreferences? initialTheme,
 }) {
   return ProviderScope(
@@ -288,6 +321,10 @@ Widget _testApp({
       ),
       if (themeRepository != null)
         themePreferencesRepositoryProvider.overrideWithValue(themeRepository),
+      if (historyPreferencesRepository != null)
+        historyPreferencesRepositoryProvider.overrideWithValue(
+          historyPreferencesRepository,
+        ),
       if (initialTheme != null)
         initialThemePreferencesProvider.overrideWithValue(initialTheme),
     ],
@@ -314,6 +351,19 @@ class _FailingThemePreferencesRepository implements ThemePreferencesRepository {
   @override
   Future<void> save(ThemePreferences preferences) =>
       Future<void>.error(StateError('Test depolama hatası'));
+}
+
+class _TestHistoryPreferencesRepository
+    implements HistoryPreferencesRepository {
+  HistoryPreferences current = const HistoryPreferences();
+
+  @override
+  Future<HistoryPreferences> load() async => current;
+
+  @override
+  Future<void> save(HistoryPreferences preferences) async {
+    current = preferences;
+  }
 }
 
 class _TestHistoryRepository implements ScanHistoryRepository {
@@ -360,6 +410,9 @@ class _TestHistoryRepository implements ScanHistoryRepository {
   Future<List<NetworkProfileSummary>> getNetworkProfiles() async => const [];
 
   @override
+  Future<List<KnownDeviceSummary>> getKnownDevices() async => const [];
+
+  @override
   Future<ScanHistoryDetails?> getDetails(int sessionId) async => null;
 
   @override
@@ -378,6 +431,18 @@ class _TestHistoryRepository implements ScanHistoryRepository {
     required String networkKey,
     required String? customName,
   }) async {}
+
+  @override
+  Future<void> setReferenceScan(int sessionId) async {}
+
+  @override
+  Future<void> forgetDevice(String stableKey) async {}
+
+  @override
+  Future<void> deleteNetworkData(String networkKey) async {}
+
+  @override
+  Future<void> applyRetentionLimit() async {}
 }
 
 class _DelayedScanner implements DeviceScanner {

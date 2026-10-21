@@ -72,6 +72,7 @@ class ScanSessions extends Table {
   BoolColumn get presenceComparable => boolean()();
   IntColumn get elapsedMillis => integer()();
   TextColumn get scanMode => text().withDefault(const Constant('detailed'))();
+  BoolColumn get isReference => boolean().withDefault(const Constant(false))();
 }
 
 class ScanObservations extends Table {
@@ -108,7 +109,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -128,6 +129,9 @@ class AppDatabase extends _$AppDatabase {
         }
         await migrator.addColumn(scanSessions, scanSessions.scanMode);
       }
+      if (from < 5) {
+        await migrator.addColumn(scanSessions, scanSessions.isReference);
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
@@ -142,6 +146,14 @@ class AppDatabase extends _$AppDatabase {
       await customStatement(
         'CREATE INDEX IF NOT EXISTS idx_scan_observations_session '
         'ON scan_observations (scan_session_id)',
+      );
+      await customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_scan_observations_stable '
+        'ON scan_observations (stable_key, id DESC)',
+      );
+      await customStatement(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_scan_sessions_reference '
+        'ON scan_sessions (network_key) WHERE is_reference = 1',
       );
       await customStatement(
         'CREATE INDEX IF NOT EXISTS idx_device_aliases_stable '

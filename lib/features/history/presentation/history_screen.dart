@@ -213,7 +213,12 @@ class HistoryDetailsScreen extends ConsumerWidget {
                 if (value == null) {
                   return const Center(child: Text('Tarama kaydı bulunamadı.'));
                 }
-                return _HistoryDetails(details: value);
+                return _HistoryDetails(
+                  details: value,
+                  onSetReference: value.summary.isPresenceComparable
+                      ? () => _setReference(context, ref, value.summary)
+                      : null,
+                );
               },
             ),
           ),
@@ -252,6 +257,61 @@ class HistoryDetailsScreen extends ConsumerWidget {
       Navigator.pop(context);
     }
   }
+
+  Future<void> _setReference(
+    BuildContext context,
+    WidgetRef ref,
+    ScanHistorySummary summary,
+  ) async {
+    if (summary.isReference) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bu tarama zaten ağ referansı')),
+      );
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Ağ referansı yapılsın mı?'),
+        content: const Text(
+          'Sonraki karşılaştırılabilir taramalarda görülmeyen cihazlar bu '
+          'taramanın cihaz listesine göre belirlenecek.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Referans yap'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+    try {
+      await ref
+          .read(scanHistoryRepositoryProvider)
+          .setReferenceScan(summary.id);
+      ref.invalidate(scanHistoryProvider);
+      ref.invalidate(networkScanHistoryProvider);
+      ref.invalidate(scanHistoryDetailsProvider(summary.id));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ağ referansı güncellendi')),
+        );
+      }
+    } on Object {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ağ referansı güncellenemedi')),
+        );
+      }
+    }
+  }
 }
 
 class _HistoryCard extends StatelessWidget {
@@ -266,9 +326,17 @@ class _HistoryCard extends StatelessWidget {
       child: ListTile(
         onTap: onTap,
         leading: Icon(
-          item.isPartial ? Icons.warning_amber_outlined : Icons.radar,
+          item.isReference
+              ? Icons.bookmark
+              : item.isPartial
+              ? Icons.warning_amber_outlined
+              : Icons.radar,
         ),
-        title: Text(_formatDateTime(item.completedAt)),
+        title: Text(
+          item.isReference
+              ? '${_formatDateTime(item.completedAt)} • Ağ referansı'
+              : _formatDateTime(item.completedAt),
+        ),
         subtitle: Text(
           '${item.totalDeviceCount} cihaz • ${item.newDeviceCount} yeni • '
           '${item.missingDevices.length} görülmedi\n'
@@ -284,9 +352,10 @@ class _HistoryCard extends StatelessWidget {
 }
 
 class _HistoryDetails extends StatelessWidget {
-  const _HistoryDetails({required this.details});
+  const _HistoryDetails({required this.details, this.onSetReference});
 
   final ScanHistoryDetails details;
+  final VoidCallback? onSetReference;
 
   @override
   Widget build(BuildContext context) {
@@ -315,6 +384,30 @@ class _HistoryDetails extends StatelessWidget {
                 Text(
                   '${summary.scanMode.label}: ${summary.scanMode.description}',
                 ),
+                const SizedBox(height: 10),
+                if (summary.isReference)
+                  const ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.bookmark),
+                    title: Text('Bu tarama ağ referansı'),
+                    subtitle: Text(
+                      'Gelecekteki görülmeyen cihaz karşılaştırmaları bu '
+                      'cihaz listesine göre yapılır.',
+                    ),
+                  )
+                else if (onSetReference != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: onSetReference,
+                      icon: const Icon(Icons.bookmark_add_outlined),
+                      label: const Text('Ağ referansı yap'),
+                    ),
+                  )
+                else
+                  const Text(
+                    'Kısmi veya hızlı taramalar ağ referansı yapılamaz.',
+                  ),
                 const SizedBox(height: 12),
                 ...DiscoveryMethod.values.map((method) {
                   final result = summary.methods[method];

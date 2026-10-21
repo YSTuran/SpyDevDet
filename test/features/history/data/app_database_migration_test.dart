@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:spy_dev_det/features/history/data/app_database.dart';
 
 void main() {
-  test('şema 3 verilerini koruyarak şema 4 alanlarını ekler', () async {
+  test('şema 3 verilerini koruyarak güncel alanları ekler', () async {
     final executor = NativeDatabase.memory(
       setup: (database) {
         database
@@ -110,5 +110,6 @@ void main() {
     expect(known.isOwned, isFalse);
     expect(profile.customName, isNull);
     expect(session.scanMode, 'detailed');
+    expect(session.isReference, isFalse);
   });
 }

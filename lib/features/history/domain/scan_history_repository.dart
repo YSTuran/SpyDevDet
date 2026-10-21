@@ -31,6 +31,8 @@ class ScanHistorySummary {
     required this.missingDevices,
     required this.elapsed,
     required this.methods,
+    this.isReference = false,
+    this.isPresenceComparable = false,
     this.scanMode = ScanMode.detailed,
   });
 
@@ -44,7 +46,42 @@ class ScanHistorySummary {
   final List<MissingDeviceSummary> missingDevices;
   final Duration elapsed;
   final Map<DiscoveryMethod, DiscoveryMethodResult> methods;
+  final bool isReference;
+  final bool isPresenceComparable;
   final ScanMode scanMode;
+}
+
+class KnownDeviceSummary {
+  const KnownDeviceSummary({
+    required this.stableKey,
+    required this.displayName,
+    required this.isKnown,
+    required this.isOwned,
+    required this.firstSeenAt,
+    required this.lastSeenAt,
+    required this.lastIpAddress,
+    this.customName,
+    this.note,
+    this.lastMacAddress,
+    this.vendor,
+    this.categoryOverride,
+  });
+
+  final String stableKey;
+  final String displayName;
+  final String? customName;
+  final bool isKnown;
+  final bool isOwned;
+  final String? note;
+  final DateTime firstSeenAt;
+  final DateTime lastSeenAt;
+  final String lastIpAddress;
+  final String? lastMacAddress;
+  final String? vendor;
+  final DeviceCategory? categoryOverride;
+
+  String get effectiveDisplayName =>
+      customName?.trim().isNotEmpty == true ? customName!.trim() : displayName;
 }
 
 class NetworkProfileSummary {
@@ -113,10 +150,20 @@ abstract interface class ScanHistoryRepository {
 
   Future<List<NetworkProfileSummary>> getNetworkProfiles();
 
+  Future<List<KnownDeviceSummary>> getKnownDevices();
+
   Future<void> renameNetworkProfile({
     required String networkKey,
     required String? customName,
   });
+
+  Future<void> setReferenceScan(int sessionId);
+
+  Future<void> forgetDevice(String stableKey);
+
+  Future<void> deleteNetworkData(String networkKey);
+
+  Future<void> applyRetentionLimit();
 
   Future<ScanHistoryDetails?> getDetails(int sessionId);
 

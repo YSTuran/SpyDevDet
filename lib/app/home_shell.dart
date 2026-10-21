@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:spy_dev_det/features/history/presentation/history_screen.dart';
+import 'package:spy_dev_det/features/history/presentation/known_devices_screen.dart';
 import 'package:spy_dev_det/features/history/presentation/network_profiles_screen.dart';
 import 'package:spy_dev_det/features/scan/presentation/scan_screen.dart';
 import 'package:spy_dev_det/features/settings/presentation/settings_screen.dart';
@@ -13,13 +14,18 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   var _selectedIndex = 0;
-  final List<Widget?> _pages = [const ScanScreen(), null, null, null];
+  final List<Widget?> _pages = [const ScanScreen(), null, null, null, null];
 
   static const _destinations = [
     _ShellDestination(
       label: 'Tarama',
       icon: Icons.radar_outlined,
       selectedIcon: Icons.radar,
+    ),
+    _ShellDestination(
+      label: 'Cihazlar',
+      icon: Icons.devices_outlined,
+      selectedIcon: Icons.devices,
     ),
     _ShellDestination(
       label: 'Ağlar',
@@ -120,9 +126,10 @@ class _HomeShellState extends State<HomeShell> {
     setState(() {
       _pages[value] ??= switch (value) {
         0 => const ScanScreen(),
-        1 => const NetworkProfilesScreen(),
-        2 => const HistoryScreen(),
-        3 => const SettingsScreen(),
+        1 => const KnownDevicesScreen(),
+        2 => const NetworkProfilesScreen(),
+        3 => const HistoryScreen(),
+        4 => const SettingsScreen(),
         _ => throw RangeError.index(value, _pages),
       };
       _selectedIndex = value;

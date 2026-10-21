@@ -1745,6 +1745,21 @@ class $ScanSessionsTable extends ScanSessions
     requiredDuringInsert: false,
     defaultValue: const Constant('detailed'),
   );
+  static const VerificationMeta _isReferenceMeta = const VerificationMeta(
+    'isReference',
+  );
+  @override
+  late final GeneratedColumn<bool> isReference = GeneratedColumn<bool>(
+    'is_reference',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_reference" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1760,6 +1775,7 @@ class $ScanSessionsTable extends ScanSessions
     presenceComparable,
     elapsedMillis,
     scanMode,
+    isReference,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1894,6 +1910,15 @@ class $ScanSessionsTable extends ScanSessions
         scanMode.isAcceptableOrUnknown(data['scan_mode']!, _scanModeMeta),
       );
     }
+    if (data.containsKey('is_reference')) {
+      context.handle(
+        _isReferenceMeta,
+        isReference.isAcceptableOrUnknown(
+          data['is_reference']!,
+          _isReferenceMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1955,6 +1980,10 @@ class $ScanSessionsTable extends ScanSessions
         DriftSqlType.string,
         data['${effectivePrefix}scan_mode'],
       )!,
+      isReference: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_reference'],
+      )!,
     );
   }
 
@@ -1978,6 +2007,7 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
   final bool presenceComparable;
   final int elapsedMillis;
   final String scanMode;
+  final bool isReference;
   const ScanSession({
     required this.id,
     required this.networkKey,
@@ -1992,6 +2022,7 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
     required this.presenceComparable,
     required this.elapsedMillis,
     required this.scanMode,
+    required this.isReference,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2009,6 +2040,7 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
     map['presence_comparable'] = Variable<bool>(presenceComparable);
     map['elapsed_millis'] = Variable<int>(elapsedMillis);
     map['scan_mode'] = Variable<String>(scanMode);
+    map['is_reference'] = Variable<bool>(isReference);
     return map;
   }
 
@@ -2027,6 +2059,7 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
       presenceComparable: Value(presenceComparable),
       elapsedMillis: Value(elapsedMillis),
       scanMode: Value(scanMode),
+      isReference: Value(isReference),
     );
   }
 
@@ -2051,6 +2084,7 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
       presenceComparable: serializer.fromJson<bool>(json['presenceComparable']),
       elapsedMillis: serializer.fromJson<int>(json['elapsedMillis']),
       scanMode: serializer.fromJson<String>(json['scanMode']),
+      isReference: serializer.fromJson<bool>(json['isReference']),
     );
   }
   @override
@@ -2070,6 +2104,7 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
       'presenceComparable': serializer.toJson<bool>(presenceComparable),
       'elapsedMillis': serializer.toJson<int>(elapsedMillis),
       'scanMode': serializer.toJson<String>(scanMode),
+      'isReference': serializer.toJson<bool>(isReference),
     };
   }
 
@@ -2087,6 +2122,7 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
     bool? presenceComparable,
     int? elapsedMillis,
     String? scanMode,
+    bool? isReference,
   }) => ScanSession(
     id: id ?? this.id,
     networkKey: networkKey ?? this.networkKey,
@@ -2101,6 +2137,7 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
     presenceComparable: presenceComparable ?? this.presenceComparable,
     elapsedMillis: elapsedMillis ?? this.elapsedMillis,
     scanMode: scanMode ?? this.scanMode,
+    isReference: isReference ?? this.isReference,
   );
   ScanSession copyWithCompanion(ScanSessionsCompanion data) {
     return ScanSession(
@@ -2135,6 +2172,9 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
           ? data.elapsedMillis.value
           : this.elapsedMillis,
       scanMode: data.scanMode.present ? data.scanMode.value : this.scanMode,
+      isReference: data.isReference.present
+          ? data.isReference.value
+          : this.isReference,
     );
   }
 
@@ -2153,7 +2193,8 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
           ..write('missingDevicesJson: $missingDevicesJson, ')
           ..write('presenceComparable: $presenceComparable, ')
           ..write('elapsedMillis: $elapsedMillis, ')
-          ..write('scanMode: $scanMode')
+          ..write('scanMode: $scanMode, ')
+          ..write('isReference: $isReference')
           ..write(')'))
         .toString();
   }
@@ -2173,6 +2214,7 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
     presenceComparable,
     elapsedMillis,
     scanMode,
+    isReference,
   );
   @override
   bool operator ==(Object other) =>
@@ -2190,7 +2232,8 @@ class ScanSession extends DataClass implements Insertable<ScanSession> {
           other.missingDevicesJson == this.missingDevicesJson &&
           other.presenceComparable == this.presenceComparable &&
           other.elapsedMillis == this.elapsedMillis &&
-          other.scanMode == this.scanMode);
+          other.scanMode == this.scanMode &&
+          other.isReference == this.isReference);
 }
 
 class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
@@ -2207,6 +2250,7 @@ class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
   final Value<bool> presenceComparable;
   final Value<int> elapsedMillis;
   final Value<String> scanMode;
+  final Value<bool> isReference;
   const ScanSessionsCompanion({
     this.id = const Value.absent(),
     this.networkKey = const Value.absent(),
@@ -2221,6 +2265,7 @@ class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
     this.presenceComparable = const Value.absent(),
     this.elapsedMillis = const Value.absent(),
     this.scanMode = const Value.absent(),
+    this.isReference = const Value.absent(),
   });
   ScanSessionsCompanion.insert({
     this.id = const Value.absent(),
@@ -2236,6 +2281,7 @@ class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
     required bool presenceComparable,
     required int elapsedMillis,
     this.scanMode = const Value.absent(),
+    this.isReference = const Value.absent(),
   }) : networkKey = Value(networkKey),
        startedAt = Value(startedAt),
        completedAt = Value(completedAt),
@@ -2261,6 +2307,7 @@ class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
     Expression<bool>? presenceComparable,
     Expression<int>? elapsedMillis,
     Expression<String>? scanMode,
+    Expression<bool>? isReference,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -2278,6 +2325,7 @@ class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
       if (presenceComparable != null) 'presence_comparable': presenceComparable,
       if (elapsedMillis != null) 'elapsed_millis': elapsedMillis,
       if (scanMode != null) 'scan_mode': scanMode,
+      if (isReference != null) 'is_reference': isReference,
     });
   }
 
@@ -2295,6 +2343,7 @@ class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
     Value<bool>? presenceComparable,
     Value<int>? elapsedMillis,
     Value<String>? scanMode,
+    Value<bool>? isReference,
   }) {
     return ScanSessionsCompanion(
       id: id ?? this.id,
@@ -2310,6 +2359,7 @@ class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
       presenceComparable: presenceComparable ?? this.presenceComparable,
       elapsedMillis: elapsedMillis ?? this.elapsedMillis,
       scanMode: scanMode ?? this.scanMode,
+      isReference: isReference ?? this.isReference,
     );
   }
 
@@ -2355,6 +2405,9 @@ class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
     if (scanMode.present) {
       map['scan_mode'] = Variable<String>(scanMode.value);
     }
+    if (isReference.present) {
+      map['is_reference'] = Variable<bool>(isReference.value);
+    }
     return map;
   }
 
@@ -2373,7 +2426,8 @@ class ScanSessionsCompanion extends UpdateCompanion<ScanSession> {
           ..write('missingDevicesJson: $missingDevicesJson, ')
           ..write('presenceComparable: $presenceComparable, ')
           ..write('elapsedMillis: $elapsedMillis, ')
-          ..write('scanMode: $scanMode')
+          ..write('scanMode: $scanMode, ')
+          ..write('isReference: $isReference')
           ..write(')'))
         .toString();
   }
@@ -4654,6 +4708,7 @@ typedef $$ScanSessionsTableCreateCompanionBuilder =
       required bool presenceComparable,
       required int elapsedMillis,
       Value<String> scanMode,
+      Value<bool> isReference,
     });
 typedef $$ScanSessionsTableUpdateCompanionBuilder =
     ScanSessionsCompanion Function({
@@ -4670,6 +4725,7 @@ typedef $$ScanSessionsTableUpdateCompanionBuilder =
       Value<bool> presenceComparable,
       Value<int> elapsedMillis,
       Value<String> scanMode,
+      Value<bool> isReference,
     });
 
 final class $$ScanSessionsTableReferences
@@ -4774,6 +4830,11 @@ class $$ScanSessionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<bool> get isReference => $composableBuilder(
+    column: $table.isReference,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> scanObservationsRefs(
     Expression<bool> Function($$ScanObservationsTableFilterComposer f) f,
   ) {
@@ -4873,6 +4934,11 @@ class $$ScanSessionsTableOrderingComposer
     column: $table.scanMode,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get isReference => $composableBuilder(
+    column: $table.isReference,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ScanSessionsTableAnnotationComposer
@@ -4941,6 +5007,11 @@ class $$ScanSessionsTableAnnotationComposer
   GeneratedColumn<String> get scanMode =>
       $composableBuilder(column: $table.scanMode, builder: (column) => column);
 
+  GeneratedColumn<bool> get isReference => $composableBuilder(
+    column: $table.isReference,
+    builder: (column) => column,
+  );
+
   Expression<T> scanObservationsRefs<T extends Object>(
     Expression<T> Function($$ScanObservationsTableAnnotationComposer a) f,
   ) {
@@ -5008,6 +5079,7 @@ class $$ScanSessionsTableTableManager
                 Value<bool> presenceComparable = const Value.absent(),
                 Value<int> elapsedMillis = const Value.absent(),
                 Value<String> scanMode = const Value.absent(),
+                Value<bool> isReference = const Value.absent(),
               }) => ScanSessionsCompanion(
                 id: id,
                 networkKey: networkKey,
@@ -5022,6 +5094,7 @@ class $$ScanSessionsTableTableManager
                 presenceComparable: presenceComparable,
                 elapsedMillis: elapsedMillis,
                 scanMode: scanMode,
+                isReference: isReference,
               ),
           createCompanionCallback:
               ({
@@ -5038,6 +5111,7 @@ class $$ScanSessionsTableTableManager
                 required bool presenceComparable,
                 required int elapsedMillis,
                 Value<String> scanMode = const Value.absent(),
+                Value<bool> isReference = const Value.absent(),
               }) => ScanSessionsCompanion.insert(
                 id: id,
                 networkKey: networkKey,
@@ -5052,6 +5126,7 @@ class $$ScanSessionsTableTableManager
                 presenceComparable: presenceComparable,
                 elapsedMillis: elapsedMillis,
                 scanMode: scanMode,
+                isReference: isReference,
               ),
           withReferenceMapper: (p0) => p0
               .map(

@@ -12,6 +12,7 @@ import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 import 'package:spy_dev_det/features/scan/domain/service_catalog.dart';
 import 'package:spy_dev_det/features/scan/presentation/scan_diagnostics_screen.dart';
+import 'package:spy_dev_det/features/scan/presentation/device_profile_editor.dart';
 
 class ScanScreen extends ConsumerStatefulWidget {
   const ScanScreen({super.key});
@@ -217,119 +218,25 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
     ScanController controller,
     DeviceObservation device,
   ) async {
-    final nameController = TextEditingController(text: device.customName);
-    final noteController = TextEditingController(text: device.note);
-    var isKnown = device.isKnown;
-    var isOwned = device.isOwned;
-    var categoryOverride = device.categoryOverride;
-    final shouldSave = await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Cihaz profilini düzenle'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  maxLength: 80,
-                  decoration: const InputDecoration(
-                    labelText: 'Özel cihaz adı',
-                    hintText: 'Örneğin: Salon televizyonu',
-                  ),
-                ),
-                TextField(
-                  controller: noteController,
-                  maxLength: 240,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Not',
-                    hintText: 'İsteğe bağlı yerel not',
-                  ),
-                ),
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: isKnown,
-                  onChanged: (value) => setDialogState(() {
-                    isKnown = value ?? false;
-                    if (!isKnown) {
-                      isOwned = false;
-                    }
-                  }),
-                  title: const Text('Bu cihazı tanıyorum'),
-                ),
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: isOwned,
-                  onChanged: (value) => setDialogState(() {
-                    isOwned = value ?? false;
-                    if (isOwned) {
-                      isKnown = true;
-                    }
-                  }),
-                  title: const Text('Bu cihaz bana/evime ait'),
-                  subtitle: const Text(
-                    'Yalnızca inceleme puanını açıklamak ve profili tanımak '
-                    'için cihazında saklanır.',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<DeviceCategory?>(
-                  initialValue: categoryOverride,
-                  decoration: const InputDecoration(
-                    labelText: 'Cihaz türü düzeltmesi',
-                  ),
-                  items: [
-                    const DropdownMenuItem<DeviceCategory?>(
-                      value: null,
-                      child: Text('Otomatik sınıflandırmayı kullan'),
-                    ),
-                    ...DeviceCategory.values.map(
-                      (category) => DropdownMenuItem<DeviceCategory?>(
-                        value: category,
-                        child: Text(category.label),
-                      ),
-                    ),
-                  ],
-                  onChanged: (value) =>
-                      setDialogState(() => categoryOverride = value),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Uygulamanın otomatik tahmini korunur; yaptığın düzeltme '
-                  'ayrı bir alan olarak gösterilir.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Vazgeç'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Kaydet'),
-            ),
-          ],
-        ),
-      ),
+    final edit = await showDeviceProfileEditor(
+      context,
+      isKnown: device.isKnown,
+      isOwned: device.isOwned,
+      customName: device.customName,
+      note: device.note,
+      categoryOverride: device.categoryOverride,
     );
-    if (shouldSave != true || !context.mounted) {
-      nameController.dispose();
-      noteController.dispose();
+    if (edit == null || !context.mounted) {
       return;
     }
     try {
       await controller.updateDeviceProfile(
         device: device,
-        isKnown: isKnown,
-        customName: nameController.text,
-        note: noteController.text,
-        isOwned: isOwned,
-        categoryOverride: categoryOverride,
+        isKnown: edit.isKnown,
+        customName: edit.customName,
+        note: edit.note,
+        isOwned: edit.isOwned,
+        categoryOverride: edit.categoryOverride,
       );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -342,9 +249,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
           const SnackBar(content: Text('Cihaz profili kaydedilemedi')),
         );
       }
-    } finally {
-      nameController.dispose();
-      noteController.dispose();
     }
   }
 }

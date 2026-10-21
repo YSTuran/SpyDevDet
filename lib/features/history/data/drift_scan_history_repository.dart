@@ -14,12 +14,13 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
   const DriftScanHistoryRepository(
     this.database, {
     this.identityResolver = const DeviceIdentityResolver(),
+    this.maxSessionsPerNetwork = 100,
   });
 
   final AppDatabase database;
   final DeviceIdentityResolver identityResolver;
+  final int maxSessionsPerNetwork;
   static const _weakIdentityReuseWindow = Duration(days: 7);
-  static const _maxSessionsPerNetwork = 100;
 
   @override
   Future<List<DeviceObservation>> recordCompletedScan(
@@ -104,7 +105,7 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
           .where((device) => device.familiarity == DeviceFamiliarity.newDevice)
           .length;
       final missingDevices = record.report.canComparePresence
-          ? await _missingSincePreviousComparableScan(
+          ? await _missingSinceReferenceOrPreviousComparableScan(
               networkKey: networkKey,
               currentKeys: decoratedDevices
                   .map((device) => device.stableKey!)
@@ -247,6 +248,58 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
   }
 
   @override
+  Future<List<KnownDeviceSummary>> getKnownDevices() async {
+    final profiles = await (database.select(
+      database.knownDevices,
+    )..orderBy([(table) => OrderingTerm.desc(table.lastSeenAt)])).get();
+    if (profiles.isEmpty) {
+      return const [];
+    }
+    final latestNames = await database
+        .customSelect(
+          '''
+          SELECT observation.stable_key, observation.display_name
+          FROM scan_observations AS observation
+          INNER JOIN (
+            SELECT stable_key, MAX(id) AS latest_id
+            FROM scan_observations
+            GROUP BY stable_key
+          ) AS latest ON latest.latest_id = observation.id
+          ''',
+          readsFrom: {database.scanObservations},
+        )
+        .get();
+    final namesByKey = {
+      for (final row in latestNames)
+        row.read<String>('stable_key'): row.read<String>('display_name'),
+    };
+    return List.unmodifiable(
+      profiles.map(
+        (profile) => KnownDeviceSummary(
+          stableKey: profile.stableKey,
+          displayName:
+              namesByKey[profile.stableKey] ??
+              profile.vendor ??
+              'Cihaz ${profile.lastIpAddress}',
+          customName: profile.customName,
+          isKnown: profile.isKnown,
+          isOwned: profile.isOwned,
+          note: profile.note,
+          firstSeenAt: profile.firstSeenAt,
+          lastSeenAt: profile.lastSeenAt,
+          lastIpAddress: profile.lastIpAddress,
+          lastMacAddress: profile.lastMacAddress,
+          vendor: profile.vendor,
+          categoryOverride: _enumByNameOrNull(
+            DeviceCategory.values,
+            profile.categoryOverride,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
   Future<void> renameNetworkProfile({
     required String networkKey,
     required String? customName,
@@ -258,6 +311,63 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
         customName: Value(_normalizeOptional(customName)),
       ),
     );
+  }
+
+  @override
+  Future<void> setReferenceScan(int sessionId) {
+    return database.transaction(() async {
+      final selected = await (database.select(
+        database.scanSessions,
+      )..where((table) => table.id.equals(sessionId))).getSingleOrNull();
+      if (selected == null) {
+        throw StateError('Tarama kaydı bulunamadı.');
+      }
+      if (!selected.presenceComparable) {
+        throw StateError(
+          'Yalnız karşılaştırılabilir taramalar referans olabilir.',
+        );
+      }
+      await (database.update(database.scanSessions)
+            ..where((table) => table.networkKey.equals(selected.networkKey)))
+          .write(const ScanSessionsCompanion(isReference: Value(false)));
+      await (database.update(database.scanSessions)
+            ..where((table) => table.id.equals(sessionId)))
+          .write(const ScanSessionsCompanion(isReference: Value(true)));
+    });
+  }
+
+  @override
+  Future<void> forgetDevice(String stableKey) async {
+    await (database.delete(
+      database.knownDevices,
+    )..where((table) => table.stableKey.equals(stableKey))).go();
+  }
+
+  @override
+  Future<void> deleteNetworkData(String networkKey) {
+    return database.transaction(() async {
+      await (database.delete(
+        database.scanSessions,
+      )..where((table) => table.networkKey.equals(networkKey))).go();
+      await (database.delete(
+        database.networkProfiles,
+      )..where((table) => table.networkKey.equals(networkKey))).go();
+    });
+  }
+
+  @override
+  Future<void> applyRetentionLimit() async {
+    final networkRows = await database
+        .customSelect(
+          'SELECT DISTINCT network_key FROM scan_sessions',
+          readsFrom: {database.scanSessions},
+        )
+        .get();
+    await database.transaction(() async {
+      for (final row in networkRows) {
+        await _pruneOldSessions(row.read<String>('network_key'));
+      }
+    });
   }
 
   @override
@@ -564,7 +674,20 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
                 (table) => OrderingTerm.desc(table.id),
               ]))
             .get();
-    final oldSessions = sessions.skip(_maxSessionsPerNetwork).toList();
+    final retentionLimit = maxSessionsPerNetwork.clamp(1, 200);
+    final keptIds = <int>{};
+    for (final session in sessions.where((session) => session.isReference)) {
+      keptIds.add(session.id);
+    }
+    for (final session in sessions) {
+      if (keptIds.length >= retentionLimit) {
+        break;
+      }
+      keptIds.add(session.id);
+    }
+    final oldSessions = sessions
+        .where((session) => !keptIds.contains(session.id))
+        .toList();
     if (oldSessions.isEmpty) {
       return;
     }
@@ -585,15 +708,29 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
       missingDevices: _decodeMissingDevices(row.missingDevicesJson),
       elapsed: Duration(milliseconds: row.elapsedMillis),
       methods: _decodeMethods(row.methodsJson),
+      isReference: row.isReference,
+      isPresenceComparable: row.presenceComparable,
       scanMode: _enumByName(ScanMode.values, row.scanMode, ScanMode.detailed),
     );
   }
 
-  Future<List<MissingDeviceSummary>> _missingSincePreviousComparableScan({
+  Future<List<MissingDeviceSummary>>
+  _missingSinceReferenceOrPreviousComparableScan({
     required String networkKey,
     required Set<String> currentKeys,
   }) async {
+    final referenceSession =
+        await (database.select(database.scanSessions)
+              ..where(
+                (table) =>
+                    table.networkKey.equals(networkKey) &
+                    table.isReference.equals(true) &
+                    table.presenceComparable.equals(true),
+              )
+              ..limit(1))
+            .getSingleOrNull();
     final previousSession =
+        referenceSession ??
         await (database.select(database.scanSessions)
               ..where(
                 (table) =>

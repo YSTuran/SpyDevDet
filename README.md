@@ -85,26 +85,33 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   Ayrıca cihazın kendisine/evine ait olduğunu belirtebilir ve otomatik cihaz
   türünü düzeltebilir. Otomatik tahmin kaybedilmeden kullanıcı düzeltmesi ayrı
   saklanır. Sonraki taramalarda yeni, daha önce görülen ve bilinen cihazlar ayrılır.
+- Cihaz profilleri ayrı Cihazlar ekranında aranabilir, filtrelenebilir,
+  düzenlenebilir veya unutulabilir. Bir profili unutmak geçmiş tarama
+  oturumlarını silmez.
 - Cihazlar ad, IP, MAC, üretici ve servis bilgisiyle aranabilir; tanınma,
   kategori, üretici, MAC ve inceleme durumuna göre filtrelenip sıralanabilir.
 - İnceleme sonucu toplam puanla birlikte puana katkı yapan her bulguyu gösterir.
   Bir cihazın görünmemesi halinde uyku, güvenlik duvarı, misafir ağı, istemci
   izolasyonu ve kullanılamayan keşif yöntemleri gibi olası nedenler açıklanır.
 - Ağlar ayrı yerel profillerde tutulur, kullanıcı tarafından adlandırılabilir
-  ve her ağın tarama geçmişi ayrıca görüntülenebilir.
+  ve her ağın tarama geçmişi ayrıca görüntülenebilir. Tek bir ağ profili ve
+  geçmişi diğer ağlara veya cihaz notlarına dokunmadan silinebilir.
 - Mobil görünümde Material 3 alt gezinme çubuğu, geniş Windows görünümünde yan
   gezinme çubuğu kullanılır. Varsayılan Aydınlık + Material görünümünün yanında
   karanlık/sistem modu ve Okyanus, Zümrüt, Menekşe, Kehribar renk paletleri
   seçilebilir. Görünüm tercihleri yalnız cihazda saklanır.
-- Ayrıntılı keşif yöntemleri başarıyla tamamlandığında önceki taramada olup bu
-  taramada görülmeyen cihazlar listelenir. Android'in beklenen komşu tablosu
+- Ayrıntılı keşif yöntemleri başarıyla tamamlandığında kullanıcı bir taramayı
+  ağ referansı olarak seçebilir. Sonraki karşılaştırılabilir taramalarda
+  görülmeyen cihazlar bu sabit referansa göre listelenir; referans yoksa en son
+  karşılaştırılabilir tarama kullanılır. Android'in beklenen komşu tablosu
   kısıtı ayrıca raporlanır ancak diğer yöntemler tamamsa karşılaştırmayı tek
   başına engellemez. Hızlı veya gerçekten kısmi tarama hatalı "görülmedi"
   sonucu üretmez. Tarama geçmişi kullanıcı tarafından
   tek tek veya topluca silinebilir; ayrıca bilinen cihaz profilleri, özel adlar
   ve notlar dahil bütün yerel tarama verileri de temizlenebilir. Görünüm
   tercihleri bu işlemden etkilenmez. Veritabanının sınırsız büyümemesi için her
-  ağın en yeni 100 taraması saklanır; cihaz profilleri bu temizlikten etkilenmez.
+  ağın en yeni 25, 50 veya 100 taramasının saklanması seçilebilir. Ağ referansı
+  sınır içinde korunur; cihaz profilleri bu temizlikten etkilenmez.
 
 Bu yöntemlerin hiçbiri bütün cihazları bulmayı veya bir cihazın amacını kesin
 olarak belirlemeyi garanti etmez. Özellikle "kamera adayı" etiketi, cihazın
