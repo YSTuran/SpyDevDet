@@ -4,7 +4,10 @@ import 'package:spy_dev_det/features/history/application/history_providers.dart'
 import 'package:spy_dev_det/features/history/domain/scan_history_repository.dart';
 import 'package:spy_dev_det/features/history/presentation/history_details_view.dart';
 import 'package:spy_dev_det/features/history/presentation/history_formatters.dart';
+import 'package:spy_dev_det/features/history/presentation/scan_comparison_flow.dart';
+import 'package:spy_dev_det/features/history/presentation/scan_report_export_flow.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_quality.dart';
 
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({this.networkKey, this.title, super.key});
@@ -20,31 +23,36 @@ class HistoryScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(title ?? 'Tarama geçmişi'),
-        actions: networkKey == null
-            ? [
-                PopupMenuButton<_HistoryAction>(
-                  tooltip: 'Geçmiş seçenekleri',
-                  onSelected: (action) {
-                    switch (action) {
-                      case _HistoryAction.clearHistory:
-                        _clearHistory(context, ref);
-                      case _HistoryAction.clearAllData:
-                        _clearAllData(context, ref);
-                    }
-                  },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(
-                      value: _HistoryAction.clearHistory,
-                      child: Text('Yalnız tarama geçmişini sil'),
-                    ),
-                    PopupMenuItem(
-                      value: _HistoryAction.clearAllData,
-                      child: Text('Tüm tarama verilerini sil'),
-                    ),
-                  ],
+        actions: [
+          IconButton(
+            tooltip: 'İki taramayı karşılaştır',
+            onPressed: () =>
+                openScanComparisonFlow(context, ref, networkKey: networkKey),
+            icon: const Icon(Icons.compare_arrows),
+          ),
+          if (networkKey == null)
+            PopupMenuButton<_HistoryAction>(
+              tooltip: 'Geçmiş seçenekleri',
+              onSelected: (action) {
+                switch (action) {
+                  case _HistoryAction.clearHistory:
+                    _clearHistory(context, ref);
+                  case _HistoryAction.clearAllData:
+                    _clearAllData(context, ref);
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: _HistoryAction.clearHistory,
+                  child: Text('Yalnız tarama geçmişini sil'),
                 ),
-              ]
-            : null,
+                PopupMenuItem(
+                  value: _HistoryAction.clearAllData,
+                  child: Text('Tüm tarama verilerini sil'),
+                ),
+              ],
+            ),
+        ],
       ),
       body: SafeArea(
         child: Center(
@@ -205,6 +213,7 @@ class HistoryDetailsScreen extends ConsumerWidget {
                 }
                 return HistoryDetailsView(
                   details: value,
+                  onExport: () => exportScanReport(context, value),
                   onSetReference: value.summary.isPresenceComparable
                       ? () => _setReference(context, ref, value.summary)
                       : null,
@@ -321,7 +330,7 @@ class _HistoryCard extends StatelessWidget {
           '${item.newDeviceCount} uygulamada ilk kez • '
           '${item.missingDevices.length} görülmedi\n'
           '${item.scanMode.label} • '
-          '${item.isPartial ? 'Kısmi sonuç' : 'Planlandığı gibi tamamlandı'} • '
+          '${item.quality.level.label} • '
           '${formatHistoryDuration(item.elapsed)}',
         ),
         isThreeLine: true,

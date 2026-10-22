@@ -4,6 +4,7 @@ import 'package:spy_dev_det/features/history/application/history_providers.dart'
 import 'package:spy_dev_det/features/history/presentation/history_screen.dart';
 import 'package:spy_dev_det/features/history/presentation/known_devices_screen.dart';
 import 'package:spy_dev_det/features/history/presentation/network_profiles_screen.dart';
+import 'package:spy_dev_det/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:spy_dev_det/features/settings/application/history_preferences_controller.dart';
 import 'package:spy_dev_det/features/settings/application/theme_controller.dart';
 import 'package:spy_dev_det/features/settings/domain/history_preferences.dart';
@@ -184,6 +185,20 @@ class SettingsScreen extends ConsumerWidget {
                 Card(
                   child: Column(
                     children: [
+                      ListTile(
+                        leading: const Icon(Icons.menu_book_outlined),
+                        title: const Text('Kullanım rehberi'),
+                        subtitle: const Text(
+                          'Tarama modlarını, Android sınırlamalarını ve '
+                          'sonuçların nasıl yorumlanacağını yeniden görüntüle.',
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _open(
+                          context,
+                          const OnboardingScreen(reviewMode: true),
+                        ),
+                      ),
+                      const Divider(height: 1),
                       ListTile(
                         leading: const Icon(Icons.devices_outlined),
                         title: const Text('Cihaz profillerini yönet'),

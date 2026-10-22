@@ -2,12 +2,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:spy_dev_det/app/spy_dev_det_app.dart';
+import 'package:spy_dev_det/features/onboarding/application/onboarding_controller.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('ana bölümler gerçek uygulama kabuğunda açılır', (tester) async {
-    await tester.pumpWidget(const ProviderScope(child: SpyDevDetApp()));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [initialOnboardingCompletedProvider.overrideWithValue(true)],
+        child: const SpyDevDetApp(),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Yerel ağı tara'), findsOneWidget);

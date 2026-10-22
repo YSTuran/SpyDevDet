@@ -9,6 +9,12 @@ enum ReferenceComparisonState {
   noBaseline,
 }
 
+enum ComparisonBaselineKind {
+  explicitReference,
+  previousComparable,
+  userSelected,
+}
+
 enum ObservedIdentityQuality { weak, networkScoped, strong }
 
 extension ObservedIdentityQualityText on ObservedIdentityQuality {
@@ -95,7 +101,7 @@ class ReferenceScanComparison {
     required this.state,
     this.baselineSessionId,
     this.baselineCompletedAt,
-    this.usesExplicitReference = false,
+    this.baselineKind = ComparisonBaselineKind.previousComparable,
     this.addedDevices = const [],
     this.missingDevices = const [],
     this.changedDevices = const [],
@@ -114,6 +120,7 @@ class ReferenceScanComparison {
     required int baselineSessionId,
     required DateTime baselineCompletedAt,
     required bool usesExplicitReference,
+    ComparisonBaselineKind? baselineKind,
     required List<ComparedDeviceSummary> addedDevices,
     required List<ComparedDeviceSummary> missingDevices,
     required List<ReferenceDeviceChange> changedDevices,
@@ -121,7 +128,11 @@ class ReferenceScanComparison {
          state: ReferenceComparisonState.available,
          baselineSessionId: baselineSessionId,
          baselineCompletedAt: baselineCompletedAt,
-         usesExplicitReference: usesExplicitReference,
+         baselineKind:
+             baselineKind ??
+             (usesExplicitReference
+                 ? ComparisonBaselineKind.explicitReference
+                 : ComparisonBaselineKind.previousComparable),
          addedDevices: addedDevices,
          missingDevices: missingDevices,
          changedDevices: changedDevices,
@@ -130,10 +141,13 @@ class ReferenceScanComparison {
   final ReferenceComparisonState state;
   final int? baselineSessionId;
   final DateTime? baselineCompletedAt;
-  final bool usesExplicitReference;
+  final ComparisonBaselineKind baselineKind;
   final List<ComparedDeviceSummary> addedDevices;
   final List<ComparedDeviceSummary> missingDevices;
   final List<ReferenceDeviceChange> changedDevices;
+
+  bool get usesExplicitReference =>
+      baselineKind == ComparisonBaselineKind.explicitReference;
 
   bool get hasChanges =>
       addedDevices.isNotEmpty ||
@@ -148,6 +162,7 @@ class ReferenceScanComparator {
     required int baselineSessionId,
     required DateTime baselineCompletedAt,
     required bool usesExplicitReference,
+    ComparisonBaselineKind? baselineKind,
     required List<DeviceObservation> baselineDevices,
     required List<DeviceObservation> currentDevices,
   }) {
@@ -211,6 +226,7 @@ class ReferenceScanComparator {
       baselineSessionId: baselineSessionId,
       baselineCompletedAt: baselineCompletedAt,
       usesExplicitReference: usesExplicitReference,
+      baselineKind: baselineKind,
       addedDevices: List.unmodifiable(added),
       missingDevices: List.unmodifiable(missing),
       changedDevices: List.unmodifiable(changed),

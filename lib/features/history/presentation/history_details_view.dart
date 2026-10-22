@@ -8,16 +8,19 @@ import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 import 'package:spy_dev_det/features/scan/domain/discovery_coverage_advisor.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
+import 'package:spy_dev_det/features/scan/presentation/scan_quality_card.dart';
 
 class HistoryDetailsView extends StatelessWidget {
   const HistoryDetailsView({
     required this.details,
     this.onSetReference,
+    this.onExport,
     super.key,
   });
 
   final ScanHistoryDetails details;
   final VoidCallback? onSetReference;
+  final VoidCallback? onExport;
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +49,17 @@ class HistoryDetailsView extends StatelessWidget {
                 Text(
                   '${summary.scanMode.label}: ${summary.scanMode.description}',
                 ),
+                if (onExport != null) ...[
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: onExport,
+                      icon: const Icon(Icons.ios_share_outlined),
+                      label: const Text('Raporu dışa aktar'),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 10),
                 if (summary.isReference)
                   const ListTile(
@@ -81,6 +95,8 @@ class HistoryDetailsView extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        ScanQualityCard(assessment: summary.quality),
         const SizedBox(height: 12),
         ReferenceComparisonCard(comparison: comparison),
         if (comparison.missingDevices.isNotEmpty) ...[

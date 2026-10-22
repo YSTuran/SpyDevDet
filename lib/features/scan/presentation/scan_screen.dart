@@ -10,10 +10,12 @@ import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/discovery_coverage_advisor.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_quality.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 import 'package:spy_dev_det/features/scan/domain/service_catalog.dart';
 import 'package:spy_dev_det/features/scan/presentation/scan_diagnostics_screen.dart';
 import 'package:spy_dev_det/features/scan/presentation/device_profile_editor.dart';
+import 'package:spy_dev_det/features/scan/presentation/scan_quality_card.dart';
 
 part 'scan_controls.dart';
 part 'scan_device_card.dart';
@@ -123,6 +125,17 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
                 if (scanState.phase == ScanPhase.completed &&
                     scanState.devices.isNotEmpty) ...[
                   _ResultSummary(devices: scanState.devices),
+                  const SizedBox(height: 20),
+                ],
+                if (scanState.phase == ScanPhase.completed &&
+                    scanState.report != null) ...[
+                  ScanQualityCard(
+                    assessment: const ScanQualityEvaluator().evaluateReport(
+                      scanState.report!,
+                      rangeTruncated: scanState.rangeTruncated,
+                      noDevicesObserved: scanState.devices.length <= 1,
+                    ),
+                  ),
                   const SizedBox(height: 20),
                 ],
                 if (scanState.phase == ScanPhase.completed &&

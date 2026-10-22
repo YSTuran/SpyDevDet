@@ -88,6 +88,10 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
 - Cihaz profilleri ayrı Cihazlar ekranında aranabilir, filtrelenebilir,
   düzenlenebilir veya unutulabilir. Bir profili unutmak geçmiş tarama
   oturumlarını silmez.
+- Her cihaz profilinde ilk/son görülme, toplam gözlem sayısı, görüldüğü ve
+  karşılaştırılabilir bir taramada görülmediği zamanlar gösterilir. Ardışık
+  gözlemler arasındaki IP, servis, üretici, tür, güven ve kimlik kalitesi
+  değişiklikleri zaman çizelgesinde açıklanır.
 - Cihazlar ad, IP, MAC, üretici ve servis bilgisiyle aranabilir; tanınma,
   kategori, üretici, MAC ve inceleme durumuna göre filtrelenip sıralanabilir.
 - İnceleme sonucu toplam puanla birlikte puana katkı yapan her bulguyu gösterir.
@@ -115,6 +119,20 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   tercihleri bu işlemden etkilenmez. Veritabanının sınırsız büyümemesi için her
   ağın en yeni 25, 50 veya 100 taramasının saklanması seçilebilir. Ağ referansı
   sınır içinde korunur; cihaz profilleri bu temizlikten etkilenmez.
+- Her tarama yöntem sonuçlarına göre Tam kapsamlı, Sınırlı kapsamlı veya
+  Karşılaştırmaya uygun değil şeklinde derecelendirilir. Android'in beklenen
+  komşu tablosu kısıtı, diğer gerekli yöntemler tamamlandıysa kaliteyi tek
+  başına düşürmez.
+- Kullanıcı aynı ağdaki iki tam kapsamlı geçmiş taramayı seçerek referanstan
+  bağımsız karşılaştırabilir. Farklı ağlar, hızlı taramalar ve gerçekten kısmi
+  taramalar yanlış kayıp cihaz sonucu üretmemek için seçilemez.
+- Geçmiş taramalar JSON, CSV veya okunabilir metin raporu olarak dışa
+  aktarılabilir. Varsayılan gizlilik korumalı raporda IP/MAC adresleri
+  maskelenir; özel cihaz adları, notlar, ağ kimliği ve kanıt tanımlayıcıları
+  çıkarılır. Tam teknik rapor ayrıca kullanıcı onayı gerektirir.
+- İlk açılış rehberi tarama modlarını, Android MAC sınırlamasını, referans
+  karşılaştırmasını ve sonuçların sınırlarını açıklar. Rehber Ayarlar ekranından
+  yeniden açılabilir ve tamamlanma tercihi yalnız cihazda saklanır.
 
 Bu yöntemlerin hiçbiri bütün cihazları bulmayı veya bir cihazın amacını kesin
 olarak belirlemeyi garanti etmez. Özellikle "kamera adayı" etiketi, cihazın

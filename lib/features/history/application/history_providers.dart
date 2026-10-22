@@ -46,3 +46,9 @@ final scanHistoryDetailsProvider = FutureProvider.autoDispose
       (ref, sessionId) =>
           ref.watch(scanHistoryRepositoryProvider).getDetails(sessionId),
     );
+
+final deviceTimelineProvider = FutureProvider.autoDispose
+    .family<DeviceTimeline?, String>(
+      (ref, stableKey) =>
+          ref.watch(scanHistoryRepositoryProvider).getDeviceTimeline(stableKey),
+    );

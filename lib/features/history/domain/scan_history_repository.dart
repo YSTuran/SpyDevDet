@@ -2,6 +2,7 @@ import 'package:spy_dev_det/features/history/domain/reference_scan_comparison.da
 import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_quality.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
 class CompletedScanRecord {
@@ -66,6 +67,14 @@ class ScanHistorySummary {
   final bool isReference;
   final bool isPresenceComparable;
   final ScanMode scanMode;
+
+  ScanQualityAssessment get quality => const ScanQualityEvaluator().evaluate(
+    scanMode: scanMode,
+    methods: methods,
+    isPartial: isPartial,
+    isPresenceComparable: isPresenceComparable,
+    hasMissingDevices: missingDevices.isNotEmpty,
+  );
 }
 
 class KnownDeviceSummary {
@@ -150,6 +159,52 @@ class ScanHistoryDetails {
   final ReferenceScanComparison referenceComparison;
 }
 
+class SelectedScanComparison {
+  const SelectedScanComparison({
+    required this.baseline,
+    required this.current,
+    required this.comparison,
+  });
+
+  final ScanHistorySummary baseline;
+  final ScanHistorySummary current;
+  final ReferenceScanComparison comparison;
+}
+
+enum DeviceTimelinePresence { observed, missing }
+
+class DeviceTimelineEntry {
+  const DeviceTimelineEntry({
+    required this.sessionId,
+    required this.networkKey,
+    required this.networkDisplayName,
+    required this.completedAt,
+    required this.presence,
+    this.observation,
+    this.lastKnownIpAddress,
+  });
+
+  final int sessionId;
+  final String networkKey;
+  final String networkDisplayName;
+  final DateTime completedAt;
+  final DeviceTimelinePresence presence;
+  final DeviceObservation? observation;
+  final String? lastKnownIpAddress;
+}
+
+class DeviceTimeline {
+  const DeviceTimeline({
+    required this.device,
+    required this.observedScanCount,
+    required this.entries,
+  });
+
+  final KnownDeviceSummary device;
+  final int observedScanCount;
+  final List<DeviceTimelineEntry> entries;
+}
+
 abstract interface class ScanHistoryRepository {
   Future<RecordedScanResult> recordCompletedScan(CompletedScanRecord record);
 
@@ -172,6 +227,8 @@ abstract interface class ScanHistoryRepository {
 
   Future<List<KnownDeviceSummary>> getKnownDevices();
 
+  Future<DeviceTimeline?> getDeviceTimeline(String stableKey);
+
   Future<void> renameNetworkProfile({
     required String networkKey,
     required String? customName,
@@ -186,6 +243,11 @@ abstract interface class ScanHistoryRepository {
   Future<void> applyRetentionLimit();
 
   Future<ScanHistoryDetails?> getDetails(int sessionId);
+
+  Future<SelectedScanComparison> compareSessions({
+    required int firstSessionId,
+    required int secondSessionId,
+  });
 
   Future<void> deleteSession(int sessionId);
 

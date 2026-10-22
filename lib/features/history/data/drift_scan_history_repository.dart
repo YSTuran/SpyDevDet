@@ -319,6 +319,97 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
   }
 
   @override
+  Future<DeviceTimeline?> getDeviceTimeline(String stableKey) async {
+    final profile = await _knownDevice(stableKey);
+    if (profile == null) {
+      return null;
+    }
+    final observations =
+        await (database.select(database.scanObservations)
+              ..where((table) => table.stableKey.equals(stableKey))
+              ..orderBy([(table) => OrderingTerm.desc(table.id)]))
+            .get();
+    final sessions =
+        await (database.select(database.scanSessions)..orderBy([
+              (table) => OrderingTerm.desc(table.completedAt),
+              (table) => OrderingTerm.desc(table.id),
+            ]))
+            .get();
+    final networkProfiles = await database
+        .select(database.networkProfiles)
+        .get();
+    final networkNames = {
+      for (final network in networkProfiles)
+        network.networkKey:
+            _normalizeOptional(network.customName) ?? 'Yerel ağ',
+    };
+    final observationBySession = <int, ScanObservation>{
+      for (final observation in observations)
+        observation.scanSessionId: observation,
+    };
+    final entries = <DeviceTimelineEntry>[];
+    for (final session in sessions) {
+      final observation = observationBySession[session.id];
+      if (observation != null) {
+        entries.add(
+          DeviceTimelineEntry(
+            sessionId: session.id,
+            networkKey: session.networkKey,
+            networkDisplayName: networkNames[session.networkKey] ?? 'Yerel ağ',
+            completedAt: session.completedAt,
+            presence: DeviceTimelinePresence.observed,
+            observation: _observationFromRow(observation, profile),
+          ),
+        );
+        continue;
+      }
+      final missing = codec
+          .decodeMissingDevices(session.missingDevicesJson)
+          .where((item) => item.stableKey == stableKey)
+          .firstOrNull;
+      if (missing != null) {
+        entries.add(
+          DeviceTimelineEntry(
+            sessionId: session.id,
+            networkKey: session.networkKey,
+            networkDisplayName: networkNames[session.networkKey] ?? 'Yerel ağ',
+            completedAt: session.completedAt,
+            presence: DeviceTimelinePresence.missing,
+            lastKnownIpAddress: missing.lastIpAddress,
+          ),
+        );
+      }
+    }
+
+    final latestObservation = observations.firstOrNull;
+    final summary = KnownDeviceSummary(
+      stableKey: profile.stableKey,
+      displayName:
+          latestObservation?.displayName ??
+          profile.vendor ??
+          'Cihaz ${profile.lastIpAddress}',
+      customName: profile.customName,
+      isKnown: profile.isKnown,
+      isOwned: profile.isOwned,
+      note: profile.note,
+      firstSeenAt: profile.firstSeenAt,
+      lastSeenAt: profile.lastSeenAt,
+      lastIpAddress: profile.lastIpAddress,
+      lastMacAddress: profile.lastMacAddress,
+      vendor: profile.vendor,
+      categoryOverride: codec.enumByNameOrNull(
+        DeviceCategory.values,
+        profile.categoryOverride,
+      ),
+    );
+    return DeviceTimeline(
+      device: summary,
+      observedScanCount: observations.length,
+      entries: List.unmodifiable(entries),
+    );
+  }
+
+  @override
   Future<void> renameNetworkProfile({
     required String networkKey,
     required String? customName,
@@ -415,6 +506,71 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
       referenceComparison: await _referenceComparisonFor(
         session: session,
         currentRows: rows,
+      ),
+    );
+  }
+
+  @override
+  Future<SelectedScanComparison> compareSessions({
+    required int firstSessionId,
+    required int secondSessionId,
+  }) async {
+    if (firstSessionId == secondSessionId) {
+      throw StateError('Karşılaştırma için iki farklı tarama seçilmelidir.');
+    }
+    final selected =
+        await (database.select(database.scanSessions)..where(
+              (table) => table.id.isIn([firstSessionId, secondSessionId]),
+            ))
+            .get();
+    if (selected.length != 2) {
+      throw StateError('Seçilen taramalardan biri artık bulunamıyor.');
+    }
+    final first = selected.singleWhere((row) => row.id == firstSessionId);
+    final second = selected.singleWhere((row) => row.id == secondSessionId);
+    if (first.networkKey != second.networkKey) {
+      throw StateError('Yalnız aynı ağdaki taramalar karşılaştırılabilir.');
+    }
+    if (!first.presenceComparable || !second.presenceComparable) {
+      throw StateError(
+        'Yalnız tam kapsamlı ve karşılaştırılabilir taramalar seçilebilir.',
+      );
+    }
+    final firstIsEarlier =
+        first.completedAt.isBefore(second.completedAt) ||
+        first.completedAt == second.completedAt && first.id < second.id;
+    final baseline = firstIsEarlier ? first : second;
+    final current = firstIsEarlier ? second : first;
+    final rows =
+        await (database.select(database.scanObservations)..where(
+              (table) => table.scanSessionId.isIn([baseline.id, current.id]),
+            ))
+            .get();
+    final baselineRows = rows
+        .where((row) => row.scanSessionId == baseline.id)
+        .toList(growable: false);
+    final currentRows = rows
+        .where((row) => row.scanSessionId == current.id)
+        .toList(growable: false);
+    final profiles = await _knownDevices(
+      rows.map((row) => row.stableKey).toSet(),
+    );
+    final baselineDevices = baselineRows
+        .map((row) => _observationFromRow(row, profiles[row.stableKey]))
+        .toList(growable: false);
+    final currentDevices = currentRows
+        .map((row) => _observationFromRow(row, profiles[row.stableKey]))
+        .toList(growable: false);
+    return SelectedScanComparison(
+      baseline: _summaryFromRow(baseline),
+      current: _summaryFromRow(current),
+      comparison: comparator.compare(
+        baselineSessionId: baseline.id,
+        baselineCompletedAt: baseline.completedAt,
+        usesExplicitReference: false,
+        baselineKind: ComparisonBaselineKind.userSelected,
+        baselineDevices: baselineDevices,
+        currentDevices: currentDevices,
       ),
     );
   }

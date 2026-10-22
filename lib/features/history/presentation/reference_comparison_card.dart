@@ -61,7 +61,11 @@ class ReferenceComparisonCard extends StatelessWidget {
             Text(
               baselineTime == null
                   ? 'Karşılaştırma temeli'
-                  : '${comparison.usesExplicitReference ? 'Seçili ağ referansı' : 'Önceki uygun tarama'}: '
+                  : '${switch (comparison.baselineKind) {
+                          ComparisonBaselineKind.explicitReference => 'Seçili ağ referansı',
+                          ComparisonBaselineKind.previousComparable => 'Önceki uygun tarama',
+                          ComparisonBaselineKind.userSelected => 'Kullanıcının seçtiği temel tarama',
+                        }}: '
                         '${formatHistoryDateTime(baselineTime)}',
             ),
             const SizedBox(height: 12),
@@ -85,14 +89,28 @@ class ReferenceComparisonCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             if (!comparison.hasChanges)
-              const ListTile(
+              ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.check_circle_outline),
-                title: Text('Referansa göre değişiklik gözlemlenmedi'),
+                leading: const Icon(Icons.check_circle_outline),
+                title: Text(switch (comparison.baselineKind) {
+                  ComparisonBaselineKind.explicitReference =>
+                    'Referansa göre değişiklik gözlemlenmedi',
+                  ComparisonBaselineKind.previousComparable =>
+                    'Önceki uygun taramaya göre değişiklik gözlemlenmedi',
+                  ComparisonBaselineKind.userSelected =>
+                    'Seçilen temel taramaya göre değişiklik gözlemlenmedi',
+                }),
               ),
             if (comparison.addedDevices.isNotEmpty)
               _DeviceChangeGroup(
-                title: 'Referanstan sonra eklenen cihazlar',
+                title: switch (comparison.baselineKind) {
+                  ComparisonBaselineKind.explicitReference =>
+                    'Referanstan sonra eklenen cihazlar',
+                  ComparisonBaselineKind.previousComparable =>
+                    'Önceki uygun taramadan sonra eklenen cihazlar',
+                  ComparisonBaselineKind.userSelected =>
+                    'Seçilen taramadan sonra eklenen cihazlar',
+                },
                 icon: Icons.add_circle_outline,
                 devices: comparison.addedDevices,
               ),

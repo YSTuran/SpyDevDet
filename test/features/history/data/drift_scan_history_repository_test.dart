@@ -624,6 +624,93 @@ void main() {
     expect(history.single.scanMode, ScanMode.quick);
   });
 
+  test(
+    'aynı ağdaki iki uygun taramayı kullanıcı seçimiyle karşılaştırır',
+    () async {
+      await repository.recordCompletedScan(
+        _record(
+          ipAddress: '192.168.1.20',
+          minute: 0,
+          devices: const [
+            (ipAddress: '192.168.1.20', macAddress: 'B8:27:EB:12:34:56'),
+            (ipAddress: '192.168.1.30', macAddress: '00:17:88:12:34:56'),
+          ],
+        ),
+      );
+      await repository.recordCompletedScan(
+        _record(
+          ipAddress: '192.168.1.25',
+          minute: 5,
+          devices: const [
+            (ipAddress: '192.168.1.25', macAddress: 'B8:27:EB:12:34:56'),
+            (ipAddress: '192.168.1.40', macAddress: '3C:5A:B4:12:34:56'),
+          ],
+        ),
+      );
+      final history = await repository.getHistory();
+
+      final result = await repository.compareSessions(
+        firstSessionId: history.first.id,
+        secondSessionId: history.last.id,
+      );
+
+      expect(result.baseline.id, history.last.id);
+      expect(result.current.id, history.first.id);
+      expect(result.comparison.baselineKind.name, 'userSelected');
+      expect(result.comparison.addedDevices, hasLength(1));
+      expect(result.comparison.missingDevices, hasLength(1));
+      expect(result.comparison.changedDevices.single.ipChanged, isTrue);
+    },
+  );
+
+  test('farklı ağlardaki taramaları elle karşılaştırmaz', () async {
+    await repository.recordCompletedScan(
+      _record(ipAddress: '192.168.1.20', minute: 0),
+    );
+    await repository.recordCompletedScan(
+      _record(
+        ipAddress: '10.0.0.20',
+        minute: 5,
+        networkKey: '10.0.0.0/24|gateway:10.0.0.1',
+      ),
+    );
+    final history = await repository.getHistory();
+
+    expect(
+      () => repository.compareSessions(
+        firstSessionId: history.first.id,
+        secondSessionId: history.last.id,
+      ),
+      throwsA(isA<StateError>()),
+    );
+  });
+
+  test(
+    'cihaz zaman çizelgesinde görülme ve kaybolma kayıtlarını birleştirir',
+    () async {
+      final first = await repository.recordCompletedScan(
+        _record(ipAddress: '192.168.1.20', minute: 0),
+      );
+      await repository.recordCompletedScan(
+        _record(ipAddress: '192.168.1.20', minute: 5, devices: const []),
+      );
+      await repository.recordCompletedScan(
+        _record(ipAddress: '192.168.1.45', minute: 10),
+      );
+
+      final timeline = await repository.getDeviceTimeline(
+        first.devices.single.stableKey!,
+      );
+
+      expect(timeline, isNotNull);
+      expect(timeline!.observedScanCount, 2);
+      expect(timeline.entries, hasLength(3));
+      expect(timeline.entries[0].observation?.ipAddress, '192.168.1.45');
+      expect(timeline.entries[1].presence, DeviceTimelinePresence.missing);
+      expect(timeline.entries[2].observation?.ipAddress, '192.168.1.20');
+    },
+  );
+
   test('saklama sınırı değişince eski taramaları hemen temizler', () async {
     for (var index = 0; index < 28; index++) {
       await repository.recordCompletedScan(

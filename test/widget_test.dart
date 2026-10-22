@@ -9,6 +9,8 @@ import 'package:spy_dev_det/features/network/domain/network_snapshot.dart';
 import 'package:spy_dev_det/features/history/application/history_providers.dart';
 import 'package:spy_dev_det/features/history/domain/reference_scan_comparison.dart';
 import 'package:spy_dev_det/features/history/domain/scan_history_repository.dart';
+import 'package:spy_dev_det/features/onboarding/application/onboarding_controller.dart';
+import 'package:spy_dev_det/features/onboarding/data/onboarding_preferences_repository.dart';
 import 'package:spy_dev_det/features/scan/application/scan_controller.dart';
 import 'package:spy_dev_det/features/scan/data/fake_device_scanner.dart';
 import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
@@ -25,6 +27,30 @@ import 'package:spy_dev_det/features/settings/domain/history_preferences.dart';
 import 'package:spy_dev_det/features/settings/domain/theme_preferences.dart';
 
 void main() {
+  testWidgets('ilk kullanım rehberi tamamlanınca ana uygulamayı açar', (
+    tester,
+  ) async {
+    final onboardingRepository = _TestOnboardingPreferencesRepository();
+    await tester.pumpWidget(
+      _testApp(
+        onboardingCompleted: false,
+        onboardingRepository: onboardingRepository,
+      ),
+    );
+
+    expect(find.text('Yerel ağı görünür hâle getir'), findsOneWidget);
+    for (var index = 0; index < 3; index++) {
+      await tester.tap(find.text('İleri'));
+      await tester.pumpAndSettle();
+    }
+    expect(find.text('Değişiklikleri karşılaştır'), findsOneWidget);
+    await tester.tap(find.text('Uygulamaya başla'));
+    await tester.pumpAndSettle();
+
+    expect(onboardingRepository.completed, isTrue);
+    expect(find.text('Yerel ağı tara'), findsOneWidget);
+  });
+
   testWidgets('tarama cihazları aşamalı olarak gösterir', (tester) async {
     await tester.pumpWidget(_testApp());
 
@@ -289,7 +315,8 @@ void main() {
       250,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.drag(find.byType(ListView), const Offset(0, -160));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('100 tarama'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('100 tarama'));
@@ -311,6 +338,8 @@ Widget _testApp({
   ThemePreferencesRepository? themeRepository,
   HistoryPreferencesRepository? historyPreferencesRepository,
   ThemePreferences? initialTheme,
+  bool onboardingCompleted = true,
+  OnboardingPreferencesRepository? onboardingRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -323,6 +352,11 @@ Widget _testApp({
       scanHistoryRepositoryProvider.overrideWithValue(
         historyRepository ?? _TestHistoryRepository(),
       ),
+      initialOnboardingCompletedProvider.overrideWithValue(onboardingCompleted),
+      if (onboardingRepository != null)
+        onboardingPreferencesRepositoryProvider.overrideWithValue(
+          onboardingRepository,
+        ),
       if (themeRepository != null)
         themePreferencesRepositoryProvider.overrideWithValue(themeRepository),
       if (historyPreferencesRepository != null)
@@ -367,6 +401,19 @@ class _TestHistoryPreferencesRepository
   @override
   Future<void> save(HistoryPreferences preferences) async {
     current = preferences;
+  }
+}
+
+class _TestOnboardingPreferencesRepository
+    implements OnboardingPreferencesRepository {
+  bool completed = false;
+
+  @override
+  Future<bool> isCompleted() async => completed;
+
+  @override
+  Future<void> markCompleted() async {
+    completed = true;
   }
 }
 
@@ -424,6 +471,15 @@ class _TestHistoryRepository implements ScanHistoryRepository {
 
   @override
   Future<ScanHistoryDetails?> getDetails(int sessionId) async => null;
+
+  @override
+  Future<DeviceTimeline?> getDeviceTimeline(String stableKey) async => null;
+
+  @override
+  Future<SelectedScanComparison> compareSessions({
+    required int firstSessionId,
+    required int secondSessionId,
+  }) async => throw StateError('Test karşılaştırması tanımlanmadı');
 
   @override
   Future<void> updateDeviceProfile({

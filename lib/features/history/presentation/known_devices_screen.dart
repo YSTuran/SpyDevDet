@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:spy_dev_det/features/history/application/history_providers.dart';
 import 'package:spy_dev_det/features/history/domain/scan_history_repository.dart';
+import 'package:spy_dev_det/features/history/presentation/device_timeline_screen.dart';
 import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/presentation/device_profile_editor.dart';
 
@@ -128,6 +129,7 @@ class _KnownDevicesScreenState extends ConsumerState<KnownDevicesScreen> {
                             padding: const EdgeInsets.only(bottom: 10),
                             child: _KnownDeviceCard(
                               device: device,
+                              onViewHistory: () => _viewHistory(device),
                               onEdit: () => _edit(device),
                               onForget: () => _forget(device),
                             ),
@@ -215,6 +217,17 @@ class _KnownDevicesScreenState extends ConsumerState<KnownDevicesScreen> {
     }
   }
 
+  void _viewHistory(KnownDeviceSummary device) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => DeviceTimelineScreen(
+          stableKey: device.stableKey,
+          initialTitle: device.effectiveDisplayName,
+        ),
+      ),
+    );
+  }
+
   Future<void> _forget(KnownDeviceSummary device) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -264,11 +277,13 @@ class _KnownDevicesScreenState extends ConsumerState<KnownDevicesScreen> {
 class _KnownDeviceCard extends StatelessWidget {
   const _KnownDeviceCard({
     required this.device,
+    required this.onViewHistory,
     required this.onEdit,
     required this.onForget,
   });
 
   final KnownDeviceSummary device;
+  final VoidCallback onViewHistory;
   final VoidCallback onEdit;
   final VoidCallback onForget;
 
@@ -293,10 +308,15 @@ class _KnownDeviceCard extends StatelessWidget {
                 PopupMenuButton<_DeviceAction>(
                   tooltip: 'Cihaz seçenekleri',
                   onSelected: (action) => switch (action) {
+                    _DeviceAction.history => onViewHistory(),
                     _DeviceAction.edit => onEdit(),
                     _DeviceAction.forget => onForget(),
                   },
                   itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: _DeviceAction.history,
+                      child: Text('Cihaz geçmişini görüntüle'),
+                    ),
                     PopupMenuItem(
                       value: _DeviceAction.edit,
                       child: Text('Profili düzenle'),
@@ -337,7 +357,7 @@ class _KnownDeviceCard extends StatelessWidget {
   }
 }
 
-enum _DeviceAction { edit, forget }
+enum _DeviceAction { history, edit, forget }
 
 class _EmptyDevices extends StatelessWidget {
   const _EmptyDevices();
