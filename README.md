@@ -100,10 +100,13 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
 - Ağlar ayrı yerel profillerde tutulur, kullanıcı tarafından adlandırılabilir
   ve her ağın tarama geçmişi ayrıca görüntülenebilir. Tek bir ağ profili ve
   geçmişi diğer ağlara veya cihaz notlarına dokunmadan silinebilir.
-- Mobil görünümde Material 3 alt gezinme çubuğu, geniş Windows görünümünde yan
-  gezinme çubuğu kullanılır. Varsayılan Aydınlık + Material görünümünün yanında
-  karanlık/sistem modu ve Okyanus, Zümrüt, Menekşe, Kehribar renk paletleri
-  seçilebilir. Görünüm tercihleri yalnız cihazda saklanır.
+- Mobil görünümde yuvarlatılmış Material 3 alt gezinme çubuğu, geniş Windows
+  görünümünde markalı yan gezinme paneli kullanılır. Kartlar, formlar, düğmeler,
+  iletişim pencereleri ve tarama eylem alanı ortak ve uyarlanabilir bir görsel
+  sistem kullanır. Varsayılan Aydınlık + Material görünümünün yanında
+  karanlık/sistem modu ve Okyanus, Zümrüt, Menekşe, Kehribar, Gül, Mercan,
+  İndigo ve Grafit renk paletleri seçilebilir. Görünüm tercihleri yalnız cihazda
+  saklanır.
 - Ayrıntılı keşif yöntemleri başarıyla tamamlandığında kullanıcı bir taramayı
   ağ referansı olarak seçebilir. Sonraki karşılaştırılabilir taramalarda
   eklenen ve görülmeyen cihazların yanı sıra IP, servis, üretici, otomatik tür,

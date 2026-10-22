@@ -26,6 +26,8 @@ class SpyDevDetApp extends ConsumerWidget {
         preset: preferences.preset,
       ),
       themeMode: preferences.mode.materialMode,
+      themeAnimationDuration: const Duration(milliseconds: 320),
+      themeAnimationCurve: Curves.easeOutCubic,
       home: onboardingCompleted
           ? const HomeShell()
           : OnboardingScreen(

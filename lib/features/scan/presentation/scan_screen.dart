@@ -74,7 +74,8 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('SpyDevDet'),
+        toolbarHeight: 72,
+        title: const _ScanAppTitle(),
         actions: [
           IconButton(
             tooltip: 'Uygulama bilgisi',
@@ -90,30 +91,13 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               children: [
-                const _SafetyNotice(),
-                const SizedBox(height: 12),
-                _ScanStatusCard(state: scanState),
-                const SizedBox(height: 12),
-                FilledButton.icon(
+                _ScanActionPanel(
+                  state: scanState,
                   onPressed: scanState.phase == ScanPhase.saving
                       ? null
                       : scanState.isBusy
                       ? controller.cancelScan
                       : controller.startScan,
-                  icon: Icon(
-                    scanState.phase == ScanPhase.saving
-                        ? Icons.save_outlined
-                        : scanState.isBusy
-                        ? Icons.stop
-                        : Icons.radar,
-                  ),
-                  label: Text(
-                    scanState.phase == ScanPhase.saving
-                        ? 'Geçmişe kaydediliyor'
-                        : scanState.isBusy
-                        ? 'Taramayı durdur'
-                        : 'Yerel ağı tara',
-                  ),
                 ),
                 const SizedBox(height: 12),
                 _ScanModeSelector(
@@ -121,6 +105,10 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
                   enabled: !scanState.isBusy,
                   onChanged: controller.selectScanMode,
                 ),
+                const SizedBox(height: 12),
+                _ScanStatusCard(state: scanState),
+                const SizedBox(height: 12),
+                const _SafetyNotice(),
                 const SizedBox(height: 20),
                 if (scanState.phase == ScanPhase.completed &&
                     scanState.devices.isNotEmpty) ...[
@@ -270,5 +258,45 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
         );
       }
     }
+  }
+}
+
+class _ScanAppTitle extends StatelessWidget {
+  const _ScanAppTitle();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [scheme.primary, scheme.tertiary],
+            ),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(Icons.security_outlined, color: scheme.onPrimary),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('SpyDevDet', style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                'Yerel ağ görünürlüğü',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }

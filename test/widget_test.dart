@@ -55,7 +55,7 @@ void main() {
     await tester.pumpWidget(_testApp());
 
     expect(find.text('Yerel ağı tara'), findsOneWidget);
-    expect(find.text('Gözlemlenen cihazlar (0)'), findsOneWidget);
+    expect(find.text('Ağındaki cihazları keşfet'), findsOneWidget);
 
     await tester.tap(find.text('Yerel ağı tara'));
     await tester.pump();
@@ -101,8 +101,6 @@ void main() {
     await tester.pumpWidget(_testApp());
 
     await tester.tap(find.text('Yerel ağı tara'));
-    await tester.pump();
-    await tester.drag(find.byType(ListView), const Offset(0, -160));
     await tester.pump();
     await tester.tap(find.text('Taramayı durdur'));
     await tester.pump();
@@ -191,6 +189,9 @@ void main() {
 
     await tester.tap(find.text('Ayarlar'));
     await tester.pumpAndSettle();
+    expect(ColorThemePreset.values, hasLength(9));
+    expect(find.text('İndigo'), findsOneWidget);
+    expect(find.text('Grafit'), findsOneWidget);
     await tester.tap(find.text('Karanlık'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Okyanus').last);

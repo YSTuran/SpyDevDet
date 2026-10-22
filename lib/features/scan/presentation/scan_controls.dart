@@ -1,5 +1,106 @@
 part of 'scan_screen.dart';
 
+class _ScanActionPanel extends StatelessWidget {
+  const _ScanActionPanel({required this.state, required this.onPressed});
+
+  final ScanState state;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isSaving = state.phase == ScanPhase.saving;
+    final isBusy = state.isBusy;
+    final title = isSaving
+        ? 'Sonuçlar korunuyor'
+        : isBusy
+        ? 'Ağ taraması sürüyor'
+        : 'Ağındaki cihazları keşfet';
+    final description = isSaving
+        ? 'Tamamlanan tarama yerel geçmişe kaydediliyor.'
+        : isBusy
+        ? 'İstersen taramayı güvenli biçimde durdurabilirsin.'
+        : 'Hızlı bir genel bakış veya ayrıntılı servis keşfi başlat.';
+    final buttonLabel = isSaving
+        ? 'Geçmişe kaydediliyor'
+        : isBusy
+        ? 'Taramayı durdur'
+        : 'Yerel ağı tara';
+    final buttonIcon = isSaving
+        ? Icons.save_outlined
+        : isBusy
+        ? Icons.stop_rounded
+        : Icons.radar_rounded;
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [scheme.primaryContainer, scheme.tertiaryContainer],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final details = Row(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: scheme.surface.withValues(alpha: 0.72),
+                    borderRadius: BorderRadius.circular(17),
+                  ),
+                  child: Icon(buttonIcon, color: scheme.primary, size: 27),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        description,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+            final button = FilledButton.icon(
+              onPressed: onPressed,
+              icon: Icon(buttonIcon),
+              label: Text(buttonLabel),
+            );
+            if (constraints.maxWidth < 560) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [details, const SizedBox(height: 16), button],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(child: details),
+                const SizedBox(width: 20),
+                button,
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
 class _ScanModeSelector extends StatelessWidget {
   const _ScanModeSelector({
     required this.selected,

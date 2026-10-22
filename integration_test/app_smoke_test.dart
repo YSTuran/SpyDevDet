@@ -29,7 +29,8 @@ void main() {
 
     await tester.tap(find.text('Ayarlar'));
     await tester.pumpAndSettle();
-    expect(find.text('Tarama geçmişi'), findsOneWidget);
+    expect(find.text('Görünüm modu'), findsOneWidget);
+    expect(find.text('Renk teması'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

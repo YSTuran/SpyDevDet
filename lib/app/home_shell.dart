@@ -65,18 +65,25 @@ class _HomeShellState extends State<HomeShell> {
           if (constraints.maxWidth < 760) {
             return Scaffold(
               body: content,
-              bottomNavigationBar: NavigationBar(
-                selectedIndex: _selectedIndex,
-                onDestinationSelected: _select,
-                destinations: _destinations
-                    .map(
-                      (destination) => NavigationDestination(
-                        icon: Icon(destination.icon),
-                        selectedIcon: Icon(destination.selectedIcon),
-                        label: destination.label,
-                      ),
-                    )
-                    .toList(growable: false),
+              bottomNavigationBar: SafeArea(
+                top: false,
+                minimum: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: NavigationBar(
+                    selectedIndex: _selectedIndex,
+                    onDestinationSelected: _select,
+                    destinations: _destinations
+                        .map(
+                          (destination) => NavigationDestination(
+                            icon: Icon(destination.icon),
+                            selectedIcon: Icon(destination.selectedIcon),
+                            label: destination.label,
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+                ),
               ),
             );
           }
@@ -85,34 +92,40 @@ class _HomeShellState extends State<HomeShell> {
           return Scaffold(
             body: Row(
               children: [
-                SafeArea(
-                  child: NavigationRail(
-                    extended: extended,
-                    selectedIndex: _selectedIndex,
-                    onDestinationSelected: _select,
-                    labelType: extended
-                        ? NavigationRailLabelType.none
-                        : NavigationRailLabelType.all,
-                    leading: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Icon(
-                        Icons.security_outlined,
-                        color: Theme.of(context).colorScheme.primary,
-                        size: 30,
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      right: BorderSide(
+                        color: Theme.of(context).colorScheme.outlineVariant,
                       ),
                     ),
-                    destinations: _destinations
-                        .map(
-                          (destination) => NavigationRailDestination(
-                            icon: Icon(destination.icon),
-                            selectedIcon: Icon(destination.selectedIcon),
-                            label: Text(destination.label),
-                          ),
-                        )
-                        .toList(growable: false),
+                  ),
+                  child: SafeArea(
+                    child: NavigationRail(
+                      extended: extended,
+                      minExtendedWidth: 236,
+                      selectedIndex: _selectedIndex,
+                      onDestinationSelected: _select,
+                      groupAlignment: -0.72,
+                      labelType: extended
+                          ? NavigationRailLabelType.none
+                          : NavigationRailLabelType.all,
+                      leading: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 26),
+                        child: _BrandMark(extended: extended),
+                      ),
+                      destinations: _destinations
+                          .map(
+                            (destination) => NavigationRailDestination(
+                              icon: Icon(destination.icon),
+                              selectedIcon: Icon(destination.selectedIcon),
+                              label: Text(destination.label),
+                            ),
+                          )
+                          .toList(growable: false),
+                    ),
                   ),
                 ),
-                const VerticalDivider(width: 1),
                 Expanded(child: content),
               ],
             ),
@@ -134,6 +147,63 @@ class _HomeShellState extends State<HomeShell> {
       };
       _selectedIndex = value;
     });
+  }
+}
+
+class _BrandMark extends StatelessWidget {
+  const _BrandMark({required this.extended});
+
+  final bool extended;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final mark = Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [scheme.primary, scheme.tertiary],
+        ),
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.primary.withValues(alpha: 0.2),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Icon(Icons.security_outlined, color: scheme.onPrimary),
+    );
+    if (!extended) return mark;
+    return SizedBox(
+      width: 188,
+      child: Row(
+        children: [
+          mark,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'SpyDevDet',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                Text(
+                  'Yerel ağ keşfi',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

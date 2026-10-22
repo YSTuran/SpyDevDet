@@ -90,8 +90,8 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Renkler Material 3 tarafından okunabilir yüzey ve '
-                          'metin renklerine dönüştürülür.',
+                          'Dokuz renk paletinin tümü aydınlık ve karanlık '
+                          'görünüm için okunabilir tonlara dönüştürülür.',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         const SizedBox(height: 14),
@@ -99,7 +99,7 @@ class SettingsScreen extends ConsumerWidget {
                           builder: (context, constraints) {
                             final itemWidth = constraints.maxWidth >= 620
                                 ? (constraints.maxWidth - 24) / 3
-                                : constraints.maxWidth >= 400
+                                : constraints.maxWidth >= 310
                                 ? (constraints.maxWidth - 12) / 2
                                 : constraints.maxWidth;
                             return Wrap(
@@ -345,17 +345,36 @@ class _AppearancePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: Theme.of(context).colorScheme.primaryContainer,
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [scheme.primaryContainer, scheme.tertiaryContainer],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-              child: const Icon(Icons.palette_outlined),
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                color: scheme.primary,
+                borderRadius: BorderRadius.circular(19),
+                boxShadow: [
+                  BoxShadow(
+                    color: scheme.primary.withValues(alpha: 0.22),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Icon(Icons.palette_outlined, color: scheme.onPrimary),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -363,10 +382,15 @@ class _AppearancePreview extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${preferences.mode.label} + ${preferences.preset.label}',
-                    style: Theme.of(context).textTheme.titleMedium,
+                    'Görünüm',
+                    style: Theme.of(context).textTheme.labelLarge,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${preferences.mode.label} · ${preferences.preset.label}',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 3),
                   Text(preferences.preset.description),
                 ],
               ),
@@ -391,46 +415,77 @@ class _ColorPresetTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Semantics(
       button: true,
       selected: selected,
       label: '${preset.label} renk teması',
-      child: Material(
-        color: selected
-            ? Theme.of(context).colorScheme.secondaryContainer
-            : Theme.of(context).colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                CircleAvatar(backgroundColor: preset.seedColor, radius: 15),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        decoration: BoxDecoration(
+          color: selected ? scheme.secondaryContainer : scheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? scheme.primary : scheme.outlineVariant,
+            width: selected ? 1.6 : 1,
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(18),
+            child: Padding(
+              padding: const EdgeInsets.all(13),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Text(
-                        preset.label,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      Expanded(
+                        child: Row(
+                          children: preset.previewColors
+                              .map(
+                                (color) => Container(
+                                  width: 22,
+                                  height: 22,
+                                  margin: const EdgeInsets.only(right: 5),
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.5,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(growable: false),
+                        ),
                       ),
-                      Text(
-                        preset.description,
-                        style: Theme.of(context).textTheme.bodySmall,
+                      Icon(
+                        selected ? Icons.check_circle : Icons.circle_outlined,
+                        size: 21,
+                        color: selected ? scheme.primary : scheme.outline,
                       ),
                     ],
                   ),
-                ),
-                Icon(
-                  selected ? Icons.check_circle : Icons.circle_outlined,
-                  color: selected
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.outline,
-                ),
-              ],
+                  const SizedBox(height: 11),
+                  Text(
+                    preset.label,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    preset.description,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
