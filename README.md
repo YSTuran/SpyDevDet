@@ -161,6 +161,28 @@ yapılması önerilir:
 8. Ağ profiline bir ad, bir cihaza sahiplik/kategori düzeltmesi ekle; uygulamayı
    yeniden açtıktan ve tekrar taradıktan sonra bilgilerin korunduğunu doğrula.
 
+### Erişilebilirlik ve ekran kontrolü
+
+Widget testleri 360×800, 412×915, 800×600, 1280×720 ve 1920×1080 ekranlarda;
+normal, %150 ve %200 metin ölçeklerinde kritik ekranları denetler. APK kontrol
+noktalarında bunlara ek olarak telefonda şu manuel kontroller yapılmalıdır:
+
+1. TalkBack'i açıp tarama modu, tarama durumu, ilerleme ve cihaz kartlarının
+   anlamlı ve tek parça hâlinde okunduğunu kontrol et.
+2. Yazı boyutunu en büyüğe yaklaştır; tarama ve tema seçeneklerinin dikey düzene
+   geçtiğini, alt menünün kesilmediğini doğrula.
+3. Windows'ta Tab ve Shift+Tab ile gezin; görünür odağın tüm etkileşimli
+   kontrollere ulaştığını ve Enter/Boşluk ile çalıştığını doğrula.
+
+## Sürekli entegrasyon
+
+`.github/workflows/quality.yml`, `main` dalına gönderimlerde ve pull request'lerde
+biçimlendirme, statik analiz, tüm testler, Android debug APK ve Windows debug
+derlemesini doğrular. İş akışı elle veya `v` ile başlayan bir etiket üzerinden
+çalıştırıldığında başarılı Android ve Windows debug çıktıları 14 gün süreyle
+GitHub Actions artifact'i olarak saklanır. Bu çıktılar yalnız test içindir;
+telefon kontrol noktalarında aşağıdaki yerel release APK kullanılmalıdır.
+
 ## OUI verisini güncelleme
 
 Uygulama OUI sorgusu için çalışma sırasında internete bağlanmaz. Geliştirme

@@ -122,27 +122,51 @@ class _ScanModeSelector extends StatelessWidget {
           children: [
             Text('Tarama modu', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: SegmentedButton<ScanMode>(
-                segments: ScanMode.values
-                    .map(
-                      (mode) => ButtonSegment<ScanMode>(
-                        value: mode,
-                        icon: Icon(
-                          mode == ScanMode.quick
-                              ? Icons.bolt_outlined
-                              : Icons.manage_search_outlined,
-                        ),
-                        label: Text(mode.label),
-                      ),
-                    )
-                    .toList(growable: false),
-                selected: {selected},
-                onSelectionChanged: enabled
-                    ? (selection) => onChanged(selection.first)
-                    : null,
-              ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final textScale = MediaQuery.textScalerOf(context).scale(1);
+                final useVerticalOptions =
+                    constraints.maxWidth < 440 && textScale > 1.3;
+                if (useVerticalOptions) {
+                  return Column(
+                    children: ScanMode.values
+                        .map(
+                          (mode) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _ScanModeOption(
+                              mode: mode,
+                              selected: selected == mode,
+                              enabled: enabled,
+                              onTap: () => onChanged(mode),
+                            ),
+                          ),
+                        )
+                        .toList(growable: false),
+                  );
+                }
+                return SizedBox(
+                  width: double.infinity,
+                  child: SegmentedButton<ScanMode>(
+                    segments: ScanMode.values
+                        .map(
+                          (mode) => ButtonSegment<ScanMode>(
+                            value: mode,
+                            icon: Icon(
+                              mode == ScanMode.quick
+                                  ? Icons.bolt_outlined
+                                  : Icons.manage_search_outlined,
+                            ),
+                            label: Text(mode.label),
+                          ),
+                        )
+                        .toList(growable: false),
+                    selected: {selected},
+                    onSelectionChanged: enabled
+                        ? (selection) => onChanged(selection.first)
+                        : null,
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 8),
             Text(
@@ -150,6 +174,62 @@ class _ScanModeSelector extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ScanModeOption extends StatelessWidget {
+  const _ScanModeOption({
+    required this.mode,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final ScanMode mode;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      container: true,
+      button: true,
+      selected: selected,
+      enabled: enabled,
+      label: '${mode.label} tarama modu',
+      excludeSemantics: true,
+      child: Material(
+        color: selected ? scheme.secondaryContainer : scheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(14),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 56),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    mode == ScanMode.quick
+                        ? Icons.bolt_outlined
+                        : Icons.manage_search_outlined,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(mode.label)),
+                  Icon(
+                    selected ? Icons.check_circle : Icons.circle_outlined,
+                    color: selected ? scheme.primary : scheme.outline,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );

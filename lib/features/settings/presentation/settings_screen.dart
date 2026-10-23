@@ -50,28 +50,56 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 14),
                         LayoutBuilder(
-                          builder: (context, constraints) => SizedBox(
-                            width: double.infinity,
-                            child: SegmentedButton<AppThemeMode>(
-                              showSelectedIcon: false,
-                              segments: AppThemeMode.values
-                                  .map(
-                                    (mode) => ButtonSegment(
-                                      value: mode,
-                                      icon: constraints.maxWidth < 400
-                                          ? null
-                                          : Icon(mode.icon),
-                                      label: Text(mode.label),
-                                    ),
-                                  )
-                                  .toList(growable: false),
-                              selected: {preferences.mode},
-                              onSelectionChanged: (selection) => _save(
-                                context,
-                                controller.selectMode(selection.first),
+                          builder: (context, constraints) {
+                            final textScale = MediaQuery.textScalerOf(
+                              context,
+                            ).scale(1);
+                            final useVerticalOptions =
+                                constraints.maxWidth < 440 && textScale > 1.3;
+                            if (useVerticalOptions) {
+                              return Column(
+                                children: AppThemeMode.values
+                                    .map(
+                                      (mode) => Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 8,
+                                        ),
+                                        child: _ThemeModeOption(
+                                          mode: mode,
+                                          selected: mode == preferences.mode,
+                                          onTap: () => _save(
+                                            context,
+                                            controller.selectMode(mode),
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(growable: false),
+                              );
+                            }
+                            return SizedBox(
+                              width: double.infinity,
+                              child: SegmentedButton<AppThemeMode>(
+                                showSelectedIcon: false,
+                                segments: AppThemeMode.values
+                                    .map(
+                                      (mode) => ButtonSegment(
+                                        value: mode,
+                                        icon: constraints.maxWidth < 400
+                                            ? null
+                                            : Icon(mode.icon),
+                                        label: Text(mode.label),
+                                      ),
+                                    )
+                                    .toList(growable: false),
+                                selected: {preferences.mode},
+                                onSelectionChanged: (selection) => _save(
+                                  context,
+                                  controller.selectMode(selection.first),
+                                ),
                               ),
-                            ),
-                          ),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -335,6 +363,55 @@ class SettingsScreen extends ConsumerWidget {
     Navigator.of(
       context,
     ).push(MaterialPageRoute<void>(builder: (context) => screen));
+  }
+}
+
+class _ThemeModeOption extends StatelessWidget {
+  const _ThemeModeOption({
+    required this.mode,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AppThemeMode mode;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      container: true,
+      button: true,
+      selected: selected,
+      label: '${mode.label} görünüm modu',
+      excludeSemantics: true,
+      child: Material(
+        color: selected ? scheme.secondaryContainer : scheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 56),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(mode.icon),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(mode.label)),
+                  Icon(
+                    selected ? Icons.check_circle : Icons.circle_outlined,
+                    color: selected ? scheme.primary : scheme.outline,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

@@ -74,7 +74,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
 
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 72,
+        toolbarHeight: MediaQuery.textScalerOf(context).scale(24) > 36
+            ? 92
+            : 72,
         title: const _ScanAppTitle(),
         actions: [
           IconButton(
@@ -269,18 +271,20 @@ class _ScanAppTitle extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Row(
       children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [scheme.primary, scheme.tertiary],
+        ExcludeSemantics(
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [scheme.primary, scheme.tertiary],
+              ),
+              borderRadius: BorderRadius.circular(14),
             ),
-            borderRadius: BorderRadius.circular(14),
+            child: Icon(Icons.security_outlined, color: scheme.onPrimary),
           ),
-          child: Icon(Icons.security_outlined, color: scheme.onPrimary),
         ),
         const SizedBox(width: 12),
         Expanded(

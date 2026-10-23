@@ -63,6 +63,11 @@ class _HomeShellState extends State<HomeShell> {
             ],
           );
           if (constraints.maxWidth < 760) {
+            final scaledLabelSize = MediaQuery.textScalerOf(context).scale(12);
+            final navigationHeight = (56 + scaledLabelSize * 2).clamp(
+              80.0,
+              112.0,
+            );
             return Scaffold(
               body: content,
               bottomNavigationBar: SafeArea(
@@ -71,6 +76,7 @@ class _HomeShellState extends State<HomeShell> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(24),
                   child: NavigationBar(
+                    height: navigationHeight,
                     selectedIndex: _selectedIndex,
                     onDestinationSelected: _select,
                     destinations: _destinations

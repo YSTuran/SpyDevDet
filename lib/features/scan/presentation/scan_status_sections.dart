@@ -143,7 +143,13 @@ class _ScanStatusCard extends StatelessWidget {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            Text(state.statusMessage),
+            Semantics(
+              container: true,
+              liveRegion: true,
+              label: 'Tarama durumu: ${state.statusMessage}',
+              excludeSemantics: true,
+              child: Text(state.statusMessage),
+            ),
             if (network != null) ...[
               const SizedBox(height: 12),
               _StatusLine(label: 'Yerel IP', value: network.cidr),
@@ -216,8 +222,10 @@ class _ScanStatusCard extends StatelessWidget {
             ],
             const SizedBox(height: 12),
             Semantics(
-              label:
-                  'Tarama ilerlemesi yüzde ${(state.progress * 100).round()}',
+              container: true,
+              label: 'Tarama ilerlemesi',
+              value: 'Yüzde ${(state.progress * 100).round()}',
+              excludeSemantics: true,
               child: LinearProgressIndicator(
                 value: state.phase == ScanPhase.preparing
                     ? null

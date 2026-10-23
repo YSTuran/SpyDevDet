@@ -9,93 +9,107 @@ class _DeviceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final attention = const DeviceAttentionEvaluator().evaluate(device);
-    return Card(
-      child: InkWell(
-        onTap: () => _showDetails(context),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.devices),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      device.effectiveDisplayName,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(device.ipAddress),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  Chip(
-                    avatar: Icon(
-                      _categoryIcon(device.effectiveCategory),
-                      size: 18,
-                    ),
-                    label: Text(device.effectiveCategory.label),
-                  ),
-                  if (device.categoryOverride != null)
-                    const Chip(
-                      avatar: Icon(Icons.edit_outlined, size: 18),
-                      label: Text('Kullanıcı düzeltmesi'),
-                    ),
-                  if (device.isOwned)
-                    const Chip(
-                      avatar: Icon(Icons.home_outlined, size: 18),
-                      label: Text('Bana ait'),
-                    ),
-                  Chip(label: Text(device.confidence.label)),
-                  Chip(
-                    avatar: Icon(
-                      attention.level == AttentionLevel.review
-                          ? Icons.manage_search_outlined
-                          : attention.level == AttentionLevel.informational
-                          ? Icons.info_outline
-                          : Icons.check_circle_outline,
-                      size: 18,
-                    ),
-                    label: Text(attention.level.label),
-                  ),
-                  if (device.familiarity != DeviceFamiliarity.unclassified)
-                    Chip(
-                      avatar: Icon(
-                        device.isKnown
-                            ? Icons.verified_user_outlined
-                            : device.familiarity == DeviceFamiliarity.newDevice
-                            ? Icons.fiber_new_outlined
-                            : Icons.history,
-                        size: 18,
+    final familiarity = device.familiarity == DeviceFamiliarity.unclassified
+        ? ''
+        : ', ${device.familiarity.label}';
+    return Semantics(
+      container: true,
+      button: true,
+      label:
+          '${device.effectiveDisplayName}, ${device.ipAddress}, '
+          '${device.effectiveCategory.label}, ${device.confidence.label}, '
+          '${attention.level.label}$familiarity, ${device.macStatus.label}. '
+          'Ayrıntıları aç',
+      excludeSemantics: true,
+      child: Card(
+        child: InkWell(
+          onTap: () => _showDetails(context),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.devices),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        device.effectiveDisplayName,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      label: Text(device.familiarity.label),
                     ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                device.macStatus.label,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              if (device.services.isNotEmpty) ...[
+                    const Icon(Icons.chevron_right),
+                  ],
+                ),
                 const SizedBox(height: 10),
+                Text(device.ipAddress),
+                const SizedBox(height: 8),
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
-                  children: device.services
-                      .map((service) => Chip(label: Text(service)))
-                      .toList(),
+                  children: [
+                    Chip(
+                      avatar: Icon(
+                        _categoryIcon(device.effectiveCategory),
+                        size: 18,
+                      ),
+                      label: Text(device.effectiveCategory.label),
+                    ),
+                    if (device.categoryOverride != null)
+                      const Chip(
+                        avatar: Icon(Icons.edit_outlined, size: 18),
+                        label: Text('Kullanıcı düzeltmesi'),
+                      ),
+                    if (device.isOwned)
+                      const Chip(
+                        avatar: Icon(Icons.home_outlined, size: 18),
+                        label: Text('Bana ait'),
+                      ),
+                    Chip(label: Text(device.confidence.label)),
+                    Chip(
+                      avatar: Icon(
+                        attention.level == AttentionLevel.review
+                            ? Icons.manage_search_outlined
+                            : attention.level == AttentionLevel.informational
+                            ? Icons.info_outline
+                            : Icons.check_circle_outline,
+                        size: 18,
+                      ),
+                      label: Text(attention.level.label),
+                    ),
+                    if (device.familiarity != DeviceFamiliarity.unclassified)
+                      Chip(
+                        avatar: Icon(
+                          device.isKnown
+                              ? Icons.verified_user_outlined
+                              : device.familiarity ==
+                                    DeviceFamiliarity.newDevice
+                              ? Icons.fiber_new_outlined
+                              : Icons.history,
+                          size: 18,
+                        ),
+                        label: Text(device.familiarity.label),
+                      ),
+                  ],
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  device.macStatus.label,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                if (device.services.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: device.services
+                        .map((service) => Chip(label: Text(service)))
+                        .toList(),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

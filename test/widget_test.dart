@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spy_dev_det/app/spy_dev_det_app.dart';
@@ -272,6 +273,99 @@ void main() {
     expect(sortTop, greaterThan(filterTop));
   });
 
+  final layoutScenarios = <({String name, Size size, double textScale})>[
+    (name: 'küçük Android', size: const Size(360, 800), textScale: 2),
+    (name: 'orta Android', size: const Size(412, 915), textScale: 1.5),
+    (name: 'küçük pencere', size: const Size(800, 600), textScale: 2),
+    (name: 'masaüstü', size: const Size(1280, 720), textScale: 1.5),
+    (name: 'geniş masaüstü', size: const Size(1920, 1080), textScale: 1),
+  ];
+  for (final scenario in layoutScenarios) {
+    testWidgets('${scenario.name} görünümünde büyük metin taşma oluşturmuyor', (
+      tester,
+    ) async {
+      _configureSurface(
+        tester,
+        size: scenario.size,
+        textScale: scenario.textScale,
+      );
+
+      await tester.pumpWidget(
+        _testApp(themeRepository: _TestThemePreferencesRepository()),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.text('Ayarlar').last);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('Görünüm modu'), findsOneWidget);
+    });
+  }
+
+  testWidgets('iki kat metin ölçeğinde tarama sonuçları taşmadan gösterilir', (
+    tester,
+  ) async {
+    _configureSurface(tester, size: const Size(360, 800), textScale: 2);
+    await tester.pumpWidget(_testApp());
+
+    await tester.scrollUntilVisible(
+      find.text('Tarama modu'),
+      160,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(_semanticsWithLabel('Ayrıntılı tarama modu'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Yerel ağı tara'),
+      -160,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Yerel ağı tara'));
+    for (var index = 0; index < 5; index++) {
+      await tester.pump(const Duration(milliseconds: 310));
+    }
+    await tester.scrollUntilVisible(
+      find.text('Demo yönlendirici'),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(
+      _semanticsWithLabel(RegExp(r'Demo yönlendirici.+Ayrıntıları aç')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('tarama durumu ve ilerlemesi ekran okuyucuya açıklanır', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_testApp());
+
+    final status = tester.widget<Semantics>(
+      _semanticsWithLabel(
+        'Tarama durumu: Yerel ağ taraması başlatılmayı bekliyor',
+      ),
+    );
+    expect(status.properties.liveRegion, isTrue);
+    final progress = tester.widget<Semantics>(
+      _semanticsWithLabel('Tarama ilerlemesi'),
+    );
+    expect(progress.properties.value, 'Yüzde 0');
+  });
+
+  testWidgets('masaüstünde klavye odağı etkileşimli öğelere ulaşır', (
+    tester,
+  ) async {
+    _configureSurface(tester, size: const Size(1200, 800));
+    await tester.pumpWidget(_testApp());
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+
+    expect(FocusManager.instance.primaryFocus, isNotNull);
+  });
+
   testWidgets('geri tuşu önce tarama sekmesine döner', (tester) async {
     await tester.pumpWidget(
       _testApp(themeRepository: _TestThemePreferencesRepository()),
@@ -331,6 +425,29 @@ void main() {
     expect(historyPreferences.current.maxScansPerNetwork, 25);
   });
 }
+
+void _configureSurface(
+  WidgetTester tester, {
+  required Size size,
+  double textScale = 1,
+}) {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1;
+  tester.platformDispatcher.textScaleFactorTestValue = textScale;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+}
+
+Finder _semanticsWithLabel(Pattern label) => find.byWidgetPredicate((widget) {
+  if (widget is! Semantics) return false;
+  final actual = widget.properties.label;
+  return switch (label) {
+    String() => actual == label,
+    RegExp() => actual != null && label.hasMatch(actual),
+    _ => false,
+  };
+});
 
 Widget _testApp({
   NetworkInfoRepository? repository,
