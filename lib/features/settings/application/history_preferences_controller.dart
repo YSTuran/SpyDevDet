@@ -19,9 +19,13 @@ final historyPreferencesControllerProvider =
 class HistoryPreferencesController extends Notifier<HistoryPreferences> {
   var _revision = 0;
   Future<void> _saveQueue = Future<void>.value();
+  late HistoryPreferences _persisted;
 
   @override
-  HistoryPreferences build() => ref.watch(initialHistoryPreferencesProvider);
+  HistoryPreferences build() {
+    _persisted = ref.watch(initialHistoryPreferencesProvider);
+    return _persisted;
+  }
 
   Future<void> selectRetentionLimit(int limit) {
     if (!HistoryPreferences.supportedLimits.contains(limit)) {
@@ -31,7 +35,6 @@ class HistoryPreferencesController extends Notifier<HistoryPreferences> {
   }
 
   Future<void> _update(HistoryPreferences next) async {
-    final previous = state;
     final revision = ++_revision;
     state = next;
     final operation = _ignoreFailure(
@@ -40,9 +43,10 @@ class HistoryPreferencesController extends Notifier<HistoryPreferences> {
     _saveQueue = operation;
     try {
       await operation;
+      _persisted = next;
     } on Object {
       if (revision == _revision) {
-        state = previous;
+        state = _persisted;
       }
       rethrow;
     }

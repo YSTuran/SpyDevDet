@@ -271,7 +271,27 @@ class ScanReportExporter {
     return '${parts.take(3).join(':')}:xx:xx:xx';
   }
 
-  String _csvCell(String value) => '"${value.replaceAll('"', '""')}"';
+  String _csvCell(String value) {
+    var safeValue = value.replaceAll(RegExp(r'[\t\r\n]'), ' ');
+    final firstVisible = safeValue.trimLeft();
+    if (firstVisible.isNotEmpty &&
+        const {
+          '=',
+          '+',
+          '-',
+          '@',
+          '＝',
+          '＋',
+          '－',
+          '＠',
+        }.contains(firstVisible[0])) {
+      // Spreadsheet applications can execute cells that start with a formula
+      // marker even when the CSV value is correctly quoted. A leading apostrophe
+      // makes the cell explicit text while preserving the human-readable value.
+      safeValue = "'$safeValue";
+    }
+    return '"${safeValue.replaceAll('"', '""')}"';
+  }
 
   String _fileTimestamp(DateTime value) {
     String two(int number) => number.toString().padLeft(2, '0');

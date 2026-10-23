@@ -36,6 +36,35 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test('ardışık kayıt hatalarında son kalıcı saklama sınırına döner', () async {
+    final container = ProviderContainer(
+      overrides: [
+        historyPreferencesRepositoryProvider.overrideWithValue(
+          _FailingHistoryPreferencesRepository(),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(
+      historyPreferencesControllerProvider.notifier,
+    );
+
+    final first = expectLater(
+      controller.selectRetentionLimit(50),
+      throwsA(isA<StateError>()),
+    );
+    final second = expectLater(
+      controller.selectRetentionLimit(25),
+      throwsA(isA<StateError>()),
+    );
+    await Future.wait([first, second]);
+
+    expect(
+      container.read(historyPreferencesControllerProvider).maxScansPerNetwork,
+      100,
+    );
+  });
 }
 
 class _MemoryHistoryPreferencesRepository
@@ -48,5 +77,17 @@ class _MemoryHistoryPreferencesRepository
   @override
   Future<void> save(HistoryPreferences preferences) async {
     saved = preferences;
+  }
+}
+
+class _FailingHistoryPreferencesRepository
+    implements HistoryPreferencesRepository {
+  @override
+  Future<HistoryPreferences> load() async => const HistoryPreferences();
+
+  @override
+  Future<void> save(HistoryPreferences preferences) async {
+    await Future<void>.delayed(Duration.zero);
+    throw StateError('storage unavailable');
   }
 }

@@ -16,9 +16,13 @@ final themeControllerProvider =
 class ThemeController extends Notifier<ThemePreferences> {
   var _revision = 0;
   Future<void> _saveQueue = Future<void>.value();
+  late ThemePreferences _persisted;
 
   @override
-  ThemePreferences build() => ref.watch(initialThemePreferencesProvider);
+  ThemePreferences build() {
+    _persisted = ref.watch(initialThemePreferencesProvider);
+    return _persisted;
+  }
 
   Future<void> selectMode(AppThemeMode mode) =>
       _update(state.copyWith(mode: mode));
@@ -27,7 +31,6 @@ class ThemeController extends Notifier<ThemePreferences> {
       _update(state.copyWith(preset: preset));
 
   Future<void> _update(ThemePreferences next) async {
-    final previous = state;
     final revision = ++_revision;
     state = next;
     final operation = _ignoreFailure(
@@ -36,9 +39,10 @@ class ThemeController extends Notifier<ThemePreferences> {
     _saveQueue = operation;
     try {
       await operation;
+      _persisted = next;
     } on Object {
       if (revision == _revision) {
-        state = previous;
+        state = _persisted;
       }
       rethrow;
     }

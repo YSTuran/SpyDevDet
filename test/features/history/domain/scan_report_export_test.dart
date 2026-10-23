@@ -53,6 +53,32 @@ void main() {
 
     expect(report.content, contains('"Salon, ""kamera"""'));
   });
+
+  test('CSV formül başlatıcılarını çalıştırılabilir hücreye dönüştürmez', () {
+    for (final marker in ['=', '+', '-', '@', '＝', '＋', '－', '＠']) {
+      final report = exporter.generate(
+        details: _details(displayName: '  ${marker}KÖTÜ_FORMÜL()'),
+        format: ScanReportExportFormat.csv,
+        privacyMode: ScanReportPrivacyMode.full,
+        applicationVersion: '2.1.0',
+      );
+
+      expect(report.content, contains('"\'${marker}KÖTÜ_FORMÜL()"'));
+      expect(report.content, isNot(contains('"  ${marker}KÖTÜ_FORMÜL()"')));
+    }
+  });
+
+  test('CSV içindeki kontrol karakterlerini tek hücrede güvenli tutar', () {
+    final report = exporter.generate(
+      details: _details(displayName: '\t=FORMÜL()\r\nYeni satır'),
+      format: ScanReportExportFormat.csv,
+      privacyMode: ScanReportPrivacyMode.full,
+      applicationVersion: '2.1.0',
+    );
+
+    expect(report.content, contains('"\'=FORMÜL()  Yeni satır"'));
+    expect(report.content, isNot(contains('\t')));
+  });
 }
 
 ScanHistoryDetails _details({String displayName = 'Salon kamerası'}) {

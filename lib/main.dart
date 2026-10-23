@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:spy_dev_det/app/spy_dev_det_app.dart';
+import 'package:spy_dev_det/features/history/data/report_file_service.dart';
 import 'package:spy_dev_det/features/onboarding/application/onboarding_controller.dart';
 import 'package:spy_dev_det/features/onboarding/data/onboarding_preferences_repository.dart';
 import 'package:spy_dev_det/features/settings/application/history_preferences_controller.dart';
@@ -15,6 +18,7 @@ Future<void> main() async {
   final themeRepository = SharedThemePreferencesRepository();
   final historyRepository = SharedHistoryPreferencesRepository();
   final onboardingRepository = SharedOnboardingPreferencesRepository();
+  unawaited(const ReportFileService().cleanupStaleReports());
   ThemePreferences initialTheme;
   HistoryPreferences initialHistoryPreferences;
   bool initialOnboardingCompleted;
