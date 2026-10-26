@@ -555,6 +555,7 @@ void main() {
     final profiles = await repository.getKnownDevices();
     expect(profiles.single.effectiveDisplayName, 'Kayıtlı cihaz');
     expect(profiles.single.isKnown, isTrue);
+    expect(profiles.single.observationCount, 1);
 
     await repository.forgetDevice(profiles.single.stableKey);
     expect(await repository.getKnownDevices(), isEmpty);

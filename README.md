@@ -20,10 +20,15 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   bağlantısının yerel IPv4 adresi, prefix değeri ve ağ geçidi işletim sisteminin
   yerel API'lerinden alınır.
 - Yalnızca RFC1918 özel adres aralıkları taranır.
-- Tarama en fazla 254 uzak adres ve sekiz yaygın TCP portuyla sınırlıdır.
+- Tarama en fazla 254 uzak adres ve on yaygın TCP portuyla sınırlıdır.
 - Hızlı mod erişilebilirlik, komşu tablosu ve kamera odaklı beş TCP portunu
-  kontrol eder. Ayrıntılı mod sekiz TCP portunun yanı sıra mDNS, SSDP ve ONVIF
-  duyurularını da çalıştırır. Atlanan yöntemler tanılamada açıkça gösterilir.
+  kontrol eder. Ayrıntılı mod on TCP portunun yanı sıra mDNS, SSDP,
+  WS-Discovery ve NetBIOS keşiflerini de çalıştırır. Atlanan yöntemler
+  tanılamada açıkça gösterilir.
+- Tarama başlamadan önce etkin bağlantı türü, yerel IP/prefix, alt ağ, ağ
+  geçidi, VPN durumu, seçilen mod, planlanan adres aralığı ve hedef sayısı
+  gösterilir. Android'in MAC/üretici bilgisine ilişkin platform kısıtı bu
+  özette ayrıca açıklanır.
 - Android ve Windows'ta yerel adreslere işletim sisteminin erişilebilirlik
   kontrolü uygulanır. Windows tarafında sınırlı ICMP Echo kullanılır. Açık bir
   servis portu olmasa da yanıt veren cihazlar gözlemlenebilir; taramayı
@@ -31,13 +36,18 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
 - Mobil ağ ve algılanan VPN bağlantıları üzerinden tarama engellenir.
 - TCP bağlantısı kurulduğunda socket hemen kapatılır; kimlik doğrulama veya veri
   gönderme işlemi yapılmaz.
-- TCP, erişilebilirlik, mDNS, SSDP ve ONVIF/WS-Discovery keşifleri birbirini
+- Ayrıntılı tarama Windows bilgisayarlarını görünür kılmaya yardımcı olmak için
+  SMB (TCP 445) ve Uzak Masaüstü (TCP 3389) portlarını da sınırlı bağlantı
+  denemesiyle kontrol eder. Uygulama paylaşımları açmaz, dosya okumaz ve uzak
+  oturum başlatmaz.
+- TCP, erişilebilirlik, mDNS, SSDP ve WS-Discovery/NetBIOS keşifleri birbirini
   beklemeden paralel çalışır; ilerleme göstergesi bütün yöntemlerin durumunu
   hesaba katar.
 - mDNS üzerinden yaygın servisler ve DNS-SD servis türü duyuruları keşfedilir.
   Yalnız model/üretici gibi sınırlı TXT alanları temizlenerek kullanılır. mDNS
-  sorguları sınırlı eşzamanlılıkla çalıştırılır; SSDP ve ONVIF yanıtları sayısal
-  ve boyutsal sınırlarla işlenir. Bildirilen konum adreslerinden içerik
+  sorguları sınırlı eşzamanlılıkla çalıştırılır; SSDP, WS-Discovery ve NetBIOS
+  yanıtları sayısal ve boyutsal sınırlarla işlenir. Bildirilen konum
+  adreslerinden içerik
   indirilmez.
 - Erişilebildiği platformlarda IP komşu tablosundaki geçerli kayıtlar hem cihaz
   keşfi hem de MAC zenginleştirmesi için kullanılır. Android 10 ve üzerinin
@@ -49,9 +59,12 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   üretilen çevrimdışı OUI asset'i 24, 28 ve 36 bit en uzun prefix eşleşmesiyle
   üretici adını gösterebilir. Yerel/rastgele MAC adreslerinde üretici tahmin
   edilmez.
-- ONVIF keşfi yalnız sınırlı WS-Discovery Probe mesajları gönderir ve
-  ProbeMatch duyurularını ayrıştırır; kullanıcı adı/parola denemez, cihaz
-  ayarlarını değiştirmez ve duyurulan servis adreslerinden içerik indirmez.
+- WS-Discovery keşfi sınırlı ONVIF video ve genel cihaz Probe mesajları gönderir
+  ve yalnız eşleşen ProbeMatch duyurularını ayrıştırır. Ayrıntılı mod ayrıca
+  yerel yayın adresine iki sınırlı NetBIOS Node Status sorgusu göndererek
+  yanıtlayan Windows cihazlarının adını kullanabilir. Kullanıcı adı/parola
+  denemez, paylaşım açmaz, cihaz ayarlarını değiştirmez ve duyurulan servis
+  adreslerinden içerik indirmez.
 - Tanılama ekranı her yöntemin süresini, istek ve yanıt sayaçlarını, kabul
   edilmeyen yanıtları, multicast durumunu ve kullanılabilirlik nedenini
   gösterir. Bu toplu ölçümler tarama geçmişinde de saklanır.
@@ -61,7 +74,7 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   kanıtlarıyla ve güven seviyesiyle birlikte gösterilir.
 - Yeni cihaz, IP tabanlı zayıf kimlik ve kamera servisi gibi bulgular ayrı bir
   açıklanabilir inceleme durumunda özetlenir. Bu durum casusluk hükmü değildir.
-- Erişilebilirlik, TCP, mDNS, SSDP, ONVIF ve MAC zenginleştirme aşamalarının
+- Erişilebilirlik, TCP, mDNS, SSDP, WS-Discovery/NetBIOS ve MAC zenginleştirme aşamalarının
   başarı, hata, süre ve cihaz sayıları ayrı ayrı raporlanır; tek yöntemin
   kullanılamaması taramayı çökertmez.
 - Tamamlanan taramalar Android ve Windows'ta yerel SQLite veritabanına kaydedilir.
@@ -100,6 +113,10 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
 - Ağlar ayrı yerel profillerde tutulur, kullanıcı tarafından adlandırılabilir
   ve her ağın tarama geçmişi ayrıca görüntülenebilir. Tek bir ağ profili ve
   geçmişi diğer ağlara veya cihaz notlarına dokunmadan silinebilir.
+- Geçmiş ekranındaki istatistik görünümü son taramalardaki cihaz sayısı
+  eğilimini, ortalama tarama süresini, yeni/görülmeyen cihaz kayıtlarını,
+  bilinen-tanımlanmamış dağılımını ve en sık gözlemlenen cihazları yalnız yerel
+  verilerden hesaplar.
 - Mobil görünümde yuvarlatılmış Material 3 alt gezinme çubuğu, geniş Windows
   görünümünde markalı yan gezinme paneli kullanılır. Kartlar, formlar, düğmeler,
   iletişim pencereleri ve tarama eylem alanı ortak ve uyarlanabilir bir görsel
@@ -107,6 +124,8 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   karanlık/sistem modu ve Okyanus, Zümrüt, Menekşe, Kehribar, Gül, Mercan,
   İndigo ve Grafit renk paletleri seçilebilir. Görünüm tercihleri yalnız cihazda
   saklanır.
+- Android adaptif uygulama simgesi, aydınlık/karanlık açılış ekranı ve Windows
+  çok boyutlu uygulama simgesi ortak SpyDevDet marka işaretini kullanır.
 - Ayrıntılı keşif yöntemleri başarıyla tamamlandığında kullanıcı bir taramayı
   ağ referansı olarak seçebilir. Sonraki karşılaştırılabilir taramalarda
   eklenen ve görülmeyen cihazların yanı sıra IP, servis, üretici, otomatik tür,
@@ -157,7 +176,7 @@ yapılması önerilir:
    kaydet. Görünmeyen cihazların uyku, güvenlik duvarı veya istemci izolasyonu
    nedeniyle yanıt vermeyebileceğini göz önünde bulundur.
 7. Aynı ağı önce hızlı, sonra ayrıntılı modda tara; ayrıntılı modda mDNS, SSDP
-   ve ONVIF aşamalarının çalıştığını kontrol et.
+   ve WS-Discovery/NetBIOS aşamalarının çalıştığını kontrol et.
 8. Ağ profiline bir ad, bir cihaza sahiplik/kategori düzeltmesi ekle; uygulamayı
    yeniden açtıktan ve tekrar taradıktan sonra bilgilerin korunduğunu doğrula.
 
@@ -205,6 +224,10 @@ flutter build apk --release
 ```
 
 Üretilen dosya `build/app/outputs/flutter-apk/app-release.apk` konumundadır.
+Android sürümü, Galaxy A10 gibi eski Samsung/Exynos-Mali cihazlarda Flutter
+3.38 Impeller arka ucuyla görülebilen açılış çökmelerini önlemek için Skia
+çizim arka ucunu kullanır. Bu uyumluluk ayarı ağ keşfi ve veri saklama
+işlevlerini değiştirmez.
 
 ## Kod yapısı
 

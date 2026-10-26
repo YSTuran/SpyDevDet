@@ -1,5 +1,155 @@
 part of 'scan_screen.dart';
 
+class _NetworkPreviewCard extends StatelessWidget {
+  const _NetworkPreviewCard({
+    required this.preview,
+    required this.mode,
+    required this.enabled,
+    required this.onRefresh,
+  });
+
+  final AsyncValue<NetworkSnapshot> preview;
+  final ScanMode mode;
+  final bool enabled;
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.lan_outlined),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Tarama öncesi ağ özeti',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Ağ özetini yenile',
+                  onPressed: enabled ? onRefresh : null,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            preview.when(
+              loading: () => const Row(
+                children: [
+                  SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(child: Text('Etkin yerel ağ okunuyor…')),
+                ],
+              ),
+              error: (error, stackTrace) => _NetworkPreviewError(error: error),
+              data: (network) =>
+                  _NetworkPreviewDetails(network: network, mode: mode),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NetworkPreviewError extends StatelessWidget {
+  const _NetworkPreviewError({required this.error});
+
+  final Object error;
+
+  @override
+  Widget build(BuildContext context) {
+    final message = switch (error) {
+      NetworkInfoException() => (error as NetworkInfoException).userMessage,
+      ScanPlanningException() => (error as ScanPlanningException).userMessage,
+      _ => 'Ağ özeti şu anda okunamadı. Taramadan önce bağlantını kontrol et.',
+    };
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          Icons.warning_amber_outlined,
+          color: Theme.of(context).colorScheme.error,
+        ),
+        const SizedBox(width: 10),
+        Expanded(child: Text(message)),
+      ],
+    );
+  }
+}
+
+class _NetworkPreviewDetails extends StatelessWidget {
+  const _NetworkPreviewDetails({required this.network, required this.mode});
+
+  final NetworkSnapshot network;
+  final ScanMode mode;
+
+  @override
+  Widget build(BuildContext context) {
+    try {
+      final plan = ScanPlan.fromNetwork(network, mode: mode);
+      final platformIsAndroid =
+          Theme.of(context).platform == TargetPlatform.android;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _StatusLine(label: 'Bağlantı', value: _connectionLabel(network)),
+          _StatusLine(label: 'Yerel IP', value: network.cidr),
+          _StatusLine(
+            label: 'Alt ağ',
+            value: '${plan.networkAddress}/${network.prefixLength}',
+          ),
+          _StatusLine(
+            label: 'Ağ geçidi',
+            value: network.gatewayIpv4 ?? 'İşletim sistemi bildirmedi',
+          ),
+          _StatusLine(label: 'Tarama modu', value: mode.label),
+          _StatusLine(
+            label: 'Planlanan kapsam',
+            value: '${plan.targets.length} hedef • ${plan.rangeLabel}',
+          ),
+          _StatusLine(
+            label: 'VPN',
+            value: network.isVpn ? 'Etkin — tarama engellenir' : 'Etkin değil',
+          ),
+          if (plan.isTruncated)
+            const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Text(
+                'Büyük ağ, güvenlik ve performans için en yakın 254 hedefle sınırlandırılacak.',
+              ),
+            ),
+          if (platformIsAndroid)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Android, komşu tablosunu kısıtlayabilir; bu durumda MAC ve üretici bilgisi her cihaz için bulunamayabilir.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+        ],
+      );
+    } on ScanPlanningException catch (error) {
+      return _NetworkPreviewError(error: error);
+    }
+  }
+
+  String _connectionLabel(NetworkSnapshot network) {
+    if (network.isWifi) return 'Wi-Fi (${network.interfaceName})';
+    if (network.isEthernet) return 'Ethernet (${network.interfaceName})';
+    return network.interfaceName;
+  }
+}
+
 class _CoverageNotice extends StatelessWidget {
   const _CoverageNotice({required this.messages});
 
@@ -114,7 +264,7 @@ class _SafetyNotice extends StatelessWidget {
               child: Text(
                 'Yalnızca sahibi olduğun veya tarama izni aldığın yerel '
                 'ağlarda kullan. Tarama en fazla 254 özel IPv4 adresiyle, '
-                'sekiz yaygın TCP portuyla ve yerel servis duyurularıyla sınırlıdır.',
+                'on yaygın TCP portuyla ve yerel servis duyurularıyla sınırlıdır.',
               ),
             ),
           ],

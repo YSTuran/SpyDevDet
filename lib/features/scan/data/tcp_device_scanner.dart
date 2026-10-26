@@ -23,8 +23,10 @@ class TcpDeviceScanner implements DeviceScanner {
     _ProbePort(80, 'HTTP'),
     _ProbePort(443, 'HTTPS'),
     _ProbePort(554, 'RTSP'),
+    _ProbePort(445, 'SMB/Windows paylaşımı'),
     _ProbePort(8000, 'Web/cihaz servisi'),
     _ProbePort(8080, 'Alternatif HTTP'),
+    _ProbePort(3389, 'Uzak Masaüstü'),
     _ProbePort(9100, 'Yazıcı servisi'),
   ];
   static const _quickPortNumbers = {80, 443, 554, 8000, 8080};

@@ -46,6 +46,8 @@ class OnvifDeviceDiscovery implements DeviceDiscovery {
     final probes = [
       _ProbeRequest.modern('urn:uuid:${_uuidV4()}'),
       _ProbeRequest.legacy('urn:uuid:${_uuidV4()}'),
+      _ProbeRequest.modern('urn:uuid:${_uuidV4()}', generic: true),
+      _ProbeRequest.legacy('urn:uuid:${_uuidV4()}', generic: true),
     ];
     var sentRequests = 0;
     var receivedResponses = 0;
@@ -154,23 +156,34 @@ class OnvifDeviceDiscovery implements DeviceDiscovery {
     final isVideoTransmitter = match.types.any(
       (type) => type.toLowerCase().contains('networkvideotransmitter'),
     );
-    final displayName = match.deviceName ?? 'ONVIF cihazı';
+    final matchText = [
+      ...match.types,
+      ...match.scopes,
+      ...match.xAddrs,
+    ].join(' ').toLowerCase();
+    final isOnvif = isVideoTransmitter || matchText.contains('onvif');
+    final displayName =
+        match.deviceName ?? (isOnvif ? 'ONVIF cihazı' : 'WS-Discovery cihazı');
     return DeviceObservation(
       id: 'device-$ipAddress',
       ipAddress: ipAddress,
       displayName: displayName,
       macStatus: MacStatus.notObserved,
       services: List.unmodifiable({
-        'ONVIF WS-Discovery',
-        ...match.types.map((type) => 'ONVIF $type'),
+        isOnvif ? 'ONVIF WS-Discovery' : 'WS-Discovery',
+        ...match.types.map(
+          (type) => isOnvif ? 'ONVIF $type' : 'WS-Discovery $type',
+        ),
       }),
-      discoveryMethod: 'ONVIF/WS-Discovery',
+      discoveryMethod: isOnvif ? 'ONVIF/WS-Discovery' : 'WS-Discovery',
       evidence: [
         DeviceEvidence(
           source: DeviceEvidenceSource.onvif,
           description: isVideoTransmitter
               ? 'ONVIF NetworkVideoTransmitter duyurusu'
-              : 'ONVIF WS-Discovery duyurusu',
+              : isOnvif
+              ? 'ONVIF WS-Discovery duyurusu'
+              : 'Genel WS-Discovery cihaz duyurusu',
           serviceType: match.types.join(' '),
           port: _port,
           identifier: match.endpointAddress,
@@ -191,7 +204,8 @@ class OnvifDeviceDiscovery implements DeviceDiscovery {
       '<a:ReplyTo><a:Address>${probe.anonymousAddress}</a:Address></a:ReplyTo>'
       '<a:To>${probe.destination}</a:To>'
       '</s:Header>'
-      '<s:Body><d:Probe><d:Types>dn:NetworkVideoTransmitter</d:Types>'
+      '<s:Body><d:Probe>'
+      '${probe.generic ? '' : '<d:Types>dn:NetworkVideoTransmitter</d:Types>'}'
       '</d:Probe></s:Body></s:Envelope>';
 
   String _uuidV4() {
@@ -327,30 +341,37 @@ class _ProbeRequest {
     required this.discoveryNamespace,
     required this.anonymousAddress,
     required this.destination,
+    required this.generic,
   });
 
-  factory _ProbeRequest.modern(String messageId) => _ProbeRequest(
-    messageId: messageId,
-    addressingNamespace: 'http://www.w3.org/2005/08/addressing',
-    discoveryNamespace: 'http://docs.oasis-open.org/ws-dd/ns/discovery/2009/01',
-    anonymousAddress: 'http://www.w3.org/2005/08/addressing/anonymous',
-    destination: 'urn:docs-oasis-open-org:ws-dd:ns:discovery:2009:01',
-  );
+  factory _ProbeRequest.modern(String messageId, {bool generic = false}) =>
+      _ProbeRequest(
+        messageId: messageId,
+        addressingNamespace: 'http://www.w3.org/2005/08/addressing',
+        discoveryNamespace:
+            'http://docs.oasis-open.org/ws-dd/ns/discovery/2009/01',
+        anonymousAddress: 'http://www.w3.org/2005/08/addressing/anonymous',
+        destination: 'urn:docs-oasis-open-org:ws-dd:ns:discovery:2009:01',
+        generic: generic,
+      );
 
-  factory _ProbeRequest.legacy(String messageId) => _ProbeRequest(
-    messageId: messageId,
-    addressingNamespace: 'http://schemas.xmlsoap.org/ws/2004/08/addressing',
-    discoveryNamespace: 'http://schemas.xmlsoap.org/ws/2005/04/discovery',
-    anonymousAddress:
-        'http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous',
-    destination: 'urn:schemas-xmlsoap-org:ws:2005:04:discovery',
-  );
+  factory _ProbeRequest.legacy(String messageId, {bool generic = false}) =>
+      _ProbeRequest(
+        messageId: messageId,
+        addressingNamespace: 'http://schemas.xmlsoap.org/ws/2004/08/addressing',
+        discoveryNamespace: 'http://schemas.xmlsoap.org/ws/2005/04/discovery',
+        anonymousAddress:
+            'http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous',
+        destination: 'urn:schemas-xmlsoap-org:ws:2005:04:discovery',
+        generic: generic,
+      );
 
   final String messageId;
   final String addressingNamespace;
   final String discoveryNamespace;
   final String anonymousAddress;
   final String destination;
+  final bool generic;
 }
 
 class OnvifProbeMatch {

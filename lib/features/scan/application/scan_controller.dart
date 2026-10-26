@@ -23,6 +23,11 @@ final networkInfoRepositoryProvider = Provider<NetworkInfoRepository>(
   (ref) => const NativeNetworkInfoRepository(),
 );
 
+final currentNetworkPreviewProvider =
+    FutureProvider.autoDispose<NetworkSnapshot>(
+      (ref) => ref.watch(networkInfoRepositoryProvider).getCurrentNetwork(),
+    );
+
 final deviceScannerProvider = Provider<DeviceScanner>(
   (ref) => const LocalNetworkDeviceScanner(),
 );
@@ -414,6 +419,7 @@ class ScanController extends Notifier<ScanState> {
       ref.invalidate(scanHistoryProvider);
       ref.invalidate(networkProfilesProvider);
       ref.invalidate(knownDevicesProvider);
+      ref.invalidate(historyStatisticsProvider);
     } on Object {
       if (runId == _runId) {
         state = state.copyWith(
@@ -484,6 +490,7 @@ class ScanController extends Notifier<ScanState> {
     ref.invalidate(scanHistoryProvider);
     ref.invalidate(knownDevicesProvider);
     ref.invalidate(scanHistoryDetailsProvider);
+    ref.invalidate(historyStatisticsProvider);
   }
 
   List<DeviceObservation> _upsertDevice(

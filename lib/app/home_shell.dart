@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:spy_dev_det/app/brand_mark.dart';
 import 'package:spy_dev_det/features/history/presentation/history_screen.dart';
 import 'package:spy_dev_det/features/history/presentation/known_devices_screen.dart';
 import 'package:spy_dev_det/features/history/presentation/network_profiles_screen.dart';
@@ -163,27 +164,7 @@ class _BrandMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final mark = Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [scheme.primary, scheme.tertiary],
-        ),
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.primary.withValues(alpha: 0.2),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Icon(Icons.security_outlined, color: scheme.onPrimary),
-    );
+    const mark = SpyDevDetBrandMark();
     if (!extended) return mark;
     return SizedBox(
       width: 188,

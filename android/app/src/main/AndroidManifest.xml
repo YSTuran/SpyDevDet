@@ -9,6 +9,15 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="false">
+        <!--
+             Galaxy A10 gibi eski Samsung/Exynos-Mali cihazlarda Flutter
+             3.38 Impeller arka ucu açılış sırasında yerel grafik sürücüsünü
+             çökertebilir. Android 11+ hedefinde daha geniş cihaz uyumluluğu
+             için kararlı Skia arka ucu kullanılır.
+        -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

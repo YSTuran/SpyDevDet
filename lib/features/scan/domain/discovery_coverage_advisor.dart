@@ -41,7 +41,7 @@ class DiscoveryCoverageAdvisor {
     if (multicastMethods.any((method) => _isUnavailable(methods[method]))) {
       explanations.add(
         'Bir veya daha fazla yerel servis keşfi kullanılamadı; mDNS, SSDP '
-        'veya ONVIF duyurusu yapan cihazlar eksik olabilir.',
+        'WS-Discovery veya NetBIOS yanıtı veren cihazlar eksik olabilir.',
       );
     }
     if (multicastMethods.every(

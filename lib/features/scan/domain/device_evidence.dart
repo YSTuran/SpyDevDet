@@ -4,6 +4,7 @@ enum DeviceEvidenceSource {
   mdns,
   ssdp,
   onvif,
+  netbios,
   network,
   neighbor,
 }
@@ -14,7 +15,8 @@ extension DeviceEvidenceSourceText on DeviceEvidenceSource {
     DeviceEvidenceSource.tcp => 'TCP',
     DeviceEvidenceSource.mdns => 'mDNS',
     DeviceEvidenceSource.ssdp => 'SSDP',
-    DeviceEvidenceSource.onvif => 'ONVIF',
+    DeviceEvidenceSource.onvif => 'ONVIF/WS-Discovery',
+    DeviceEvidenceSource.netbios => 'NetBIOS',
     DeviceEvidenceSource.network => 'Ağ bilgisi',
     DeviceEvidenceSource.neighbor => 'Komşu tablosu',
   };

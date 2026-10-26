@@ -91,6 +91,7 @@ class KnownDeviceSummary {
     this.lastMacAddress,
     this.vendor,
     this.categoryOverride,
+    this.observationCount = 0,
   });
 
   final String stableKey;
@@ -105,6 +106,7 @@ class KnownDeviceSummary {
   final String? lastMacAddress;
   final String? vendor;
   final DeviceCategory? categoryOverride;
+  final int observationCount;
 
   String get effectiveDisplayName =>
       customName?.trim().isNotEmpty == true ? customName!.trim() : displayName;

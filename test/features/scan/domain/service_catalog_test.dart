@@ -60,4 +60,70 @@ void main() {
     expect(result.confidence, ConfidenceLevel.high);
     expect(catalog.inspect(device).single.kind, ServiceKind.onvifVideo);
   });
+
+  test(
+    'Windows servislerini açıklayıp bilgisayar adayı olarak sınıflandırır',
+    () {
+      const device = DeviceObservation(
+        id: 'windows-pc',
+        ipAddress: '192.168.1.20',
+        displayName: 'Ağ cihazı',
+        macStatus: MacStatus.notObserved,
+        services: ['SMB/Windows paylaşımı (445)', 'Uzak Masaüstü (3389)'],
+        evidence: [
+          DeviceEvidence(
+            source: DeviceEvidenceSource.tcp,
+            description: 'TCP 445 portu bağlantı kabul etti',
+            port: 445,
+          ),
+          DeviceEvidence(
+            source: DeviceEvidenceSource.tcp,
+            description: 'TCP 3389 portu bağlantı kabul etti',
+            port: 3389,
+          ),
+        ],
+      );
+
+      final insights = catalog.inspect(device);
+      final classified = const DeviceClassifier().classify(
+        device,
+        gatewayIpv4: null,
+      );
+
+      expect(
+        insights.map((item) => item.id),
+        containsAll(['tcp-445', 'tcp-3389']),
+      );
+      expect(classified.category, DeviceCategory.computerOrPhone);
+      expect(classified.confidence, ConfidenceLevel.medium);
+    },
+  );
+
+  test('genel WS-Discovery yanıtını ONVIF kamera olarak etiketlemez', () {
+    const device = DeviceObservation(
+      id: 'windows-service',
+      ipAddress: '192.168.1.30',
+      displayName: 'WS-Discovery cihazı',
+      macStatus: MacStatus.notObserved,
+      services: ['WS-Discovery wsdp:Device'],
+      evidence: [
+        DeviceEvidence(
+          source: DeviceEvidenceSource.onvif,
+          description: 'Genel WS-Discovery cihaz duyurusu',
+          serviceType: 'wsdp:Device',
+          identifier: 'urn:uuid:device-1',
+        ),
+      ],
+    );
+
+    final insights = catalog.inspect(device);
+    final classified = const DeviceClassifier().classify(
+      device,
+      gatewayIpv4: null,
+    );
+
+    expect(insights.single.id, 'ws-discovery');
+    expect(insights.single.kind, ServiceKind.discovery);
+    expect(classified.category, DeviceCategory.unknown);
+  });
 }

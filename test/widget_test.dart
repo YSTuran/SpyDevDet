@@ -354,6 +354,24 @@ void main() {
     expect(progress.properties.value, 'Yüzde 0');
   });
 
+  testWidgets('tarama öncesi ağ kapsamını kullanıcıya açıklar', (tester) async {
+    await tester.pumpWidget(_testApp());
+    await tester.pump();
+
+    await tester.scrollUntilVisible(
+      find.text('Tarama öncesi ağ özeti'),
+      180,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.text('Tarama öncesi ağ özeti'), findsOneWidget);
+    expect(find.text('Yerel IP: 192.168.1.24/24'), findsOneWidget);
+    expect(
+      find.text('Planlanan kapsam: 253 hedef • 192.168.1.1 – 192.168.1.254'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('masaüstünde klavye odağı etkileşimli öğelere ulaşır', (
     tester,
   ) async {
@@ -461,6 +479,16 @@ Widget _testApp({
 }) {
   return ProviderScope(
     overrides: [
+      currentNetworkPreviewProvider.overrideWith(
+        (ref) async => const NetworkSnapshot(
+          localIpv4: '192.168.1.24',
+          prefixLength: 24,
+          interfaceName: 'wlan0',
+          gatewayIpv4: '192.168.1.1',
+          isWifi: true,
+          isVpn: false,
+        ),
+      ),
       networkInfoRepositoryProvider.overrideWithValue(
         repository ?? const _TestNetworkRepository(),
       ),

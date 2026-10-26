@@ -8,7 +8,7 @@ extension DiscoveryMethodText on DiscoveryMethod {
     DiscoveryMethod.tcp => 'TCP port kontrolü',
     DiscoveryMethod.mdns => 'mDNS servis keşfi',
     DiscoveryMethod.ssdp => 'SSDP/UPnP keşfi',
-    DiscoveryMethod.onvif => 'ONVIF/WS-Discovery keşfi',
+    DiscoveryMethod.onvif => 'WS-Discovery/NetBIOS keşfi',
     DiscoveryMethod.neighbor => 'MAC zenginleştirme',
   };
 }

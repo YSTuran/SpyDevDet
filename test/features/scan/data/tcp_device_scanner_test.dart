@@ -30,10 +30,10 @@ void main() {
     final completed = events.whereType<ScanCompleted>().single;
 
     expect(completed.metrics.attemptedTargets, 1);
-    expect(completed.metrics.sentRequests, 8);
+    expect(completed.metrics.sentRequests, 10);
     expect(
       completed.metrics.receivedResponses + completed.metrics.timeoutCount,
-      lessThanOrEqualTo(8),
+      lessThanOrEqualTo(10),
     );
     expect(token.isCancelled, isFalse);
   });

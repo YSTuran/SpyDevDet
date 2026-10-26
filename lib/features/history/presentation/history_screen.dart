@@ -4,6 +4,7 @@ import 'package:spy_dev_det/features/history/application/history_providers.dart'
 import 'package:spy_dev_det/features/history/domain/scan_history_repository.dart';
 import 'package:spy_dev_det/features/history/presentation/history_details_view.dart';
 import 'package:spy_dev_det/features/history/presentation/history_formatters.dart';
+import 'package:spy_dev_det/features/history/presentation/history_statistics_screen.dart';
 import 'package:spy_dev_det/features/history/presentation/scan_comparison_flow.dart';
 import 'package:spy_dev_det/features/history/presentation/scan_report_export_flow.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
@@ -24,6 +25,16 @@ class HistoryScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(title ?? 'Tarama geçmişi'),
         actions: [
+          if (networkKey == null)
+            IconButton(
+              tooltip: 'Ağ geçmişi istatistikleri',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (context) => const HistoryStatisticsScreen(),
+                ),
+              ),
+              icon: const Icon(Icons.insights_outlined),
+            ),
           IconButton(
             tooltip: 'İki taramayı karşılaştır',
             onPressed: () =>
@@ -392,4 +403,5 @@ void _invalidateHistory(WidgetRef ref) {
   ref.invalidate(networkScanHistoryProvider);
   ref.invalidate(networkProfilesProvider);
   ref.invalidate(scanHistoryDetailsProvider);
+  ref.invalidate(historyStatisticsProvider);
 }

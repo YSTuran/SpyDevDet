@@ -5,9 +5,9 @@ import 'package:spy_dev_det/features/scan/data/mdns_device_discovery.dart';
 import 'package:spy_dev_det/features/scan/data/native_multicast_lock.dart';
 import 'package:spy_dev_det/features/scan/data/native_neighbor_repository.dart';
 import 'package:spy_dev_det/features/scan/data/native_reachability_discovery.dart';
-import 'package:spy_dev_det/features/scan/data/onvif_device_discovery.dart';
 import 'package:spy_dev_det/features/scan/data/ssdp_device_discovery.dart';
 import 'package:spy_dev_det/features/scan/data/tcp_device_scanner.dart';
+import 'package:spy_dev_det/features/scan/data/ws_netbios_device_discovery.dart';
 import 'package:spy_dev_det/features/scan/domain/device_classifier.dart';
 import 'package:spy_dev_det/features/scan/domain/device_discovery.dart';
 import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
@@ -29,7 +29,7 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
     this.reachabilityDiscovery = const NativeReachabilityDiscovery(),
     this.mdnsDiscovery = const MdnsDeviceDiscovery(),
     this.ssdpDiscovery = const SsdpDeviceDiscovery(),
-    this.onvifDiscovery = const OnvifDeviceDiscovery(),
+    this.onvifDiscovery = const WsNetbiosDeviceDiscovery(),
     this.neighborRepository = const NativeNeighborRepository(),
     this.multicastLock = const NativeMulticastLock(),
     this.classifier = const DeviceClassifier(),
@@ -335,11 +335,11 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
     int completedTargets,
   ) => DiscoveryMetrics(
     attemptedTargets: completedTargets,
-    sentRequests: completedTargets * (plan.mode == ScanMode.quick ? 5 : 8),
+    sentRequests: completedTargets * (plan.mode == ScanMode.quick ? 5 : 10),
     acceptedResponses: responsiveDevices,
     detail:
         'Planlanan ${plan.targets.length} hedef; tamamlanan her hedefte '
-        '${plan.mode == ScanMode.quick ? 5 : 8} sınırlı TCP bağlantı denemesi',
+        '${plan.mode == ScanMode.quick ? 5 : 10} sınırlı TCP bağlantı denemesi',
   );
 
   Future<void> _skipMulticastDiscoveries(
@@ -532,7 +532,7 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
       DiscoveryMethod.reachability => 'Cihaz erişilebilirlik',
       DiscoveryMethod.mdns => 'mDNS',
       DiscoveryMethod.ssdp => 'SSDP',
-      DiscoveryMethod.onvif => 'ONVIF/WS-Discovery',
+      DiscoveryMethod.onvif => 'WS-Discovery/NetBIOS',
       DiscoveryMethod.tcp => 'TCP',
       DiscoveryMethod.neighbor => 'Komşu tablosu',
     };

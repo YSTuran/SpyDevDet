@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:spy_dev_det/features/history/data/app_database.dart';
 import 'package:spy_dev_det/features/history/data/drift_scan_history_repository.dart';
 import 'package:spy_dev_det/features/history/domain/scan_history_repository.dart';
+import 'package:spy_dev_det/features/history/domain/network_history_statistics.dart';
 import 'package:spy_dev_det/features/settings/application/history_preferences_controller.dart';
 
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
@@ -33,6 +34,19 @@ final knownDevicesProvider =
     FutureProvider.autoDispose<List<KnownDeviceSummary>>(
       (ref) => ref.watch(scanHistoryRepositoryProvider).getKnownDevices(),
     );
+
+final historyStatisticsProvider =
+    FutureProvider.autoDispose<NetworkHistoryStatistics>((ref) async {
+      final repository = ref.watch(scanHistoryRepositoryProvider);
+      final historyFuture = repository.getHistory(limit: 200);
+      final networksFuture = repository.getNetworkProfiles();
+      final devicesFuture = repository.getKnownDevices();
+      return NetworkHistoryStatistics.fromRecords(
+        history: await historyFuture,
+        networks: await networksFuture,
+        devices: await devicesFuture,
+      );
+    });
 
 final networkScanHistoryProvider = FutureProvider.autoDispose
     .family<List<ScanHistorySummary>, String>(

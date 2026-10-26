@@ -38,7 +38,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       title: 'Doğru tarama modunu seç',
       description:
           'Hızlı mod temel erişilebilirlik ve seçili portları kontrol eder. '
-          'Ayrıntılı mod mDNS, SSDP ve ONVIF duyurularını da dinler.',
+          'Ayrıntılı mod mDNS, SSDP, WS-Discovery ve NetBIOS yanıtlarını da dinler.',
       bullets: [
         'Hızlı mod kısa kontrol içindir.',
         'Referans ve geçmiş karşılaştırması için ayrıntılı modu kullan.',

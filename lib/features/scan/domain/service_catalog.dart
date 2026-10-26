@@ -12,6 +12,7 @@ enum ServiceKind {
   mediaDevice,
   discovery,
   onvifVideo,
+  fileSharing,
 }
 
 class ServiceInsight {
@@ -64,15 +65,41 @@ class ServiceCatalog {
       }
       if (evidence.source == DeviceEvidenceSource.onvif) {
         final video = serviceType.contains('networkvideotransmitter');
-        insights[video ? 'onvif-video' : 'onvif'] = ServiceInsight(
-          id: video ? 'onvif-video' : 'onvif',
-          title: video ? 'ONVIF video cihazı duyurusu' : 'ONVIF duyurusu',
+        final onvif = evidence.description.startsWith('ONVIF');
+        insights[video
+            ? 'onvif-video'
+            : onvif
+            ? 'onvif'
+            : 'ws-discovery'] = ServiceInsight(
+          id: video
+              ? 'onvif-video'
+              : onvif
+              ? 'onvif'
+              : 'ws-discovery',
+          title: video
+              ? 'ONVIF video cihazı duyurusu'
+              : onvif
+              ? 'ONVIF duyurusu'
+              : 'WS-Discovery cihaz duyurusu',
           explanation: video
               ? 'Cihaz, WS-Discovery yanıtında kendisini ağ video vericisi olarak tanıttı.'
-              : 'Cihaz ONVIF/WS-Discovery keşfine yanıt verdi.',
+              : onvif
+              ? 'Cihaz ONVIF/WS-Discovery keşfine yanıt verdi.'
+              : 'Cihaz genel WS-Discovery keşfine yanıt verdi.',
           kind: video ? ServiceKind.onvifVideo : ServiceKind.discovery,
           caution:
               'Bu bulgu cihazın gizli veya kötü amaçlı olduğunu kanıtlamaz.',
+        );
+      }
+      if (evidence.source == DeviceEvidenceSource.netbios) {
+        insights['netbios'] = const ServiceInsight(
+          id: 'netbios',
+          title: 'NetBIOS cihaz adı yanıtı',
+          explanation:
+              'Cihaz yerel ağdaki sınırlı NetBIOS durum sorgusuna ad bilgisiyle yanıt verdi.',
+          kind: ServiceKind.nameService,
+          caution:
+              'Yanıt cihazın güvenilirliğini göstermez; uygulama paylaşımlara erişmez.',
         );
       }
     }
@@ -112,6 +139,15 @@ class ServiceCatalog {
       kind: ServiceKind.mediaStream,
       caution: 'RTSP tek başına cihazın kamera olduğunu kesinleştirmez.',
     ),
+    445 => const ServiceInsight(
+      id: 'tcp-445',
+      title: 'SMB paylaşımı (TCP 445)',
+      explanation:
+          'Windows dosya/yazıcı paylaşımı veya SMB uyumlu bir ağ servisi olabilir.',
+      kind: ServiceKind.fileSharing,
+      caution:
+          'Uygulama paylaşım içeriğine erişmez; yalnızca portun bağlantı kabul ettiğini kaydeder.',
+    ),
     8000 => const ServiceInsight(
       id: 'tcp-8000',
       title: 'Cihaz servisi (TCP 8000)',
@@ -123,6 +159,15 @@ class ServiceCatalog {
       title: 'Yazıcı servisi (TCP 9100)',
       explanation: 'Ağ üzerinden doğrudan yazdırma servisi olabilir.',
       kind: ServiceKind.printer,
+    ),
+    3389 => const ServiceInsight(
+      id: 'tcp-3389',
+      title: 'Uzak Masaüstü (TCP 3389)',
+      explanation:
+          'Windows Uzak Masaüstü veya uyumlu bir yönetim servisi olabilir.',
+      kind: ServiceKind.remoteAdministration,
+      caution:
+          'Uygulama oturum açmayı denemez; yalnızca portun bağlantı kabul ettiğini kaydeder.',
     ),
     _ => null,
   };

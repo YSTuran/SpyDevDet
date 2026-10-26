@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:spy_dev_det/app/brand_mark.dart';
 import 'package:spy_dev_det/features/history/presentation/reference_comparison_card.dart';
+import 'package:spy_dev_det/features/network/domain/network_info_repository.dart';
+import 'package:spy_dev_det/features/network/domain/network_snapshot.dart';
 import 'package:spy_dev_det/features/scan/application/scan_controller.dart';
 import 'package:spy_dev_det/features/scan/application/scan_state.dart';
 import 'package:spy_dev_det/features/scan/domain/device_attention.dart';
@@ -10,6 +13,7 @@ import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/discovery_coverage_advisor.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
+import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_quality.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 import 'package:spy_dev_det/features/scan/domain/service_catalog.dart';
@@ -49,6 +53,10 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(currentNetworkPreviewProvider);
+      return;
+    }
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
@@ -64,6 +72,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
   @override
   Widget build(BuildContext context) {
     final scanState = ref.watch(scanControllerProvider);
+    final networkPreview = ref.watch(currentNetworkPreviewProvider);
     final controller = ref.read(scanControllerProvider.notifier);
     final displayedDevices = const DeviceListFilter().apply(
       scanState.devices,
@@ -109,6 +118,14 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
                 ),
                 const SizedBox(height: 12),
                 _ScanStatusCard(state: scanState),
+                const SizedBox(height: 12),
+                _NetworkPreviewCard(
+                  preview: networkPreview,
+                  mode: scanState.scanMode,
+                  enabled: !scanState.isBusy,
+                  onRefresh: () =>
+                      ref.invalidate(currentNetworkPreviewProvider),
+                ),
                 const SizedBox(height: 12),
                 const _SafetyNotice(),
                 const SizedBox(height: 20),
@@ -217,7 +234,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
       children: const [
         Text(
           'Uygulama etkin yerel ağdaki özel IPv4 adreslerinde erişilebilirliği ve seçili TCP '
-          'portlarını kontrol eder; mDNS, SSDP ve ONVIF servis duyurularını dinler. Sonuçlar bir '
+          'portlarını kontrol eder; mDNS, SSDP, WS-Discovery ve NetBIOS yanıtlarını dinler. Sonuçlar bir '
           'cihazın casus olduğunu kanıtlamaz ve tüm cihazların bulunacağını '
           'garanti etmez.',
         ),
@@ -268,24 +285,9 @@ class _ScanAppTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Row(
       children: [
-        ExcludeSemantics(
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [scheme.primary, scheme.tertiary],
-              ),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(Icons.security_outlined, color: scheme.onPrimary),
-          ),
-        ),
+        const SpyDevDetBrandMark(size: 40),
         const SizedBox(width: 12),
         Expanded(
           child: Column(

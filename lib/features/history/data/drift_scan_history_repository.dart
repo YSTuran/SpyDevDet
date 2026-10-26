@@ -292,6 +292,20 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
       for (final row in latestNames)
         row.read<String>('stable_key'): row.read<String>('display_name'),
     };
+    final observationCounts = await database
+        .customSelect(
+          '''
+          SELECT stable_key, COUNT(*) AS observation_count
+          FROM scan_observations
+          GROUP BY stable_key
+          ''',
+          readsFrom: {database.scanObservations},
+        )
+        .get();
+    final observationCountByKey = {
+      for (final row in observationCounts)
+        row.read<String>('stable_key'): row.read<int>('observation_count'),
+    };
     return List.unmodifiable(
       profiles.map(
         (profile) => KnownDeviceSummary(
@@ -313,6 +327,7 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
             DeviceCategory.values,
             profile.categoryOverride,
           ),
+          observationCount: observationCountByKey[profile.stableKey] ?? 0,
         ),
       ),
     );
@@ -401,6 +416,7 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
         DeviceCategory.values,
         profile.categoryOverride,
       ),
+      observationCount: observations.length,
     );
     return DeviceTimeline(
       device: summary,

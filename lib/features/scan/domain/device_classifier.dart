@@ -102,14 +102,27 @@ class DeviceClassifier {
       );
     }
 
-    if (_containsAny(searchable, const [
-      '_workstation._tcp',
-      '_device-info._tcp',
-      'ssh (22)',
-    ])) {
+    final hasComputerService = serviceInsights.any(
+      (insight) =>
+          insight.kind == ServiceKind.remoteAdministration ||
+          insight.kind == ServiceKind.fileSharing,
+    );
+    if (hasComputerService ||
+        _containsAny(searchable, const [
+          '_workstation._tcp',
+          '_device-info._tcp',
+          'ssh (22)',
+          'smb/windows paylaşımı (445)',
+          'uzak masaüstü (3389)',
+          'netbios ad servisi (137)',
+        ])) {
       return device.copyWith(
         category: DeviceCategory.computerOrPhone,
-        confidence: searchable.contains('_workstation._tcp')
+        confidence:
+            searchable.contains('_workstation._tcp') ||
+                serviceInsights.any(
+                  (insight) => insight.kind == ServiceKind.fileSharing,
+                )
             ? ConfidenceLevel.medium
             : ConfidenceLevel.low,
       );
