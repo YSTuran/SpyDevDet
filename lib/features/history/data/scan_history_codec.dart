@@ -39,7 +39,14 @@ class ScanHistoryCodec {
       for (final method in DiscoveryMethod.values) {
         final value = decoded[method.name];
         if (value is! Map<String, dynamic>) {
-          if (method == DiscoveryMethod.reachability ||
+          if (method == DiscoveryMethod.netbios) {
+            methods[method] = const DiscoveryMethodResult(
+              method: DiscoveryMethod.netbios,
+              phase: DiscoveryMethodPhase.completed,
+              userMessage:
+                  'Bu kayıt NetBIOS ayrı raporlanmadan önce oluşturuldu.',
+            );
+          } else if (method == DiscoveryMethod.reachability ||
               method == DiscoveryMethod.onvif) {
             methods[method] = DiscoveryMethodResult(
               method: method,

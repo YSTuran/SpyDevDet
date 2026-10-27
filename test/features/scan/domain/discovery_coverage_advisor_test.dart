@@ -15,6 +15,7 @@ void main() {
                 DiscoveryMethod.mdns,
                 DiscoveryMethod.ssdp,
                 DiscoveryMethod.onvif,
+                DiscoveryMethod.netbios,
               }.contains(method)
               ? DiscoveryMethodPhase.skipped
               : DiscoveryMethodPhase.completed,

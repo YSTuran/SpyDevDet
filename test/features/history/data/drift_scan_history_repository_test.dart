@@ -179,6 +179,7 @@ void main() {
     await repository.clearHistory();
 
     expect(await repository.getHistory(), isEmpty);
+    expect((await repository.getKnownDevices()).single.isKnown, isTrue);
 
     final next = await repository.recordCompletedScan(
       _record(ipAddress: '192.168.1.21', minute: 5),
@@ -589,6 +590,30 @@ void main() {
     expect(firstProfile.scanCount, 1);
     expect(filteredHistory, hasLength(1));
     expect(filteredHistory.single.networkKey, firstNetwork);
+  });
+
+  test('cihaz sıklığını seçilen ağın gözlemleriyle sınırlar', () async {
+    const firstNetwork = '192.168.1.0/24|gateway:192.168.1.1';
+    const secondNetwork = '10.0.0.0/24|gateway:10.0.0.1';
+    await repository.recordCompletedScan(
+      _record(ipAddress: '192.168.1.20', minute: 0, networkKey: firstNetwork),
+    );
+    await repository.recordCompletedScan(
+      _record(ipAddress: '192.168.1.21', minute: 5, networkKey: firstNetwork),
+    );
+    await repository.recordCompletedScan(
+      _record(ipAddress: '10.0.0.20', minute: 10, networkKey: secondNetwork),
+    );
+
+    final firstNetworkDevices = await repository.getKnownDevices(
+      networkKey: firstNetwork,
+    );
+    final secondNetworkDevices = await repository.getKnownDevices(
+      networkKey: secondNetwork,
+    );
+
+    expect(firstNetworkDevices.single.observationCount, 2);
+    expect(secondNetworkDevices.single.observationCount, 1);
   });
 
   test(

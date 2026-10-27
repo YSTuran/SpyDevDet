@@ -15,18 +15,19 @@ class TcpDeviceScanner implements DeviceScanner {
   const TcpDeviceScanner({
     this.maxConcurrentProbes = 32,
     this.probeTimeout = const Duration(milliseconds: 450),
+    this.responsiveHostProbeTimeout = const Duration(milliseconds: 250),
   });
 
   static const _ports = [
-    _ProbePort(22, 'SSH'),
-    _ProbePort(53, 'DNS'),
     _ProbePort(80, 'HTTP'),
     _ProbePort(443, 'HTTPS'),
-    _ProbePort(554, 'RTSP'),
     _ProbePort(445, 'SMB/Windows paylaşımı'),
+    _ProbePort(3389, 'Uzak Masaüstü'),
+    _ProbePort(554, 'RTSP'),
+    _ProbePort(22, 'SSH'),
+    _ProbePort(53, 'DNS'),
     _ProbePort(8000, 'Web/cihaz servisi'),
     _ProbePort(8080, 'Alternatif HTTP'),
-    _ProbePort(3389, 'Uzak Masaüstü'),
     _ProbePort(9100, 'Yazıcı servisi'),
   ];
   static const _quickPortNumbers = {80, 443, 554, 8000, 8080};
@@ -34,6 +35,7 @@ class TcpDeviceScanner implements DeviceScanner {
 
   final int maxConcurrentProbes;
   final Duration probeTimeout;
+  final Duration responsiveHostProbeTimeout;
 
   @override
   Stream<ScanEvent> scan(
@@ -90,11 +92,7 @@ class TcpDeviceScanner implements DeviceScanner {
     final openPortsByHost = <String, Set<int>>{};
     final rejectedPortByHost = <String, int>{};
     final responsiveHosts = <String>{};
-    final remainingProbesByHost = <String, int>{
-      for (final target in plan.targets) target: ports.length,
-    };
-    final totalJobs = plan.targets.length * ports.length;
-    var nextJob = 0;
+    var nextHostIndex = 0;
     var completedTargets = 0;
     var sentRequests = 0;
     var receivedResponses = 0;
@@ -102,72 +100,67 @@ class TcpDeviceScanner implements DeviceScanner {
 
     Future<void> worker() async {
       while (!cancellationToken.isCancelled) {
-        final jobIndex = nextJob++;
-        if (jobIndex >= totalJobs) {
+        final hostIndex = nextHostIndex++;
+        if (hostIndex >= plan.targets.length) {
           return;
         }
 
-        final hostIndex = jobIndex ~/ ports.length;
-        final portIndex = jobIndex % ports.length;
         final host = plan.targets[hostIndex];
-        final probePort = ports[portIndex];
-        sentRequests++;
-        final probeResult = await _probe(
-          host: host,
-          port: probePort.number,
-          sourceAddress: plan.network.localIpv4,
-          cancellationToken: cancellationToken,
-        );
-
-        if (cancellationToken.isCancelled) {
-          return;
-        }
-
-        if (probeResult == _ProbeResult.timeout) {
-          timeoutCount++;
-        }
-        if (probeResult == _ProbeResult.open ||
-            probeResult == _ProbeResult.rejected) {
-          receivedResponses++;
-          final firstResponse = responsiveHosts.add(host);
-          final openPorts = openPortsByHost.putIfAbsent(host, () => <int>{});
-          if (probeResult == _ProbeResult.open) {
-            openPorts.add(probePort.number);
-          } else {
-            rejectedPortByHost.putIfAbsent(host, () => probePort.number);
-          }
-          if (firstResponse || probeResult == _ProbeResult.open) {
-            controller.add(
-              DeviceObserved(
-                _observationFor(
-                  host: host,
-                  gateway: plan.network.gatewayIpv4,
-                  openPorts: openPorts,
-                  rejectedPort: rejectedPortByHost[host],
-                ),
-              ),
-            );
-          }
-        }
-
-        final remaining = remainingProbesByHost[host]! - 1;
-        remainingProbesByHost[host] = remaining;
-        if (remaining == 0) {
-          completedTargets++;
-          controller.add(
-            ScanProgress(
-              completedTargets: completedTargets,
-              totalTargets: plan.targets.length,
-            ),
+        for (final probePort in ports) {
+          if (cancellationToken.isCancelled) return;
+          sentRequests++;
+          final probeResult = await _probe(
+            host: host,
+            port: probePort.number,
+            sourceAddress: plan.network.localIpv4,
+            timeout: responsiveHosts.contains(host)
+                ? _shorterTimeout
+                : probeTimeout,
+            cancellationToken: cancellationToken,
           );
+
+          if (cancellationToken.isCancelled) return;
+
+          if (probeResult == _ProbeResult.timeout) timeoutCount++;
+          if (probeResult == _ProbeResult.open ||
+              probeResult == _ProbeResult.rejected) {
+            receivedResponses++;
+            final firstResponse = responsiveHosts.add(host);
+            final openPorts = openPortsByHost.putIfAbsent(host, () => <int>{});
+            if (probeResult == _ProbeResult.open) {
+              openPorts.add(probePort.number);
+            } else {
+              rejectedPortByHost.putIfAbsent(host, () => probePort.number);
+            }
+            if (firstResponse || probeResult == _ProbeResult.open) {
+              controller.add(
+                DeviceObserved(
+                  _observationFor(
+                    host: host,
+                    gateway: plan.network.gatewayIpv4,
+                    openPorts: openPorts,
+                    rejectedPort: rejectedPortByHost[host],
+                  ),
+                ),
+              );
+            }
+          }
         }
+
+        completedTargets++;
+        controller.add(
+          ScanProgress(
+            completedTargets: completedTargets,
+            totalTargets: plan.targets.length,
+          ),
+        );
       }
     }
 
     final platformConcurrency = Platform.isAndroid
         ? math.min(maxConcurrentProbes, _androidProbeLimit)
         : maxConcurrentProbes;
-    final workerCount = math.min(platformConcurrency, totalJobs);
+    final workerCount = math.min(platformConcurrency, plan.targets.length);
     await Future.wait(List.generate(workerCount, (_) => worker()));
     stopwatch.stop();
 
@@ -200,7 +193,8 @@ class TcpDeviceScanner implements DeviceScanner {
           timeoutCount: timeoutCount,
           detail:
               '${ports.length} sınırlı TCP portunda gerçek bağlantı denemeleri; '
-              'en fazla $workerCount eşzamanlı',
+              'en fazla $workerCount eşzamanlı hedef; yanıt veren hedeflerde '
+              'uyarlanabilir zaman aşımı',
         ),
       ),
     );
@@ -210,6 +204,7 @@ class TcpDeviceScanner implements DeviceScanner {
     required String host,
     required int port,
     required String sourceAddress,
+    required Duration timeout,
     required ScanCancellationToken cancellationToken,
   }) async {
     ConnectionTask<Socket>? connectionTask;
@@ -235,7 +230,7 @@ class TcpDeviceScanner implements DeviceScanner {
       }
 
       final socket = await connectionTask.socket.timeout(
-        probeTimeout,
+        timeout,
         onTimeout: () {
           connectionTask?.cancel();
           throw TimeoutException('TCP bağlantı zaman aşımına uğradı.');
@@ -253,6 +248,10 @@ class TcpDeviceScanner implements DeviceScanner {
       removeCancelListener();
     }
   }
+
+  Duration get _shorterTimeout => responsiveHostProbeTimeout < probeTimeout
+      ? responsiveHostProbeTimeout
+      : probeTimeout;
 
   DeviceObservation _observationFor({
     required String host,

@@ -1,6 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:spy_dev_det/features/history/data/report_file_service.dart';
 import 'package:spy_dev_det/features/scan/application/scan_controller.dart';
+import 'package:spy_dev_det/features/scan/application/scan_state.dart';
+import 'package:spy_dev_det/features/scan/domain/diagnostic_bundle_export.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 
 class ScanDiagnosticsScreen extends ConsumerWidget {
@@ -12,7 +18,18 @@ class ScanDiagnosticsScreen extends ConsumerWidget {
     final network = state.network;
     final report = state.report;
     return Scaffold(
-      appBar: AppBar(title: const Text('Tarama tanılama')),
+      appBar: AppBar(
+        title: const Text('Tarama tanılama'),
+        actions: [
+          IconButton(
+            tooltip: 'Gizlilik korumalı tanılamayı dışa aktar',
+            onPressed: state.phase == ScanPhase.idle
+                ? null
+                : () => _exportDiagnostics(context, state),
+            icon: const Icon(Icons.ios_share_outlined),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -76,6 +93,8 @@ class ScanDiagnosticsScreen extends ConsumerWidget {
                               ? 'Kısmi tarama'
                               : 'Karşılaştırılabilir tam tarama',
                         ),
+                        if (state.errorCode case final errorCode?)
+                          _Line(label: 'Hata kodu', value: errorCode),
                       ],
                     ),
                   ),
@@ -112,12 +131,59 @@ class ScanDiagnosticsScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
+                Card(
+                  child: const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'Tanılama paketi yalnız sen dışa aktardığında oluşturulur. '
+                      'IP adresleri maskelenir; MAC adresleri ve cihaz kimlikleri '
+                      'pakete eklenmez. Uygulama paketi otomatik yüklemez.',
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _exportDiagnostics(BuildContext context, ScanState state) async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      final report = const DiagnosticBundleExporter().generate(
+        applicationVersion: '${packageInfo.version}+${packageInfo.buildNumber}',
+        operatingSystem: Platform.operatingSystem,
+        operatingSystemVersion: Platform.operatingSystemVersion,
+        scanPhase: state.phase.name,
+        statusMessage: state.statusMessage,
+        scanMode: state.scanMode,
+        scannedTargets: state.scannedTargets,
+        totalTargets: state.totalTargets,
+        rangeTruncated: state.rangeTruncated,
+        network: state.network,
+        scanRange: state.scanRange,
+        report: state.report,
+        errorCode: state.errorCode,
+      );
+      final result = await const ReportFileService().saveOrShare(
+        report,
+        subject: 'SpyDevDet gizlilik korumalı tanılama paketi',
+      );
+      if (!context.mounted || result == ReportFileResult.cancelled) return;
+      final message = result == ReportFileResult.saved
+          ? 'Tanılama paketi kaydedildi'
+          : 'Tanılama paketi paylaşım için hazırlandı';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } on Object {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tanılama paketi oluşturulamadı')),
+      );
+    }
   }
 }
 

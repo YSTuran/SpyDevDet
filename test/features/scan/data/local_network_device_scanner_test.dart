@@ -35,6 +35,7 @@ void main() {
         mdnsDiscovery: const _MdnsDiscovery(),
         ssdpDiscovery: const _EmptyDiscovery(),
         onvifDiscovery: const _EmptyDiscovery(),
+        netbiosDiscovery: const _EmptyDiscovery(),
         neighborRepository: const _NeighborRepository(),
         multicastLock: const _MulticastLock(),
       );
@@ -97,6 +98,7 @@ void main() {
       mdnsDiscovery: const _EmptyDiscovery(),
       ssdpDiscovery: const _EmptyDiscovery(),
       onvifDiscovery: const _EmptyDiscovery(),
+      netbiosDiscovery: const _EmptyDiscovery(),
       neighborRepository: const _NeighborRepository(),
       multicastLock: const _MulticastLock(),
     );
@@ -128,6 +130,7 @@ void main() {
       mdnsDiscovery: const _FailIfCalledDiscovery(),
       ssdpDiscovery: const _FailIfCalledDiscovery(),
       onvifDiscovery: const _FailIfCalledDiscovery(),
+      netbiosDiscovery: const _FailIfCalledDiscovery(),
       neighborRepository: const _NeighborRepository(),
       multicastLock: const _MulticastLock(),
     );
@@ -141,6 +144,10 @@ void main() {
     expect(results[DiscoveryMethod.mdns]?.phase, DiscoveryMethodPhase.skipped);
     expect(results[DiscoveryMethod.ssdp]?.phase, DiscoveryMethodPhase.skipped);
     expect(results[DiscoveryMethod.onvif]?.phase, DiscoveryMethodPhase.skipped);
+    expect(
+      results[DiscoveryMethod.netbios]?.phase,
+      DiscoveryMethodPhase.skipped,
+    );
     expect(results[DiscoveryMethod.tcp]?.phase, DiscoveryMethodPhase.completed);
     expect(
       results[DiscoveryMethod.neighbor]?.phase,
@@ -167,6 +174,7 @@ void main() {
         mdnsDiscovery: const _EmptyDiscovery(),
         ssdpDiscovery: const _EmptyDiscovery(),
         onvifDiscovery: const _EmptyDiscovery(),
+        netbiosDiscovery: const _EmptyDiscovery(),
         neighborRepository: const _AndroidRestrictedNeighborRepository(),
         multicastLock: const _MulticastLock(),
       );

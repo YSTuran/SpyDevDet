@@ -40,9 +40,10 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   SMB (TCP 445) ve Uzak Masaüstü (TCP 3389) portlarını da sınırlı bağlantı
   denemesiyle kontrol eder. Uygulama paylaşımları açmaz, dosya okumaz ve uzak
   oturum başlatmaz.
-- TCP, erişilebilirlik, mDNS, SSDP ve WS-Discovery/NetBIOS keşifleri birbirini
+- TCP, erişilebilirlik, mDNS, SSDP, WS-Discovery ve NetBIOS keşifleri birbirini
   beklemeden paralel çalışır; ilerleme göstergesi bütün yöntemlerin durumunu
-  hesaba katar.
+  hesaba katar. WS-Discovery ile NetBIOS ayrı durum, süre ve sayaçlarla
+  raporlanır; eski birleşik geçmiş kayıtları geriye dönük olarak okunur.
 - mDNS üzerinden yaygın servisler ve DNS-SD servis türü duyuruları keşfedilir.
   Yalnız model/üretici gibi sınırlı TXT alanları temizlenerek kullanılır. mDNS
   sorguları sınırlı eşzamanlılıkla çalıştırılır; SSDP, WS-Discovery ve NetBIOS
@@ -67,14 +68,17 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   adreslerinden içerik indirmez.
 - Tanılama ekranı her yöntemin süresini, istek ve yanıt sayaçlarını, kabul
   edilmeyen yanıtları, multicast durumunu ve kullanılabilirlik nedenini
-  gösterir. Bu toplu ölçümler tarama geçmişinde de saklanır.
+  gösterir. Bu toplu ölçümler tarama geçmişinde de saklanır. Kullanıcı ayrıca
+  bu ekrandan IP adresleri maskelenmiş, MAC ve cihaz kimlikleri çıkarılmış bir
+  JSON tanılama paketi oluşturabilir; paket yalnız kullanıcı isteğiyle
+  kaydedilir veya paylaşılır ve otomatik yüklenmez.
 - Gözlemlenen port ve duyurular merkezi servis kataloğuyla açıklanır. Portun
   açık olması tek başına tehlike veya kamera kanıtı sayılmaz.
 - Yönlendirici, yazıcı, medya cihazı ve kamera adayı sınıfları gözlemlenen ağ
   kanıtlarıyla ve güven seviyesiyle birlikte gösterilir.
 - Yeni cihaz, IP tabanlı zayıf kimlik ve kamera servisi gibi bulgular ayrı bir
   açıklanabilir inceleme durumunda özetlenir. Bu durum casusluk hükmü değildir.
-- Erişilebilirlik, TCP, mDNS, SSDP, WS-Discovery/NetBIOS ve MAC zenginleştirme aşamalarının
+- Erişilebilirlik, TCP, mDNS, SSDP, WS-Discovery, NetBIOS ve MAC zenginleştirme aşamalarının
   başarı, hata, süre ve cihaz sayıları ayrı ayrı raporlanır; tek yöntemin
   kullanılamaması taramayı çökertmez.
 - Tamamlanan taramalar Android ve Windows'ta yerel SQLite veritabanına kaydedilir.
@@ -116,7 +120,12 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
 - Geçmiş ekranındaki istatistik görünümü son taramalardaki cihaz sayısı
   eğilimini, ortalama tarama süresini, yeni/görülmeyen cihaz kayıtlarını,
   bilinen-tanımlanmamış dağılımını ve en sık gözlemlenen cihazları yalnız yerel
-  verilerden hesaplar.
+  verilerden hesaplar. İstatistikler tüm ağlar veya seçilen tek ağ için
+  filtrelenebilir; ağ profilinden ilgili istatistiklere doğrudan gidilebilir.
+- TCP hedefleri sınırlı eşzamanlı hedef gruplarıyla taranır. Yanıt veren
+  hedeflerde kalan kontroller daha kısa zaman aşımı kullanır; yaygın web ve
+  Windows servisleri önceliklendirilir. Tarama ilerledikçe tahmini kalan süre
+  kullanıcıya gösterilir.
 - Mobil görünümde yuvarlatılmış Material 3 alt gezinme çubuğu, geniş Windows
   görünümünde markalı yan gezinme paneli kullanılır. Kartlar, formlar, düğmeler,
   iletişim pencereleri ve tarama eylem alanı ortak ve uyarlanabilir bir görsel
@@ -176,7 +185,7 @@ yapılması önerilir:
    kaydet. Görünmeyen cihazların uyku, güvenlik duvarı veya istemci izolasyonu
    nedeniyle yanıt vermeyebileceğini göz önünde bulundur.
 7. Aynı ağı önce hızlı, sonra ayrıntılı modda tara; ayrıntılı modda mDNS, SSDP
-   ve WS-Discovery/NetBIOS aşamalarının çalıştığını kontrol et.
+   ile ayrı WS-Discovery ve NetBIOS aşamalarının çalıştığını kontrol et.
 8. Ağ profiline bir ad, bir cihaza sahiplik/kategori düzeltmesi ekle; uygulamayı
    yeniden açtıktan ve tekrar taradıktan sonra bilgilerin korunduğunu doğrula.
 
@@ -197,7 +206,9 @@ noktalarında bunlara ek olarak telefonda şu manuel kontroller yapılmalıdır:
 
 `.github/workflows/quality.yml`, `main` dalına gönderimlerde ve pull request'lerde
 biçimlendirme, statik analiz, tüm testler, Android debug APK ve Windows debug
-derlemesini doğrular. İş akışı elle veya `v` ile başlayan bir etiket üzerinden
+derlemesini doğrular. Windows derlemesinde uygulama gerçek masaüstü hedefinde
+açılarak ana Tarama, Cihazlar, Ağlar ve Ayarlar bölümlerini gezen entegrasyon
+testi de çalıştırılır. İş akışı elle veya `v` ile başlayan bir etiket üzerinden
 çalıştırıldığında başarılı Android ve Windows debug çıktıları 14 gün süreyle
 GitHub Actions artifact'i olarak saklanır. Bu çıktılar yalnız test içindir;
 telefon kontrol noktalarında aşağıdaki yerel release APK kullanılmalıdır.

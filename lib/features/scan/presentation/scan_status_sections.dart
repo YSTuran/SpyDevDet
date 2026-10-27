@@ -328,6 +328,11 @@ class _ScanStatusCard extends StatelessWidget {
                   label: 'Süre',
                   value: '${state.elapsed!.inMilliseconds / 1000} sn',
                 ),
+              if (state.estimatedRemaining != null)
+                _StatusLine(
+                  label: 'Tahmini kalan',
+                  value: _formatEstimatedDuration(state.estimatedRemaining!),
+                ),
             ],
             if (state.report case final report?) ...[
               const SizedBox(height: 10),
@@ -386,6 +391,13 @@ class _ScanStatusCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatEstimatedDuration(Duration duration) {
+    final seconds = duration.inSeconds;
+    if (seconds < 60) return 'yaklaşık ${seconds.clamp(1, 59)} sn';
+    final minutes = (seconds / 60).ceil();
+    return 'yaklaşık $minutes dk';
   }
 }
 

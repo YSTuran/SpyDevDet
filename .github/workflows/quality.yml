@@ -64,7 +64,7 @@ jobs:
           retention-days: 14
 
   windows-build:
-    name: Build Windows
+    name: Build and smoke test Windows
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -88,6 +88,9 @@ jobs:
 
       - name: Build Windows debug application
         run: flutter build windows --debug --no-pub
+
+      - name: Run desktop integration smoke test
+        run: flutter test integration_test/app_smoke_test.dart -d windows --no-pub
 
       - name: Upload Windows debug application
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')

@@ -5,35 +5,101 @@ import 'package:spy_dev_det/features/history/domain/network_history_statistics.d
 import 'package:spy_dev_det/features/history/domain/scan_history_repository.dart';
 import 'package:spy_dev_det/features/history/presentation/history_formatters.dart';
 
-class HistoryStatisticsScreen extends ConsumerWidget {
-  const HistoryStatisticsScreen({super.key});
+class HistoryStatisticsScreen extends ConsumerStatefulWidget {
+  const HistoryStatisticsScreen({this.initialNetworkKey, super.key});
+
+  final String? initialNetworkKey;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final statistics = ref.watch(historyStatisticsProvider);
+  ConsumerState<HistoryStatisticsScreen> createState() =>
+      _HistoryStatisticsScreenState();
+}
+
+class _HistoryStatisticsScreenState
+    extends ConsumerState<HistoryStatisticsScreen> {
+  static const _allNetworksValue = '__all_networks__';
+  late String? _selectedNetworkKey = widget.initialNetworkKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final statistics = ref.watch(
+      historyStatisticsProvider(_selectedNetworkKey),
+    );
+    final profiles = ref.watch(networkProfilesProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Ağ geçmişi istatistikleri'),
         actions: [
           IconButton(
             tooltip: 'İstatistikleri yenile',
-            onPressed: () => ref.invalidate(historyStatisticsProvider),
+            onPressed: () =>
+                ref.invalidate(historyStatisticsProvider(_selectedNetworkKey)),
             icon: const Icon(Icons.refresh),
           ),
         ],
       ),
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 920),
-            child: statistics.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stackTrace) => _StatisticsError(
-                onRetry: () => ref.invalidate(historyStatisticsProvider),
+        child: Column(
+          children: [
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 920),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: profiles.when(
+                    loading: () => const LinearProgressIndicator(),
+                    error: (error, stackTrace) => const SizedBox.shrink(),
+                    data: (items) => DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      initialValue: _selectedNetworkKey ?? _allNetworksValue,
+                      decoration: const InputDecoration(
+                        labelText: 'İstatistik kapsamı',
+                        prefixIcon: Icon(Icons.filter_alt_outlined),
+                      ),
+                      items: [
+                        const DropdownMenuItem(
+                          value: _allNetworksValue,
+                          child: Text('Tüm ağlar'),
+                        ),
+                        ...items.map(
+                          (profile) => DropdownMenuItem(
+                            value: profile.networkKey,
+                            child: Text(
+                              profile.displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) => setState(() {
+                        _selectedNetworkKey = value == _allNetworksValue
+                            ? null
+                            : value;
+                      }),
+                    ),
+                  ),
+                ),
               ),
-              data: (value) => _StatisticsContent(statistics: value),
             ),
-          ),
+            Expanded(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 920),
+                  child: statistics.when(
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (error, stackTrace) => _StatisticsError(
+                      onRetry: () => ref.invalidate(
+                        historyStatisticsProvider(_selectedNetworkKey),
+                      ),
+                    ),
+                    data: (value) => _StatisticsContent(statistics: value),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

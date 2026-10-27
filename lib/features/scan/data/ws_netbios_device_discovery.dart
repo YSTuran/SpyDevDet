@@ -4,92 +4,12 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:spy_dev_det/features/scan/data/onvif_device_discovery.dart';
 import 'package:spy_dev_det/features/scan/domain/device_discovery.dart';
 import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
-import 'package:spy_dev_det/features/scan/domain/device_observation_merger.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_cancellation_token.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
-
-class WsNetbiosDeviceDiscovery implements DeviceDiscovery {
-  const WsNetbiosDeviceDiscovery({
-    this.wsDiscovery = const OnvifDeviceDiscovery(),
-    this.netbiosDiscovery = const NetbiosDeviceDiscovery(),
-  });
-
-  final DeviceDiscovery wsDiscovery;
-  final DeviceDiscovery netbiosDiscovery;
-
-  @override
-  Future<DeviceDiscoveryResult> discover(
-    ScanPlan plan,
-    ScanCancellationToken cancellationToken,
-  ) async {
-    final outcomes = await Future.wait([
-      _runSafely(wsDiscovery, plan, cancellationToken),
-      _runSafely(netbiosDiscovery, plan, cancellationToken),
-    ]);
-    final successful = outcomes.where((item) => item.result != null).toList();
-    if (successful.isEmpty) {
-      throw StateError('WS-Discovery ve NetBIOS keşifleri kullanılamadı.');
-    }
-
-    final observations = <String, DeviceObservation>{};
-    for (final outcome in successful) {
-      for (final device in outcome.result!.devices) {
-        final existing = observations[device.ipAddress];
-        observations[device.ipAddress] = existing == null
-            ? device
-            : const DeviceObservationMerger().merge(existing, device);
-      }
-    }
-    final failures = outcomes.where((item) => item.result == null).length;
-    return DeviceDiscoveryResult(
-      devices: List.unmodifiable(observations.values),
-      metrics: DiscoveryMetrics(
-        sentRequests: successful.fold(
-          0,
-          (sum, item) => sum + item.result!.metrics.sentRequests,
-        ),
-        receivedResponses: successful.fold(
-          0,
-          (sum, item) => sum + item.result!.metrics.receivedResponses,
-        ),
-        acceptedResponses: successful.fold(
-          0,
-          (sum, item) => sum + item.result!.metrics.acceptedResponses,
-        ),
-        ignoredResponses: successful.fold(
-          0,
-          (sum, item) => sum + item.result!.metrics.ignoredResponses,
-        ),
-        timeoutCount: successful.fold(
-          0,
-          (sum, item) => sum + item.result!.metrics.timeoutCount,
-        ),
-        detail:
-            'Sınırlı WS-Discovery ve NetBIOS Node Status sorguları'
-            '${failures == 0 ? '' : ' • $failures alt yöntem kullanılamadı'}',
-      ),
-    );
-  }
-
-  Future<_DiscoveryOutcome> _runSafely(
-    DeviceDiscovery discovery,
-    ScanPlan plan,
-    ScanCancellationToken cancellationToken,
-  ) async {
-    try {
-      return _DiscoveryOutcome(
-        await discovery.discover(plan, cancellationToken),
-      );
-    } on Object {
-      return const _DiscoveryOutcome(null);
-    }
-  }
-}
 
 class NetbiosDeviceDiscovery implements DeviceDiscovery {
   const NetbiosDeviceDiscovery({
@@ -359,10 +279,4 @@ class NetbiosNodeStatusResponse {
     if (value.isEmpty) return null;
     return value.length <= 15 ? value : value.substring(0, 15);
   }
-}
-
-class _DiscoveryOutcome {
-  const _DiscoveryOutcome(this.result);
-
-  final DeviceDiscoveryResult? result;
 }

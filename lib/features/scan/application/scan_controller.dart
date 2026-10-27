@@ -123,15 +123,18 @@ class ScanController extends Notifier<ScanState> {
       }
     } on NetworkInfoException catch (error) {
       if (runId == _runId) {
-        _fail(error.userMessage);
+        _fail(error.userMessage, errorCode: error.code);
       }
     } on ScanPlanningException catch (error) {
       if (runId == _runId) {
-        _fail(error.userMessage);
+        _fail(error.userMessage, errorCode: error.code);
       }
     } on Object {
       if (runId == _runId) {
-        _fail('Tarama beklenmeyen bir nedenle tamamlanamadı.');
+        _fail(
+          'Tarama beklenmeyen bir nedenle tamamlanamadı.',
+          errorCode: 'UNEXPECTED_SCAN_FAILURE',
+        );
       }
     } finally {
       if (runId == _runId) {
@@ -156,6 +159,7 @@ class ScanController extends Notifier<ScanState> {
       phase: ScanPhase.cancelled,
       statusMessage: message,
       report: state.report?.cancelRunning(),
+      clearEstimatedRemaining: true,
     );
   }
 
@@ -254,6 +258,8 @@ class ScanController extends Notifier<ScanState> {
       statusMessage:
           'Ağ bağlantısı tarama sırasında değişti. Sonuçlar kaydedilmedi.',
       report: state.report?.cancelRunning(),
+      errorCode: 'NETWORK_CHANGED',
+      clearEstimatedRemaining: true,
     );
   }
 
@@ -265,6 +271,11 @@ class ScanController extends Notifier<ScanState> {
           statusMessage: '${event.totalTargets} yerel adres taranıyor',
         );
       case ScanProgress():
+        final estimatedRemaining = _estimateRemaining(
+          report: state.report,
+          completedTargets: event.completedTargets,
+          totalTargets: event.totalTargets,
+        );
         state = state.copyWith(
           progress: _scanProgress(
             report: state.report,
@@ -273,12 +284,17 @@ class ScanController extends Notifier<ScanState> {
           ),
           scannedTargets: event.completedTargets,
           totalTargets: event.totalTargets,
+          estimatedRemaining: estimatedRemaining,
+          clearEstimatedRemaining: estimatedRemaining == null,
           statusMessage:
               '${state.devices.length} cihaz gözlemlendi • '
               '${event.completedTargets}/${event.totalTargets} adres',
         );
       case ScanStageChanged():
-        state = state.copyWith(statusMessage: event.userMessage);
+        state = state.copyWith(
+          statusMessage: event.userMessage,
+          clearEstimatedRemaining: state.scannedTargets >= state.totalTargets,
+        );
       case ScanMethodStatusChanged():
         final report = state.report;
         if (report != null) {
@@ -308,20 +324,45 @@ class ScanController extends Notifier<ScanState> {
           elapsed: event.elapsed,
           report: state.report?.complete(DateTime.now()),
           statusMessage: 'Tarama tamamlandı • geçmişe kaydediliyor',
+          clearEstimatedRemaining: true,
         );
       case ScanCancelled():
         state = state.copyWith(
           phase: ScanPhase.cancelled,
           statusMessage: 'Tarama iptal edildi',
           report: state.report?.cancelRunning(),
+          clearEstimatedRemaining: true,
         );
       case ScanFailed():
-        _fail(event.userMessage);
+        _fail(event.userMessage, errorCode: 'SCANNER_FAILURE');
     }
   }
 
-  void _fail(String message) {
-    state = state.copyWith(phase: ScanPhase.failed, statusMessage: message);
+  void _fail(String message, {String? errorCode}) {
+    state = state.copyWith(
+      phase: ScanPhase.failed,
+      statusMessage: message,
+      errorCode: errorCode,
+      clearEstimatedRemaining: true,
+    );
+  }
+
+  Duration? _estimateRemaining({
+    required ScanReport? report,
+    required int completedTargets,
+    required int totalTargets,
+  }) {
+    if (report == null ||
+        completedTargets < 1 ||
+        completedTargets >= totalTargets) {
+      return null;
+    }
+    final elapsed = DateTime.now().difference(report.startedAt);
+    final remainingMillis =
+        elapsed.inMilliseconds *
+        (totalTargets - completedTargets) ~/
+        completedTargets;
+    return Duration(milliseconds: remainingMillis.clamp(0, 600000));
   }
 
   double _scanProgress({
@@ -333,11 +374,12 @@ class ScanController extends Notifier<ScanState> {
       return 0;
     }
     const weights = <DiscoveryMethod, double>{
-      DiscoveryMethod.tcp: 0.60,
+      DiscoveryMethod.tcp: 0.57,
       DiscoveryMethod.reachability: 0.15,
       DiscoveryMethod.mdns: 0.075,
       DiscoveryMethod.ssdp: 0.075,
       DiscoveryMethod.onvif: 0.05,
+      DiscoveryMethod.netbios: 0.03,
       DiscoveryMethod.neighbor: 0.05,
     };
     var value = 0.0;

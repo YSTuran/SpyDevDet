@@ -5,6 +5,7 @@ import 'package:spy_dev_det/features/scan/data/mdns_device_discovery.dart';
 import 'package:spy_dev_det/features/scan/data/native_multicast_lock.dart';
 import 'package:spy_dev_det/features/scan/data/native_neighbor_repository.dart';
 import 'package:spy_dev_det/features/scan/data/native_reachability_discovery.dart';
+import 'package:spy_dev_det/features/scan/data/onvif_device_discovery.dart';
 import 'package:spy_dev_det/features/scan/data/ssdp_device_discovery.dart';
 import 'package:spy_dev_det/features/scan/data/tcp_device_scanner.dart';
 import 'package:spy_dev_det/features/scan/data/ws_netbios_device_discovery.dart';
@@ -29,7 +30,8 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
     this.reachabilityDiscovery = const NativeReachabilityDiscovery(),
     this.mdnsDiscovery = const MdnsDeviceDiscovery(),
     this.ssdpDiscovery = const SsdpDeviceDiscovery(),
-    this.onvifDiscovery = const WsNetbiosDeviceDiscovery(),
+    this.onvifDiscovery = const OnvifDeviceDiscovery(),
+    this.netbiosDiscovery = const NetbiosDeviceDiscovery(),
     this.neighborRepository = const NativeNeighborRepository(),
     this.multicastLock = const NativeMulticastLock(),
     this.classifier = const DeviceClassifier(),
@@ -42,6 +44,7 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
   final DeviceDiscovery mdnsDiscovery;
   final DeviceDiscovery ssdpDiscovery;
   final DeviceDiscovery onvifDiscovery;
+  final DeviceDiscovery netbiosDiscovery;
   final NeighborRepository neighborRepository;
   final NativeMulticastLock multicastLock;
   final DeviceClassifier classifier;
@@ -349,6 +352,7 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
       DiscoveryMethod.mdns,
       DiscoveryMethod.ssdp,
       DiscoveryMethod.onvif,
+      DiscoveryMethod.netbios,
     ]) {
       controller.add(
         ScanMethodStatusChanged(
@@ -423,6 +427,15 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
         _runAndEmitDiscovery(
           method: DiscoveryMethod.onvif,
           discovery: onvifDiscovery,
+          plan: plan,
+          cancellationToken: cancellationToken,
+          observations: observations,
+          controller: controller,
+          warning: warning,
+        ),
+        _runAndEmitDiscovery(
+          method: DiscoveryMethod.netbios,
+          discovery: netbiosDiscovery,
           plan: plan,
           cancellationToken: cancellationToken,
           observations: observations,
@@ -532,7 +545,8 @@ class LocalNetworkDeviceScanner implements DeviceScanner {
       DiscoveryMethod.reachability => 'Cihaz erişilebilirlik',
       DiscoveryMethod.mdns => 'mDNS',
       DiscoveryMethod.ssdp => 'SSDP',
-      DiscoveryMethod.onvif => 'WS-Discovery/NetBIOS',
+      DiscoveryMethod.onvif => 'WS-Discovery',
+      DiscoveryMethod.netbios => 'NetBIOS',
       DiscoveryMethod.tcp => 'TCP',
       DiscoveryMethod.neighbor => 'Komşu tablosu',
     };

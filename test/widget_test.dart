@@ -613,7 +613,9 @@ class _TestHistoryRepository implements ScanHistoryRepository {
   Future<List<NetworkProfileSummary>> getNetworkProfiles() async => const [];
 
   @override
-  Future<List<KnownDeviceSummary>> getKnownDevices() async => const [];
+  Future<List<KnownDeviceSummary>> getKnownDevices({
+    String? networkKey,
+  }) async => const [];
 
   @override
   Future<ScanHistoryDetails?> getDetails(int sessionId) async => null;

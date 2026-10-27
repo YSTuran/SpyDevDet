@@ -227,7 +227,7 @@ abstract interface class ScanHistoryRepository {
 
   Future<List<NetworkProfileSummary>> getNetworkProfiles();
 
-  Future<List<KnownDeviceSummary>> getKnownDevices();
+  Future<List<KnownDeviceSummary>> getKnownDevices({String? networkKey});
 
   Future<DeviceTimeline?> getDeviceTimeline(String stableKey);
 

@@ -19,7 +19,10 @@ class ReportFileService {
 
   Future<void> cleanupStaleReports() => temporaryStore.cleanupStaleReports();
 
-  Future<ReportFileResult> saveOrShare(GeneratedScanReport report) async {
+  Future<ReportFileResult> saveOrShare(
+    GeneratedScanReport report, {
+    String subject = 'SpyDevDet tarama raporu',
+  }) async {
     final bytes = Uint8List.fromList(utf8.encode(report.content));
     if (Platform.isWindows) {
       final extension = report.fileName.split('.').last;
@@ -43,7 +46,7 @@ class ReportFileService {
     final temporaryFile = await temporaryStore.write(report, bytes);
     final result = await SharePlus.instance.share(
       ShareParams(
-        subject: 'SpyDevDet tarama raporu',
+        subject: subject,
         files: [XFile(temporaryFile.path, mimeType: report.mimeType)],
         fileNameOverrides: [report.fileName],
       ),

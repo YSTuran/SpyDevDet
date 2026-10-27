@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:spy_dev_det/features/history/application/history_providers.dart';
 import 'package:spy_dev_det/features/history/domain/scan_history_repository.dart';
 import 'package:spy_dev_det/features/history/presentation/history_screen.dart';
+import 'package:spy_dev_det/features/history/presentation/history_statistics_screen.dart';
 
 class NetworkProfilesScreen extends ConsumerWidget {
   const NetworkProfilesScreen({super.key});
@@ -40,6 +41,13 @@ class NetworkProfilesScreen extends ConsumerWidget {
                             profile: profile,
                             onRename: () => _rename(context, ref, profile),
                             onDelete: () => _delete(context, ref, profile),
+                            onStatistics: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (context) => HistoryStatisticsScreen(
+                                  initialNetworkKey: profile.networkKey,
+                                ),
+                              ),
+                            ),
                             onOpen: () => Navigator.of(context).push(
                               MaterialPageRoute<void>(
                                 builder: (context) => HistoryScreen(
@@ -174,12 +182,14 @@ class _NetworkProfileCard extends StatelessWidget {
     required this.profile,
     required this.onRename,
     required this.onDelete,
+    required this.onStatistics,
     required this.onOpen,
   });
 
   final NetworkProfileSummary profile;
   final VoidCallback onRename;
   final VoidCallback onDelete;
+  final VoidCallback onStatistics;
   final VoidCallback onOpen;
 
   @override
@@ -201,9 +211,14 @@ class _NetworkProfileCard extends StatelessWidget {
           tooltip: 'Ağ seçenekleri',
           onSelected: (action) => switch (action) {
             _NetworkAction.rename => onRename(),
+            _NetworkAction.statistics => onStatistics(),
             _NetworkAction.delete => onDelete(),
           },
           itemBuilder: (context) => const [
+            PopupMenuItem(
+              value: _NetworkAction.statistics,
+              child: Text('İstatistikleri göster'),
+            ),
             PopupMenuItem(
               value: _NetworkAction.rename,
               child: Text('Ağı adlandır'),
@@ -235,7 +250,7 @@ class _NetworkProfileCard extends StatelessWidget {
   }
 }
 
-enum _NetworkAction { rename, delete }
+enum _NetworkAction { rename, statistics, delete }
 
 class _EmptyNetworkProfiles extends StatelessWidget {
   const _EmptyNetworkProfiles();

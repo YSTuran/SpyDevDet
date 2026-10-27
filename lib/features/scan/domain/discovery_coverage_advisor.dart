@@ -16,6 +16,7 @@ class DiscoveryCoverageAdvisor {
       DiscoveryMethod.mdns,
       DiscoveryMethod.ssdp,
       DiscoveryMethod.onvif,
+      DiscoveryMethod.netbios,
     ];
 
     if (rangeTruncated) {

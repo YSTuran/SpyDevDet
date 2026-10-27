@@ -35,15 +35,23 @@ final knownDevicesProvider =
       (ref) => ref.watch(scanHistoryRepositoryProvider).getKnownDevices(),
     );
 
-final historyStatisticsProvider =
-    FutureProvider.autoDispose<NetworkHistoryStatistics>((ref) async {
+final historyStatisticsProvider = FutureProvider.autoDispose
+    .family<NetworkHistoryStatistics, String?>((ref, networkKey) async {
       final repository = ref.watch(scanHistoryRepositoryProvider);
-      final historyFuture = repository.getHistory(limit: 200);
+      final historyFuture = repository.getHistory(
+        limit: 200,
+        networkKey: networkKey,
+      );
       final networksFuture = repository.getNetworkProfiles();
-      final devicesFuture = repository.getKnownDevices();
+      final devicesFuture = repository.getKnownDevices(networkKey: networkKey);
+      final networks = await networksFuture;
       return NetworkHistoryStatistics.fromRecords(
         history: await historyFuture,
-        networks: await networksFuture,
+        networks: networkKey == null
+            ? networks
+            : networks
+                  .where((network) => network.networkKey == networkKey)
+                  .toList(growable: false),
         devices: await devicesFuture,
       );
     });

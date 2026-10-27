@@ -25,16 +25,16 @@ class HistoryScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(title ?? 'Tarama geçmişi'),
         actions: [
-          if (networkKey == null)
-            IconButton(
-              tooltip: 'Ağ geçmişi istatistikleri',
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (context) => const HistoryStatisticsScreen(),
-                ),
+          IconButton(
+            tooltip: 'Ağ geçmişi istatistikleri',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (context) =>
+                    HistoryStatisticsScreen(initialNetworkKey: networkKey),
               ),
-              icon: const Icon(Icons.insights_outlined),
             ),
+            icon: const Icon(Icons.insights_outlined),
+          ),
           IconButton(
             tooltip: 'İki taramayı karşılaştır',
             onPressed: () =>

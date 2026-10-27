@@ -267,7 +267,7 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
   }
 
   @override
-  Future<List<KnownDeviceSummary>> getKnownDevices() async {
+  Future<List<KnownDeviceSummary>> getKnownDevices({String? networkKey}) async {
     final profiles = await (database.select(
       database.knownDevices,
     )..orderBy([(table) => OrderingTerm.desc(table.lastSeenAt)])).get();
@@ -276,7 +276,8 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
     }
     final latestNames = await database
         .customSelect(
-          '''
+          networkKey == null
+              ? '''
           SELECT observation.stable_key, observation.display_name
           FROM scan_observations AS observation
           INNER JOIN (
@@ -284,8 +285,21 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
             FROM scan_observations
             GROUP BY stable_key
           ) AS latest ON latest.latest_id = observation.id
+          '''
+              : '''
+          SELECT observation.stable_key, observation.display_name
+          FROM scan_observations AS observation
+          INNER JOIN (
+            SELECT candidate.stable_key, MAX(candidate.id) AS latest_id
+            FROM scan_observations AS candidate
+            INNER JOIN scan_sessions AS session
+              ON session.id = candidate.scan_session_id
+            WHERE session.network_key = ?
+            GROUP BY candidate.stable_key
+          ) AS latest ON latest.latest_id = observation.id
           ''',
-          readsFrom: {database.scanObservations},
+          variables: networkKey == null ? const [] : [Variable(networkKey)],
+          readsFrom: {database.scanObservations, database.scanSessions},
         )
         .get();
     final namesByKey = {
@@ -294,12 +308,22 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
     };
     final observationCounts = await database
         .customSelect(
-          '''
+          networkKey == null
+              ? '''
           SELECT stable_key, COUNT(*) AS observation_count
           FROM scan_observations
           GROUP BY stable_key
+          '''
+              : '''
+          SELECT observation.stable_key, COUNT(*) AS observation_count
+          FROM scan_observations AS observation
+          INNER JOIN scan_sessions AS session
+            ON session.id = observation.scan_session_id
+          WHERE session.network_key = ?
+          GROUP BY observation.stable_key
           ''',
-          readsFrom: {database.scanObservations},
+          variables: networkKey == null ? const [] : [Variable(networkKey)],
+          readsFrom: {database.scanObservations, database.scanSessions},
         )
         .get();
     final observationCountByKey = {
@@ -307,29 +331,35 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
         row.read<String>('stable_key'): row.read<int>('observation_count'),
     };
     return List.unmodifiable(
-      profiles.map(
-        (profile) => KnownDeviceSummary(
-          stableKey: profile.stableKey,
-          displayName:
-              namesByKey[profile.stableKey] ??
-              profile.vendor ??
-              'Cihaz ${profile.lastIpAddress}',
-          customName: profile.customName,
-          isKnown: profile.isKnown,
-          isOwned: profile.isOwned,
-          note: profile.note,
-          firstSeenAt: profile.firstSeenAt,
-          lastSeenAt: profile.lastSeenAt,
-          lastIpAddress: profile.lastIpAddress,
-          lastMacAddress: profile.lastMacAddress,
-          vendor: profile.vendor,
-          categoryOverride: codec.enumByNameOrNull(
-            DeviceCategory.values,
-            profile.categoryOverride,
+      profiles
+          .where(
+            (profile) =>
+                networkKey == null ||
+                observationCountByKey.containsKey(profile.stableKey),
+          )
+          .map(
+            (profile) => KnownDeviceSummary(
+              stableKey: profile.stableKey,
+              displayName:
+                  namesByKey[profile.stableKey] ??
+                  profile.vendor ??
+                  'Cihaz ${profile.lastIpAddress}',
+              customName: profile.customName,
+              isKnown: profile.isKnown,
+              isOwned: profile.isOwned,
+              note: profile.note,
+              firstSeenAt: profile.firstSeenAt,
+              lastSeenAt: profile.lastSeenAt,
+              lastIpAddress: profile.lastIpAddress,
+              lastMacAddress: profile.lastMacAddress,
+              vendor: profile.vendor,
+              categoryOverride: codec.enumByNameOrNull(
+                DeviceCategory.values,
+                profile.categoryOverride,
+              ),
+              observationCount: observationCountByKey[profile.stableKey] ?? 0,
+            ),
           ),
-          observationCount: observationCountByKey[profile.stableKey] ?? 0,
-        ),
-      ),
     );
   }
 

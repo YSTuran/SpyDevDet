@@ -1,6 +1,6 @@
 import 'package:spy_dev_det/features/scan/domain/scan_mode.dart';
 
-enum DiscoveryMethod { reachability, tcp, mdns, ssdp, onvif, neighbor }
+enum DiscoveryMethod { reachability, tcp, mdns, ssdp, onvif, netbios, neighbor }
 
 extension DiscoveryMethodText on DiscoveryMethod {
   String get label => switch (this) {
@@ -8,7 +8,8 @@ extension DiscoveryMethodText on DiscoveryMethod {
     DiscoveryMethod.tcp => 'TCP port kontrolü',
     DiscoveryMethod.mdns => 'mDNS servis keşfi',
     DiscoveryMethod.ssdp => 'SSDP/UPnP keşfi',
-    DiscoveryMethod.onvif => 'WS-Discovery/NetBIOS keşfi',
+    DiscoveryMethod.onvif => 'WS-Discovery keşfi',
+    DiscoveryMethod.netbios => 'NetBIOS keşfi',
     DiscoveryMethod.neighbor => 'MAC zenginleştirme',
   };
 }

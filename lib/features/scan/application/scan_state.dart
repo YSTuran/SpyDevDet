@@ -27,6 +27,8 @@ class ScanState {
     this.network,
     this.scanRange,
     this.elapsed,
+    this.estimatedRemaining,
+    this.errorCode,
     this.report,
     this.referenceComparison,
   });
@@ -43,6 +45,8 @@ class ScanState {
       network = null,
       scanRange = null,
       elapsed = null,
+      estimatedRemaining = null,
+      errorCode = null,
       report = null,
       referenceComparison = null;
 
@@ -57,6 +61,8 @@ class ScanState {
   final NetworkSnapshot? network;
   final String? scanRange;
   final Duration? elapsed;
+  final Duration? estimatedRemaining;
+  final String? errorCode;
   final ScanReport? report;
   final ReferenceScanComparison? referenceComparison;
 
@@ -80,6 +86,10 @@ class ScanState {
     NetworkSnapshot? network,
     String? scanRange,
     Duration? elapsed,
+    Duration? estimatedRemaining,
+    bool clearEstimatedRemaining = false,
+    String? errorCode,
+    bool clearErrorCode = false,
     ScanReport? report,
     ReferenceScanComparison? referenceComparison,
     bool clearReferenceComparison = false,
@@ -96,6 +106,10 @@ class ScanState {
       network: network ?? this.network,
       scanRange: scanRange ?? this.scanRange,
       elapsed: elapsed ?? this.elapsed,
+      estimatedRemaining: clearEstimatedRemaining
+          ? null
+          : estimatedRemaining ?? this.estimatedRemaining,
+      errorCode: clearErrorCode ? null : errorCode ?? this.errorCode,
       report: report ?? this.report,
       referenceComparison: clearReferenceComparison
           ? null
