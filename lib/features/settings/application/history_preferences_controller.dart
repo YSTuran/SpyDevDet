@@ -37,8 +37,9 @@ class HistoryPreferencesController extends Notifier<HistoryPreferences> {
   Future<void> _update(HistoryPreferences next) async {
     final revision = ++_revision;
     state = next;
-    final operation = _ignoreFailure(_saveQueue)
-        .then((_) => ref.read(historyPreferencesRepositoryProvider).save(next));
+    final operation = _ignoreFailure(
+      _saveQueue,
+    ).then((_) => ref.read(historyPreferencesRepositoryProvider).save(next));
     _saveQueue = operation;
     try {
       await operation;

@@ -95,9 +95,11 @@ class ServiceCatalog {
         insights['netbios'] = const ServiceInsight(
           id: 'netbios',
           title: 'NetBIOS cihaz adı yanıtı',
-          explanation: 'Cihaz yerel ağdaki sınırlı NetBIOS durum sorgusuna ad bilgisiyle yanıt verdi.',
+          explanation:
+              'Cihaz yerel ağdaki sınırlı NetBIOS durum sorgusuna ad bilgisiyle yanıt verdi.',
           kind: ServiceKind.nameService,
-          caution: 'Yanıt cihazın güvenilirliğini göstermez; uygulama paylaşımlara erişmez.',
+          caution:
+              'Yanıt cihazın güvenilirliğini göstermez; uygulama paylaşımlara erişmez.',
         );
       }
     }
@@ -140,9 +142,11 @@ class ServiceCatalog {
     445 => const ServiceInsight(
       id: 'tcp-445',
       title: 'SMB paylaşımı (TCP 445)',
-      explanation: 'Windows dosya/yazıcı paylaşımı veya SMB uyumlu bir ağ servisi olabilir.',
+      explanation:
+          'Windows dosya/yazıcı paylaşımı veya SMB uyumlu bir ağ servisi olabilir.',
       kind: ServiceKind.fileSharing,
-      caution: 'Uygulama paylaşım içeriğine erişmez; yalnızca portun bağlantı kabul ettiğini kaydeder.',
+      caution:
+          'Uygulama paylaşım içeriğine erişmez; yalnızca portun bağlantı kabul ettiğini kaydeder.',
     ),
     8000 => const ServiceInsight(
       id: 'tcp-8000',
@@ -162,7 +166,8 @@ class ServiceCatalog {
       explanation:
           'Windows Uzak Masaüstü veya uyumlu bir yönetim servisi olabilir.',
       kind: ServiceKind.remoteAdministration,
-      caution: 'Uygulama oturum açmayı denemez; yalnızca portun bağlantı kabul ettiğini kaydeder.',
+      caution:
+          'Uygulama oturum açmayı denemez; yalnızca portun bağlantı kabul ettiğini kaydeder.',
     ),
     _ => null,
   };

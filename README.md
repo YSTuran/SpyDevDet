@@ -89,11 +89,12 @@ dışındadır; kamera keşfi güvenli ONVIF/WS-Discovery duyurularıyla sınır
   cihazlar kimlik takma adlarıyla önceki profiline bağlanır; aynı IP'yi alan
   farklı bir güçlü kimlik eski profili devralmaz.
 - Alt ağ ve ağ geçidi adresinden oluşan temel ağ kimliği her taramada
-  kullanılabilir. Ağ geçidinin MAC adresi veya güvenilir SSDP/ONVIF servis
-  kimliği edinilebildiğinde buna güçlü bir kimlik takma adı eklenir; güçlü kanıt
-  bulunamazsa profil sınırlı kimlik olarak işaretlenir. MAC bilgisinin geçici
-  olarak alınamaması aynı ağın geçmişini bölmez, aynı adresleri kullanan farklı
-  ağ geçitleri güçlü kanıt bulunduğunda ayrılır.
+  kullanılabilir. Ağ geçidinin genel MAC adresi edinilebildiğinde buna güçlü
+  bir kimlik takma adı eklenir; SSDP/ONVIF servis kimlikleri tek başına güçlü
+  ağ kanıtı sayılmaz. Güçlü kanıt bulunamazsa profil sınırlı kimlik olarak
+  işaretlenir. MAC bilgisinin geçici olarak alınamaması aynı ağın geçmişini
+  bölmez, aynı adresleri kullanan farklı ağ geçitleri güçlü kanıt bulunduğunda
+  ayrılır.
   Tarama sırasında yerel IP, bağdaştırıcı veya ağ geçidi değişirse sonuçlar
   eski ağın geçmişine yazılmadan tarama durdurulur. Tamamlanmış bir taramadan
   geç dönen ağ kontrolü kaydedilmiş sonucu geçersiz kılamaz. Uygulama arka
@@ -205,13 +206,21 @@ noktalarında bunlara ek olarak telefonda şu manuel kontroller yapılmalıdır:
 ## Sürekli entegrasyon
 
 `.github/workflows/quality.yml`, `main` dalına gönderimlerde ve pull request'lerde
-biçimlendirme, statik analiz, tüm testler, Android debug APK ve Windows debug
-derlemesini doğrular. Windows derlemesinde uygulama gerçek masaüstü hedefinde
-açılarak ana Tarama, Cihazlar, Ağlar ve Ayarlar bölümlerini gezen entegrasyon
-testi de çalıştırılır. İş akışı elle veya `v` ile başlayan bir etiket üzerinden
-çalıştırıldığında başarılı Android ve Windows debug çıktıları 14 gün süreyle
-GitHub Actions artifact'i olarak saklanır. Bu çıktılar yalnız test içindir;
-telefon kontrol noktalarında aşağıdaki yerel release APK kullanılmalıdır.
+biçimlendirme, statik analiz, tüm testler, Android release APK ve Windows debug
+derlemesini doğrular. Android işi API 30 emülatöründe gerçek platform kanalını,
+Windows işi ise gerçek masaüstü hedefinde ana Tarama, Cihazlar, Ağlar ve Ayarlar
+bölümlerini gezen entegrasyon testini çalıştırır. İş akışı elle veya `v` ile
+başlayan bir etiket üzerinden çalıştırıldığında başarılı Android release APK
+ve Windows debug çıktıları 14 gün süreyle GitHub Actions artifact'i olarak
+saklanır. Telefon kontrol noktalarında aşağıdaki yerel release APK da
+kullanılabilir.
+
+Android yapılandırması Flutter 3.47.8 ile doğrulanan AGP 9.0.1, Gradle 9.1.0 ve
+AGP'nin yerleşik Kotlin 2.3.20 çalışma zamanını kullanır. Uygulama modülü eski
+`kotlin-android` eklentisi ve `kotlinOptions` bloğu yerine built-in Kotlin
+yapılandırmasına geçirilmiştir. Flutter 3.47.8'in Gradle eklentisi yeni AGP DSL
+geçişini tamamlayana kadar yalnız `android.newDsl=false` uyumluluk katmanı
+korunur.
 
 ## OUI verisini güncelleme
 
@@ -235,10 +244,45 @@ flutter build apk --release
 ```
 
 Üretilen dosya `build/app/outputs/flutter-apk/app-release.apk` konumundadır.
-Android sürümü, Galaxy A10 gibi eski Samsung/Exynos-Mali cihazlarda Flutter
-3.38 Impeller arka ucuyla görülebilen açılış çökmelerini önlemek için Skia
-çizim arka ucunu kullanır. Bu uyumluluk ayarı ağ keşfi ve veri saklama
+Android sürümü, Galaxy A10 gibi eski Samsung/Exynos-Mali cihazlarda Impeller ve
+yerel grafik sürücüsü etkileşiminden doğabilen açılış çökmelerini önlemek için
+Skia çizim arka ucunu kullanır. Bu uyumluluk ayarı ağ keşfi ve veri saklama
 işlevlerini değiştirmez.
+
+## Windows release paketi
+
+Windows çıktısı tek başına `spy_dev_det.exe` dosyasından oluşmaz; `Release`
+klasöründeki DLL ve `data` içerikleriyle birlikte dağıtılmalıdır. Güncel kaynak
+koddan sürümlü ZIP ve SHA-256 özeti üretmek için:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tool/package_windows_release.ps1
+```
+
+Paket ve özet `build/distributions` klasörüne yazılır. Betik önce Windows
+release derlemesini oluşturur, ardından bütün çalışma zamanı dosyalarını aynı
+arşive ekler.
+
+## Performans ve dayanıklılık kontrolü
+
+Otomatik test paketi tarama birleştirme hattını art arda çalıştıran
+bir regresyon kontrolü ile devam eden taramanın iptal süresini sınayan bir
+kontrol içerir. Bunlar gerçek ağ veya telefon performansının yerine geçmez.
+Her APK kontrol noktasında Galaxy A10 üzerinde aşağıdaki değerler ayrıca
+kaydedilmelidir:
+
+| Kontrol | Kabul ölçütü | Ölçülen değer |
+| --- | --- | --- |
+| Temiz açılış | Çökme veya siyah ekranda kalma yok | Manuel |
+| Beş ardışık hızlı tarama | Çökme ve kilitlenme yok | Manuel |
+| Beş ardışık ayrıntılı tarama | Çökme ve kilitlenme yok | Manuel |
+| Tarama iptali | Arayüz kısa sürede bekleme durumuna döner | Manuel |
+| Arka plana alma | Devam eden tarama güvenle iptal edilir | Manuel |
+| 100 kayıtla geçmiş | Ekran kullanılabilir kalır | Manuel |
+
+Gerçek tarama süreleri ağdaki hedef ve güvenlik duvarı davranışına bağlı
+olduğundan sabit bir saniye sınırı yerine önceki sürüme göre belirgin gerileme,
+çökme ve arayüz kilitlenmesi izlenir.
 
 ## Kod yapısı
 

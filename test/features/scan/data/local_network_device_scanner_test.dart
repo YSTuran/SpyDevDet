@@ -189,6 +189,95 @@ void main() {
       expect(neighborResult.userMessage, contains('Android 10'));
     },
   );
+
+  test(
+    'tarama birleştirme hattı 100 ardışık çalışmada kararlı kalır',
+    () async {
+      final plan = ScanPlan.fromNetwork(
+        const NetworkSnapshot(
+          localIpv4: '192.168.1.2',
+          prefixLength: 30,
+          interfaceName: 'test',
+          gatewayIpv4: '192.168.1.1',
+          isWifi: true,
+          isVpn: false,
+        ),
+        mode: ScanMode.quick,
+      );
+      final scanner = LocalNetworkDeviceScanner(
+        tcpScanner: const _TcpScanner(),
+        reachabilityDiscovery: const _ReachabilityDiscovery(),
+        mdnsDiscovery: const _FailIfCalledDiscovery(),
+        ssdpDiscovery: const _FailIfCalledDiscovery(),
+        onvifDiscovery: const _FailIfCalledDiscovery(),
+        netbiosDiscovery: const _FailIfCalledDiscovery(),
+        neighborRepository: const _NeighborRepository(),
+        multicastLock: const _MulticastLock(),
+      );
+      final stopwatch = Stopwatch()..start();
+
+      for (var run = 0; run < 100; run++) {
+        final events = await scanner
+            .scan(plan, ScanCancellationToken())
+            .toList();
+        expect(
+          events.whereType<ScanCompleted>(),
+          hasLength(1),
+          reason: '${run + 1}. tarama tamamlanamadı.',
+        );
+        expect(events.whereType<ScanCancelled>(), isEmpty);
+      }
+
+      stopwatch.stop();
+      expect(
+        stopwatch.elapsed,
+        lessThan(const Duration(seconds: 5)),
+        reason:
+            'Sahte bağımlılıklarla çalışan tarama hattında belirgin gerileme.',
+      );
+    },
+  );
+
+  test('devam eden tarama iptalden sonra 500 ms içinde kapanır', () async {
+    final plan = ScanPlan.fromNetwork(
+      const NetworkSnapshot(
+        localIpv4: '192.168.1.2',
+        prefixLength: 30,
+        interfaceName: 'test',
+        gatewayIpv4: '192.168.1.1',
+        isWifi: true,
+        isVpn: false,
+      ),
+      mode: ScanMode.quick,
+    );
+    final scanner = LocalNetworkDeviceScanner(
+      tcpScanner: const _WaitsForCancellationScanner(),
+      reachabilityDiscovery: const _WaitsForCancellationDiscovery(),
+      mdnsDiscovery: const _FailIfCalledDiscovery(),
+      ssdpDiscovery: const _FailIfCalledDiscovery(),
+      onvifDiscovery: const _FailIfCalledDiscovery(),
+      netbiosDiscovery: const _FailIfCalledDiscovery(),
+      neighborRepository: const _NeighborRepository(),
+      multicastLock: const _MulticastLock(),
+    );
+    final token = ScanCancellationToken();
+    final started = Completer<void>();
+    final events = <ScanEvent>[];
+    final done = Completer<void>();
+    scanner.scan(plan, token).listen((event) {
+      events.add(event);
+      if (event is ScanStarted && !started.isCompleted) started.complete();
+    }, onDone: done.complete);
+
+    await started.future;
+    final stopwatch = Stopwatch()..start();
+    token.cancel();
+    await done.future.timeout(const Duration(milliseconds: 500));
+    stopwatch.stop();
+
+    expect(events.whereType<ScanCancelled>(), hasLength(1));
+    expect(stopwatch.elapsed, lessThan(const Duration(milliseconds: 500)));
+  });
 }
 
 class _TcpWaitsForDiscovery implements DeviceScanner {
@@ -292,6 +381,49 @@ class _TcpScanner implements DeviceScanner {
       completedTargets: plan.targets.length,
       elapsed: Duration.zero,
     );
+  }
+}
+
+class _WaitsForCancellationScanner implements DeviceScanner {
+  const _WaitsForCancellationScanner();
+
+  @override
+  Stream<ScanEvent> scan(
+    ScanPlan plan,
+    ScanCancellationToken cancellationToken,
+  ) async* {
+    yield ScanStarted(totalTargets: plan.targets.length);
+    final cancelled = Completer<void>();
+    final removeListener = cancellationToken.addCancelListener(() {
+      if (!cancelled.isCompleted) cancelled.complete();
+    });
+    try {
+      await cancelled.future;
+    } finally {
+      removeListener();
+    }
+    yield const ScanCancelled();
+  }
+}
+
+class _WaitsForCancellationDiscovery implements DeviceDiscovery {
+  const _WaitsForCancellationDiscovery();
+
+  @override
+  Future<DeviceDiscoveryResult> discover(
+    ScanPlan plan,
+    ScanCancellationToken cancellationToken,
+  ) async {
+    final cancelled = Completer<void>();
+    final removeListener = cancellationToken.addCancelListener(() {
+      if (!cancelled.isCompleted) cancelled.complete();
+    });
+    try {
+      await cancelled.future;
+    } finally {
+      removeListener();
+    }
+    return const DeviceDiscoveryResult.empty();
   }
 }
 

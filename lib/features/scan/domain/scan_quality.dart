@@ -12,7 +12,8 @@ extension ScanQualityLevelText on ScanQualityLevel {
   };
 
   String get description => switch (this) {
-    ScanQualityLevel.comprehensive => 'Ayrıntılı keşif yöntemleri karşılaştırma için yeterli kapsamla tamamlandı.',
+    ScanQualityLevel.comprehensive =>
+      'Ayrıntılı keşif yöntemleri karşılaştırma için yeterli kapsamla tamamlandı.',
     ScanQualityLevel.limited =>
       'Kullanılabilir sonuçlar var ancak bütün keşif yöntemleri çalışmadı.',
     ScanQualityLevel.insufficient =>
