@@ -242,7 +242,9 @@ class ReferenceScanComparator {
     }
     if (_hasIdentifier(device, DeviceEvidenceSource.onvif) ||
         _hasIdentifier(device, DeviceEvidenceSource.ssdp)) {
-      return ObservedIdentityQuality.strong;
+      // ONVIF endpoints and SSDP USNs are self-declared multicast data. They
+      // improve continuity inside one network but are not authenticated.
+      return ObservedIdentityQuality.networkScoped;
     }
     if (_hasIdentifier(device, DeviceEvidenceSource.mdns)) {
       return ObservedIdentityQuality.networkScoped;

@@ -4027,19 +4027,15 @@ class $$DeviceIdentityAliasesTableTableManager
                     >
                   >(state) {
                     if (stableKey) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.stableKey,
-                                referencedTable:
-                                    $$DeviceIdentityAliasesTableReferences
-                                        ._stableKeyTable(db),
-                                referencedColumn:
-                                    $$DeviceIdentityAliasesTableReferences
-                                        ._stableKeyTable(db)
-                                        .stableKey,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.stableKey,
+                        referencedTable: $$DeviceIdentityAliasesTableReferences
+                            ._stableKeyTable(db),
+                        referencedColumn: $$DeviceIdentityAliasesTableReferences
+                            ._stableKeyTable(db)
+                            .stableKey,
+                      ) as T;
                     }
 
                     return state;
@@ -4653,19 +4649,16 @@ class $$NetworkIdentityAliasesTableTableManager
                     >
                   >(state) {
                     if (networkKey) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.networkKey,
-                                referencedTable:
-                                    $$NetworkIdentityAliasesTableReferences
-                                        ._networkKeyTable(db),
-                                referencedColumn:
-                                    $$NetworkIdentityAliasesTableReferences
-                                        ._networkKeyTable(db)
-                                        .networkKey,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.networkKey,
+                        referencedTable: $$NetworkIdentityAliasesTableReferences
+                            ._networkKeyTable(db),
+                        referencedColumn:
+                            $$NetworkIdentityAliasesTableReferences
+                                ._networkKeyTable(db)
+                                .networkKey,
+                      ) as T;
                     }
 
                     return state;
@@ -5656,19 +5649,15 @@ class $$ScanObservationsTableTableManager
                     >
                   >(state) {
                     if (scanSessionId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.scanSessionId,
-                                referencedTable:
-                                    $$ScanObservationsTableReferences
-                                        ._scanSessionIdTable(db),
-                                referencedColumn:
-                                    $$ScanObservationsTableReferences
-                                        ._scanSessionIdTable(db)
-                                        .id,
-                              )
-                              as T;
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.scanSessionId,
+                        referencedTable: $$ScanObservationsTableReferences
+                            ._scanSessionIdTable(db),
+                        referencedColumn: $$ScanObservationsTableReferences
+                            ._scanSessionIdTable(db)
+                            .id,
+                      ) as T;
                     }
 
                     return state;

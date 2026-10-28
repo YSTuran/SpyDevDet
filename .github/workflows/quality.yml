@@ -19,13 +19,14 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  FLUTTER_VERSION: 3.38.9
+  # 3.47.8 contains the Dart TLS trust-store fix from GHSA-frr6-h895-5pxp.
+  FLUTTER_VERSION: 3.47.8
 
 jobs:
   android-quality:
     name: Analyze, test and build Android
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,15 +52,33 @@ jobs:
       - name: Run tests
         run: flutter test --no-pub
 
-      - name: Build debug APK
-        run: flutter build apk --debug --no-pub
+      - name: Build release APK
+        # Flutter regenerates the release plugin registrant during pub get.
+        # Avoid --no-pub here so dev-only integration plugins cannot remain in
+        # a stale release registrant (flutter/flutter#169336).
+        run: flutter build apk --release
 
-      - name: Upload debug APK
+      - name: Enable KVM for Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run Android 11 native integration smoke test
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: flutter test integration_test/app_smoke_test.dart -d emulator-5554
+
+      - name: Upload release APK
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: spydevdet-android-debug-${{ github.ref_name }}
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          name: spydevdet-android-release-${{ github.ref_name }}
+          path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -91,6 +110,9 @@ jobs:
 
       - name: Run desktop integration smoke test
         run: flutter test integration_test/app_smoke_test.dart -d windows --no-pub
+
+      - name: Run Windows native adapter tests
+        run: .\build\windows\x64\runner\Debug\network_adapter_classifier_test.exe
 
       - name: Upload Windows debug application
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')

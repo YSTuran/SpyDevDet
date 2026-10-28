@@ -77,6 +77,30 @@ void main() {
       ObservedIdentityQuality.networkScoped,
     );
   });
+
+  test('ONVIF ve SSDP kimliklerini güçlü kabul etmez', () {
+    for (final source in const [
+      DeviceEvidenceSource.onvif,
+      DeviceEvidenceSource.ssdp,
+    ]) {
+      final device = _device(
+        key: 'device-${source.name}',
+        ip: '192.168.1.21',
+        evidence: [
+          DeviceEvidence(
+            source: source,
+            description: 'Kimliği doğrulanmamış servis duyurusu',
+            identifier: 'uuid:shared-device',
+          ),
+        ],
+      );
+
+      expect(
+        comparator.identityQuality(device),
+        ObservedIdentityQuality.networkScoped,
+      );
+    }
+  });
 }
 
 DeviceObservation _device({

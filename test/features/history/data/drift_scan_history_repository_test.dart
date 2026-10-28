@@ -492,30 +492,77 @@ void main() {
     },
   );
 
+  test('gateway servis kimliğini tek başına güçlü ağ kimliği saymaz', () async {
+    const baseKey = '192.168.1.0/24|gateway:192.168.1.1';
+    const firstStrongKey = '$baseKey|gateway-service:ssdp%3Auuid%3Arouter-1';
+    const secondStrongKey = '$baseKey|gateway-service:ssdp%3Auuid%3Arouter-2';
+    await repository.recordCompletedScan(
+      _record(
+        ipAddress: '192.168.1.20',
+        minute: 0,
+        networkIdentityKeys: const [firstStrongKey, baseKey],
+      ),
+    );
+    await repository.recordCompletedScan(
+      _record(
+        ipAddress: '192.168.1.20',
+        minute: 5,
+        networkIdentityKeys: const [secondStrongKey, baseKey],
+      ),
+    );
+
+    final history = await repository.getHistory();
+    expect(history.first.networkKey, baseKey);
+    expect(history.last.networkKey, baseKey);
+  });
+
   test(
-    'aynı adresleri kullanan farklı gateway servis kimliklerini ayırır',
+    'kopyalanan servis kimliği farklı IP adresinde cihaz profilini devralmaz',
     () async {
-      const baseKey = '192.168.1.0/24|gateway:192.168.1.1';
-      const firstStrongKey = '$baseKey|gateway-service:ssdp%3Auuid%3Arouter-1';
-      const secondStrongKey = '$baseKey|gateway-service:ssdp%3Auuid%3Arouter-2';
-      await repository.recordCompletedScan(
-        _record(
+      final first = await repository.recordCompletedScan(
+        _serviceRecord(
           ipAddress: '192.168.1.20',
           minute: 0,
-          networkIdentityKeys: const [firstStrongKey, baseKey],
+          identifier: 'uuid:shared-device',
         ),
       );
-      await repository.recordCompletedScan(
-        _record(
+      await repository.updateDeviceProfile(
+        stableKey: first.devices.single.stableKey!,
+        isKnown: false,
+        isOwned: true,
+        customName: 'Bana ait kamera',
+        note: 'Güvenilen profil',
+      );
+
+      final legitimate = await repository.recordCompletedScan(
+        _serviceRecord(
           ipAddress: '192.168.1.20',
           minute: 5,
-          networkIdentityKeys: const [secondStrongKey, baseKey],
+          identifier: 'uuid:shared-device',
+        ),
+      );
+      final impersonator = await repository.recordCompletedScan(
+        _serviceRecord(
+          ipAddress: '192.168.1.90',
+          minute: 10,
+          identifier: 'uuid:shared-device',
         ),
       );
 
-      final history = await repository.getHistory();
-      expect(history.first.networkKey, secondStrongKey);
-      expect(history.last.networkKey, firstStrongKey);
+      expect(legitimate.devices.single.familiarity, DeviceFamiliarity.known);
+      expect(legitimate.devices.single.isOwned, isTrue);
+      expect(legitimate.devices.single.effectiveDisplayName, 'Bana ait kamera');
+      expect(
+        impersonator.devices.single.stableKey,
+        isNot(first.devices.single.stableKey),
+      );
+      expect(
+        impersonator.devices.single.familiarity,
+        DeviceFamiliarity.newDevice,
+      );
+      expect(impersonator.devices.single.isOwned, isFalse);
+      expect(impersonator.devices.single.customName, isNull);
+      expect(impersonator.devices.single.note, isNull);
     },
   );
 
@@ -803,5 +850,36 @@ CompletedScanRecord _record({
               ),
             )
             .toList(),
+  );
+}
+
+CompletedScanRecord _serviceRecord({
+  required String ipAddress,
+  required int minute,
+  required String identifier,
+}) {
+  final base = _record(ipAddress: ipAddress, minute: minute, devices: const []);
+  return CompletedScanRecord(
+    networkKey: base.networkKey,
+    networkIdentityKeys: base.networkIdentityKeys,
+    report: base.report,
+    elapsed: base.elapsed,
+    devices: [
+      DeviceObservation(
+        id: 'service-$ipAddress',
+        ipAddress: ipAddress,
+        displayName: 'Servis cihazı',
+        macStatus: MacStatus.notObserved,
+        services: const ['SSDP'],
+        discoveryMethod: 'SSDP',
+        evidence: [
+          DeviceEvidence(
+            source: DeviceEvidenceSource.ssdp,
+            description: 'Kimliği doğrulanmamış SSDP duyurusu',
+            identifier: identifier,
+          ),
+        ],
+      ),
+    ],
   );
 }

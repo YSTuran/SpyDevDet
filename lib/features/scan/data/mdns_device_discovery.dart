@@ -17,6 +17,10 @@ class MdnsDeviceDiscovery implements DeviceDiscovery {
 
   static const _serviceEnumeration = '_services._dns-sd._udp.local';
   static const _maxConcurrentLookups = 12;
+  static const _maxPointersPerServiceType = 24;
+  static const _maxServiceRecordsPerInstance = 8;
+  static const _maxTxtRecordsPerInstance = 8;
+  static const _maxAddressesPerTarget = 8;
   static const _defaultServiceTypes = [
     '_http._tcp.local',
     '_https._tcp.local',
@@ -90,6 +94,7 @@ class MdnsDeviceDiscovery implements DeviceDiscovery {
               ResourceRecordQuery.serverPointer(serviceType),
               timeout: queryTimeout,
             )
+            .take(_maxPointersPerServiceType)
             .toList(),
       );
       if (cancellationToken.isCancelled) {
@@ -132,6 +137,7 @@ class MdnsDeviceDiscovery implements DeviceDiscovery {
               ResourceRecordQuery.addressIPv4(service.record.target),
               timeout: queryTimeout,
             )
+            .take(_maxAddressesPerTarget)
             .toList(),
       );
       if (cancellationToken.isCancelled) {
@@ -202,12 +208,14 @@ class MdnsDeviceDiscovery implements DeviceDiscovery {
             ResourceRecordQuery.service(pointer.domainName),
             timeout: queryTimeout,
           )
+          .take(_maxServiceRecordsPerInstance)
           .toList(),
       client
           .lookup<TxtResourceRecord>(
             ResourceRecordQuery.text(pointer.domainName),
             timeout: queryTimeout,
           )
+          .take(_maxTxtRecordsPerInstance)
           .toList(),
     ]);
     final records = groups[0].whereType<SrvResourceRecord>();
@@ -282,9 +290,8 @@ class MdnsDeviceDiscovery implements DeviceDiscovery {
   String? _normalizeServiceType(String value) {
     final normalized = value.trim().toLowerCase();
     if (normalized.length > 128 ||
-        !RegExp(
-          r'^_[a-z0-9-]+\._(?:tcp|udp)\.local\.?$',
-        ).hasMatch(normalized)) {
+        !RegExp(r'^_[a-z0-9-]+\._(?:tcp|udp)\.local\.?$')
+            .hasMatch(normalized)) {
       return null;
     }
     return normalized.endsWith('.')

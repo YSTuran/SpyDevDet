@@ -53,7 +53,7 @@ void main() {
     );
   });
 
-  test('yerel MAC yerine SSDP kimliğini kullanır', () {
+  test('yerel MAC yerine ağ ve IP kapsamlı SSDP kimliğini kullanır', () {
     const device = DeviceObservation(
       id: 'device-2',
       ipAddress: '192.168.1.21',
@@ -72,7 +72,7 @@ void main() {
 
     expect(
       resolver.resolve(device, networkKey: 'network-a'),
-      'ssdp:uuid:device-1',
+      'service:network-a|ip:192.168.1.21|ssdp:uuid:device-1',
     );
   });
 
@@ -114,7 +114,7 @@ void main() {
     );
   });
 
-  test('ONVIF endpoint kimliğini SSDP kimliğine tercih eder', () {
+  test('ONVIF endpoint kimliğini ağ ve IP kapsamıyla kullanır', () {
     const device = DeviceObservation(
       id: 'device-onvif',
       ipAddress: '192.168.1.40',
@@ -137,7 +137,8 @@ void main() {
 
     expect(
       resolver.resolve(device, networkKey: '192.168.1.0/24'),
-      'onvif:urn:uuid:onvif-device',
+      'service:192.168.1.0/24|ip:192.168.1.40|onvif:'
+      'urn:uuid:onvif-device',
     );
   });
 
@@ -165,8 +166,8 @@ void main() {
 
     expect(resolver.candidateKeys(device, networkKey: 'network-a'), [
       'mac:B8:27:EB:12:34:56',
-      'onvif:urn:uuid:onvif-device',
-      'ssdp:uuid:ssdp-device',
+      'service:network-a|ip:192.168.1.40|onvif:urn:uuid:onvif-device',
+      'service:network-a|ip:192.168.1.40|ssdp:uuid:ssdp-device',
       'network:network-a|ip:192.168.1.40',
     ]);
   });

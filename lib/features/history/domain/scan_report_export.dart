@@ -153,7 +153,7 @@ class ScanReportExporter {
       'automaticCategory': device.category.name,
       'confidence': device.confidence.name,
       'familiarity': device.familiarity.name,
-      'services': device.services,
+      'services': _exportableServices(device, masked: masked),
       'discoveryMethod': device.discoveryMethod,
       'owned': device.isOwned,
       if (!masked) 'stableKey': device.stableKey,
@@ -205,7 +205,7 @@ class ScanReportExporter {
       device.effectiveCategory.label,
       device.confidence.label,
       device.familiarity.label,
-      device.services.join(' | '),
+      _exportableServices(device, masked: masked).join(' | '),
       masked ? '' : device.note ?? '',
     ];
   }
@@ -230,6 +230,7 @@ class ScanReportExporter {
       ..writeln();
     for (var index = 0; index < details.devices.length; index++) {
       final device = details.devices[index];
+      final services = _exportableServices(device, masked: masked);
       buffer
         ..writeln(
           '${index + 1}. '
@@ -248,7 +249,7 @@ class ScanReportExporter {
         ..writeln('   Güven: ${device.confidence.label}')
         ..writeln(
           '   Servisler: '
-          '${device.services.isEmpty ? 'Gözlemlenmedi' : device.services.join(', ')}',
+          '${services.isEmpty ? 'Gözlemlenmedi' : services.join(', ')}',
         );
       if (!masked && device.note?.trim().isNotEmpty == true) {
         buffer.writeln('   Not: ${device.note}');
@@ -256,6 +257,20 @@ class ScanReportExporter {
       buffer.writeln();
     }
     return buffer.toString();
+  }
+
+  List<String> _exportableServices(
+    DeviceObservation device, {
+    required bool masked,
+  }) {
+    if (!masked) {
+      return device.services;
+    }
+    return device.services
+        .where(
+          (service) => !service.trimLeft().toLowerCase().startsWith('mdns:'),
+        )
+        .toList(growable: false);
   }
 
   String _maskIp(String value) {

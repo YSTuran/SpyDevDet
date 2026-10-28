@@ -41,13 +41,15 @@ class NativeReachabilityDiscovery implements DeviceDiscovery {
     });
     List<String>? addresses;
     try {
-      addresses = await _channel
-          .invokeListMethod<String>('discoverReachableHosts', {
-            'requestId': requestId,
-            'sourceAddress': plan.network.localIpv4,
-            'targets': plan.targets,
-            'timeoutMillis': timeout.inMilliseconds,
-          });
+      addresses = await _channel.invokeListMethod<String>(
+        'discoverReachableHosts',
+        {
+          'requestId': requestId,
+          'sourceAddress': plan.network.localIpv4,
+          'targets': plan.targets,
+          'timeoutMillis': timeout.inMilliseconds,
+        },
+      );
     } on PlatformException {
       throw const ReachabilityUnavailableException();
     } on MissingPluginException {

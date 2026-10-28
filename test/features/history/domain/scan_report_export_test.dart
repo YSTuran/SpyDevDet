@@ -23,6 +23,7 @@ void main() {
     expect(report.content, isNot(contains('192.168.1.42')));
     expect(report.content, isNot(contains('B8:27:EB:12:34:56')));
     expect(report.content, isNot(contains('Özel kullanıcı notu')));
+    expect(report.content, isNot(contains("fn=Yusuf'un Salon TV'si")));
     expect(report.content, contains('192.168.1.x'));
     final decoded = jsonDecode(report.content) as Map<String, dynamic>;
     expect(decoded['schemaVersion'], 1);
@@ -41,6 +42,21 @@ void main() {
     expect(report.content, contains('192.168.1.42'));
     expect(report.content, contains('B8:27:EB:12:34:56'));
     expect(report.content, contains('Özel kullanıcı notu'));
+    expect(report.content, contains("fn=Yusuf'un Salon TV'si"));
+  });
+
+  test('maskelenmiş tüm rapor türleri mDNS dost adını çıkarır', () {
+    for (final format in ScanReportExportFormat.values) {
+      final report = exporter.generate(
+        details: _details(),
+        format: format,
+        privacyMode: ScanReportPrivacyMode.masked,
+        applicationVersion: '2.1.0',
+      );
+
+      expect(report.content, isNot(contains("Yusuf'un Salon TV'si")));
+      expect(report.content, contains('RTSP (554)'));
+    }
   });
 
   test('CSV özel karakterleri güvenli biçimde kaçışlar', () {
@@ -116,7 +132,10 @@ ScanHistoryDetails _details({String displayName = 'Salon kamerası'}) {
         macAddress: 'B8:27:EB:12:34:56',
         macStatus: MacStatus.available,
         vendor: 'Raspberry Pi Foundation',
-        services: const ['RTSP (554)'],
+        services: const [
+          'RTSP (554)',
+          "mDNS: fn=Yusuf'un Salon TV'si, model=TV-2026",
+        ],
         note: 'Özel kullanıcı notu',
         category: DeviceCategory.cameraCandidate,
         confidence: ConfidenceLevel.high,

@@ -9,6 +9,7 @@ project(runner LANGUAGES CXX)
 add_executable(${BINARY_NAME} WIN32
   "flutter_window.cpp"
   "main.cpp"
+  "network_adapter_classifier.cpp"
   "network_info_channel.cpp"
   "utils.cpp"
   "win32_window.cpp"
@@ -40,3 +41,14 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
+
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(network_adapter_classifier_test
+    "network_adapter_classifier.cpp"
+    "network_adapter_classifier_test.cpp"
+  )
+  apply_standard_settings(network_adapter_classifier_test)
+  add_test(NAME network_adapter_classifier
+    COMMAND network_adapter_classifier_test)
+endif()

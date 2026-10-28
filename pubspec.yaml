@@ -19,7 +19,8 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 2.5.0+19
 
 environment:
-  sdk: ^3.10.8
+  # Dart 3.13.7 contains the TLS trust-store fix used by Flutter 3.47.8.
+  sdk: ">=3.13.7 <4.0.0"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions

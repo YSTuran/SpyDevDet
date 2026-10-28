@@ -764,7 +764,15 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
       }
     }
 
-    return strongKeys.isNotEmpty ? strongKeys.first : keys.first;
+    if (strongKeys.isNotEmpty) {
+      return strongKeys.first;
+    }
+    // A gateway service identifier is unauthenticated multicast data. Keep it
+    // as an alias, but never make it the canonical network profile key.
+    return weakKeys.firstWhere(
+      (key) => !key.contains('|gateway-service:'),
+      orElse: () => weakKeys.first,
+    );
   }
 
   Future<void> _rememberNetworkIdentity({
@@ -838,9 +846,7 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
     final sessions =
         await (database.select(database.scanSessions)
               ..where(
-                (table) =>
-                    table.networkKey.like('$baseKey|gateway-mac:%') |
-                    table.networkKey.like('$baseKey|gateway-service:%'),
+                (table) => table.networkKey.like('$baseKey|gateway-mac:%'),
               )
               ..orderBy([(table) => OrderingTerm.desc(table.completedAt)]))
             .get();
@@ -848,8 +854,7 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
     return matchingKeys.length == 1 ? matchingKeys.single : null;
   }
 
-  bool _isStrongNetworkKey(String key) =>
-      key.contains('|gateway-mac:') || key.contains('|gateway-service:');
+  bool _isStrongNetworkKey(String key) => key.contains('|gateway-mac:');
 
   Future<String> _resolveStableKey(
     List<String> candidateKeys, {
@@ -942,7 +947,14 @@ class DriftScanHistoryRepository implements ScanHistoryRepository {
   }
 
   bool _isWeakKey(String key) =>
-      key.startsWith('network:') || key.startsWith('mdns:');
+      key.startsWith('network:') ||
+      key.startsWith('mdns:') ||
+      key.startsWith('service:') ||
+      // Legacy builds stored unauthenticated service identifiers as globally
+      // strong aliases. Treat those rows as weak during migration so they can
+      // no longer override a conflicting MAC address.
+      key.startsWith('onvif:') ||
+      key.startsWith('ssdp:');
 
   bool _isRecent(DateTime lastSeenAt, DateTime observedAt) =>
       observedAt.difference(lastSeenAt) <= _weakIdentityReuseWindow;

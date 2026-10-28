@@ -52,9 +52,8 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          historyStatisticsProvider(
-            null,
-          ).overrideWith((ref) async => statistics),
+          historyStatisticsProvider(null)
+              .overrideWith((ref) async => statistics),
           networkProfilesProvider.overrideWith((ref) async => const []),
         ],
         child: const MaterialApp(home: HistoryStatisticsScreen()),

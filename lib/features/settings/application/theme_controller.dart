@@ -33,9 +33,8 @@ class ThemeController extends Notifier<ThemePreferences> {
   Future<void> _update(ThemePreferences next) async {
     final revision = ++_revision;
     state = next;
-    final operation = _ignoreFailure(
-      _saveQueue,
-    ).then((_) => ref.read(themePreferencesRepositoryProvider).save(next));
+    final operation = _ignoreFailure(_saveQueue)
+        .then((_) => ref.read(themePreferencesRepositoryProvider).save(next));
     _saveQueue = operation;
     try {
       await operation;

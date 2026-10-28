@@ -63,8 +63,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
       ref
           .read(scanControllerProvider.notifier)
           .cancelScan(
-            message:
-                'Tarama uygulama arka plana geçtiği için güvenli biçimde durduruldu',
+            message: 'Tarama uygulama arka plana geçtiği için güvenli biçimde durduruldu',
           );
     }
   }

@@ -7,9 +7,7 @@ extension ScanModeText on ScanMode {
   };
 
   String get description => switch (this) {
-    ScanMode.quick =>
-      'Erişilebilirlik, destekleniyorsa MAC ve kamera odaklı sınırlı TCP kontrolü',
-    ScanMode.detailed =>
-      'TCP, mDNS, SSDP, WS-Discovery, NetBIOS, erişilebilirlik ve destekleniyorsa MAC kontrolü',
+    ScanMode.quick => 'Erişilebilirlik, destekleniyorsa MAC ve kamera odaklı sınırlı TCP kontrolü',
+    ScanMode.detailed => 'TCP, mDNS, SSDP, WS-Discovery, NetBIOS, erişilebilirlik ve destekleniyorsa MAC kontrolü',
   };
 }

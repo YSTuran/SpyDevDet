@@ -36,10 +36,19 @@ class DeviceIdentityResolver {
     final ssdpIdentifier = _identifierFor(device, DeviceEvidenceSource.ssdp);
     final onvifIdentifier = _identifierFor(device, DeviceEvidenceSource.onvif);
     if (onvifIdentifier != null) {
-      keys.add('onvif:$onvifIdentifier');
+      // WS-Discovery endpoint identifiers are self-declared by the remote
+      // device. Keep them scoped to the current network and treat them as a
+      // supporting signal rather than a globally strong identity.
+      keys.add(
+        'service:$networkKey|ip:${device.ipAddress}|onvif:$onvifIdentifier',
+      );
     }
     if (ssdpIdentifier != null) {
-      keys.add('ssdp:$ssdpIdentifier');
+      // SSDP USN values are unauthenticated and can be copied by another
+      // device, so they must never identify a device across networks.
+      keys.add(
+        'service:$networkKey|ip:${device.ipAddress}|ssdp:$ssdpIdentifier',
+      );
     }
 
     final mdnsIdentifier = _identifierFor(device, DeviceEvidenceSource.mdns);

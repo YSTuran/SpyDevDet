@@ -1,9 +1,10 @@
 #include <winsock2.h>
+#include <ws2tcpip.h>
 #include <iphlpapi.h>
 #include <iptypes.h>
 #include <icmpapi.h>
-#include <ws2tcpip.h>
 
+#include "network_adapter_classifier.h"
 #include "network_info_channel.h"
 
 #include <algorithm>
@@ -11,7 +12,6 @@
 #include <cctype>
 #include <condition_variable>
 #include <cstdint>
-#include <cwctype>
 #include <iomanip>
 #include <limits>
 #include <memory>
@@ -303,35 +303,28 @@ std::optional<std::string> FirstGateway(
   return std::nullopt;
 }
 
-std::wstring Lowercase(const wchar_t* value) {
-  if (value == nullptr) {
-    return std::wstring();
-  }
-  std::wstring lowered(value);
-  std::transform(lowered.begin(), lowered.end(), lowered.begin(),
-                 [](wchar_t character) { return std::towlower(character); });
-  return lowered;
-}
-
-bool ContainsAny(const std::wstring& value,
-                 const std::vector<std::wstring>& terms) {
-  return std::any_of(terms.begin(), terms.end(), [&](const auto& term) {
-    return value.find(term) != std::wstring::npos;
-  });
-}
-
 bool IsVpnAdapter(const IP_ADAPTER_ADDRESSES* adapter) {
-  if (adapter->IfType == IF_TYPE_TUNNEL || adapter->IfType == IF_TYPE_PPP ||
-      adapter->TunnelType != TUNNEL_TYPE_NONE) {
-    return true;
+  MIB_IF_ROW2 interface_row = {};
+  interface_row.InterfaceIndex = adapter->IfIndex;
+  std::optional<bool> is_hardware_interface;
+  if (GetIfEntry2(&interface_row) == NO_ERROR) {
+    is_hardware_interface =
+        interface_row.InterfaceAndOperStatusFlags.HardwareInterface != 0;
   }
 
-  const std::wstring identity = Lowercase(adapter->FriendlyName) + L" " +
-                                Lowercase(adapter->Description);
-  static const std::vector<std::wstring> kVpnTerms = {
-      L"vpn", L"wireguard", L"wintun", L"openvpn", L"tap-windows",
-      L"tailscale", L"zerotier"};
-  return ContainsAny(identity, kVpnTerms);
+  const std::wstring identity =
+      std::wstring(adapter->FriendlyName == nullptr ? L""
+                                                    : adapter->FriendlyName) +
+      L" " +
+      std::wstring(adapter->Description == nullptr ? L""
+                                                   : adapter->Description) +
+      L" " +
+      std::wstring(adapter->DnsSuffix == nullptr ? L"" : adapter->DnsSuffix);
+  const bool reports_tunnel_or_ppp =
+      adapter->IfType == IF_TYPE_TUNNEL || adapter->IfType == IF_TYPE_PPP ||
+      adapter->TunnelType != TUNNEL_TYPE_NONE;
+  return spy_dev_det::IsUnsafeNetworkAdapter(
+      reports_tunnel_or_ppp, is_hardware_interface, identity);
 }
 
 std::optional<std::string> PhysicalAddress(
