@@ -48,6 +48,42 @@ void main() {
       expect(plan.isTruncated, isTrue);
     });
 
+    test('büyük ağda uzaktaki geçerli ağ geçidini hedeflere dahil eder', () {
+      final plan = ScanPlan.fromNetwork(
+        const NetworkSnapshot(
+          localIpv4: '172.16.200.20',
+          prefixLength: 16,
+          interfaceName: 'wlan0',
+          gatewayIpv4: '172.16.0.1',
+          isWifi: true,
+          isVpn: false,
+        ),
+      );
+
+      expect(plan.targets, hasLength(254));
+      expect(plan.targets, contains('172.16.0.1'));
+      expect(plan.targets.first, '172.16.0.1');
+      expect(plan.targets, isNot(contains('172.16.200.20')));
+      expect(plan.rangeLabel, contains('ağ geçidi dahil'));
+      expect(plan.isTruncated, isTrue);
+    });
+
+    test('alt ağ dışındaki ağ geçidini hedeflere eklemez', () {
+      final plan = ScanPlan.fromNetwork(
+        const NetworkSnapshot(
+          localIpv4: '172.16.200.20',
+          prefixLength: 16,
+          interfaceName: 'wlan0',
+          gatewayIpv4: '192.168.1.1',
+          isWifi: true,
+          isVpn: false,
+        ),
+      );
+
+      expect(plan.targets, isNot(contains('192.168.1.1')));
+      expect(plan.rangeLabel, isNot(contains('ağ geçidi dahil')));
+    });
+
     test('genel IPv4 adresini reddeder', () {
       expect(
         () => ScanPlan.fromNetwork(_network('8.8.8.8', 24)),

@@ -343,6 +343,7 @@ class ScanController extends Notifier<ScanState> {
       phase: ScanPhase.failed,
       statusMessage: message,
       errorCode: errorCode,
+      report: state.report?.terminateAfterFailure(userMessage: message),
       clearEstimatedRemaining: true,
     );
   }

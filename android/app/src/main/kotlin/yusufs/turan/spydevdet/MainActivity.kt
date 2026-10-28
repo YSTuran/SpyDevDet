@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : FlutterActivity() {
     private var multicastLock: WifiManager.MulticastLock? = null
+    private var multicastLockLeaseCount = 0
     private val reachabilityJobs = ConcurrentHashMap<String, ReachabilityJob>()
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -51,7 +52,7 @@ class MainActivity : FlutterActivity() {
             job.executor.shutdownNow()
         }
         reachabilityJobs.clear()
-        releaseMulticastLock(null)
+        releaseAllMulticastLockLeases()
         super.onDestroy()
     }
 
@@ -62,9 +63,10 @@ class MainActivity : FlutterActivity() {
                 it.setReferenceCounted(false)
                 multicastLock = it
             }
-            if (!lock.isHeld) {
+            if (multicastLockLeaseCount == 0 && !lock.isHeld) {
                 lock.acquire()
             }
+            multicastLockLeaseCount++
             result.success(null)
         } catch (error: SecurityException) {
             result.error("MULTICAST_LOCK_DENIED", "Çok noktaya yayın kilidi alınamadı.", null)
@@ -73,10 +75,22 @@ class MainActivity : FlutterActivity() {
 
     private fun releaseMulticastLock(result: MethodChannel.Result?) {
         val lock = multicastLock
-        if (lock?.isHeld == true) {
+        if (multicastLockLeaseCount > 0) {
+            multicastLockLeaseCount--
+        }
+        if (multicastLockLeaseCount == 0 && lock?.isHeld == true) {
             lock.release()
         }
         result?.success(null)
+    }
+
+    private fun releaseAllMulticastLockLeases() {
+        multicastLockLeaseCount = 0
+        val lock = multicastLock
+        if (lock?.isHeld == true) {
+            lock.release()
+        }
+        multicastLock = null
     }
 
     private fun readNeighborSnapshot(result: MethodChannel.Result) {

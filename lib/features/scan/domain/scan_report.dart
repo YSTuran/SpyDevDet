@@ -218,4 +218,26 @@ class ScanReport {
             : entry.value,
     },
   );
+
+  ScanReport terminateAfterFailure({String? userMessage}) => ScanReport(
+    startedAt: startedAt,
+    completedAt: completedAt,
+    scanMode: scanMode,
+    methods: {
+      for (final entry in methods.entries)
+        entry.key: switch (entry.value.phase) {
+          DiscoveryMethodPhase.running => entry.value.copyWith(
+            phase: DiscoveryMethodPhase.failed,
+            userMessage: entry.value.userMessage ?? userMessage,
+          ),
+          DiscoveryMethodPhase.waiting => entry.value.copyWith(
+            phase: DiscoveryMethodPhase.cancelled,
+            userMessage:
+                entry.value.userMessage ??
+                'Tarama önceki bir yöntem başarısız olduğu için tamamlanamadı.',
+          ),
+          _ => entry.value,
+        },
+    },
+  );
 }

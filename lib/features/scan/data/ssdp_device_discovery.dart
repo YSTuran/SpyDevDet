@@ -6,6 +6,7 @@ import 'package:spy_dev_det/features/scan/domain/device_discovery.dart';
 import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation_merger.dart';
+import 'package:spy_dev_det/features/scan/domain/network_text_sanitizer.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_cancellation_token.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
@@ -202,8 +203,7 @@ class SsdpResponse {
   }
 
   static String _sanitize(String value) {
-    final sanitized = value.replaceAll(RegExp(r'[\x00-\x1F\x7F]'), '').trim();
-    return sanitized.length <= 256 ? sanitized : sanitized.substring(0, 256);
+    return NetworkTextSanitizer.sanitize(value, maxRunes: 256);
   }
 
   static String? _notEmpty(String? value) =>

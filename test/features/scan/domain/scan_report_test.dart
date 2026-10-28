@@ -35,6 +35,45 @@ void main() {
     );
   });
 
+  test('başarısız taramada çalışan ve bekleyen yöntemleri sonlandırır', () {
+    final report = ScanReport.started(DateTime(2026, 10, 15))
+        .withMethod(
+          const DiscoveryMethodResult(
+            method: DiscoveryMethod.reachability,
+            phase: DiscoveryMethodPhase.completed,
+          ),
+        )
+        .withMethod(
+          const DiscoveryMethodResult(
+            method: DiscoveryMethod.tcp,
+            phase: DiscoveryMethodPhase.running,
+          ),
+        );
+
+    final failed = report.terminateAfterFailure(userMessage: 'Tarama hatası');
+
+    expect(
+      failed.methods[DiscoveryMethod.reachability]?.phase,
+      DiscoveryMethodPhase.completed,
+    );
+    expect(
+      failed.methods[DiscoveryMethod.tcp]?.phase,
+      DiscoveryMethodPhase.failed,
+    );
+    expect(
+      failed.methods[DiscoveryMethod.mdns]?.phase,
+      DiscoveryMethodPhase.cancelled,
+    );
+    expect(
+      failed.methods.values.map((result) => result.phase),
+      isNot(contains(DiscoveryMethodPhase.running)),
+    );
+    expect(
+      failed.methods.values.map((result) => result.phase),
+      isNot(contains(DiscoveryMethodPhase.waiting)),
+    );
+  });
+
   test(
     'karşılaştırma için bütün ayrıntılı yöntemlerin tamamlanmasını ister',
     () {

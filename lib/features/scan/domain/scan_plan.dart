@@ -12,6 +12,7 @@ class ScanPlan {
     required List<String> targets,
     required this.isTruncated,
     required this.mode,
+    required this.rangeLabel,
   }) : targets = List.unmodifiable(targets);
 
   factory ScanPlan.fromNetwork(
@@ -88,6 +89,29 @@ class ScanPlan {
       }
     }
 
+    final gatewayAddress = _usableGatewayAddress(
+      network.gatewayIpv4,
+      networkValue: networkValue,
+      broadcastValue: broadcastValue,
+      mask: mask,
+      localAddress: localAddress,
+    );
+    var gatewayAddedOutsideWindow = false;
+    if (gatewayAddress != null) {
+      final gateway = Ipv4Address.format(gatewayAddress);
+      if (!targets.contains(gateway)) {
+        if (targets.length >= targetCount) {
+          targets.removeAt(_farthestTargetIndex(targets, localAddress));
+        }
+        targets.insert(0, gateway);
+        gatewayAddedOutsideWindow = true;
+      }
+    }
+
+    final rangeLabel = gatewayAddedOutsideWindow
+        ? '${targets.length} seçili yerel adres • ağ geçidi dahil'
+        : '${targets.first} – ${targets.last}';
+
     return ScanPlan._(
       network: network,
       networkAddress: Ipv4Address.format(networkValue),
@@ -95,6 +119,7 @@ class ScanPlan {
       targets: targets,
       isTruncated: remoteHostCount > targets.length,
       mode: mode,
+      rangeLabel: rangeLabel,
     );
   }
 
@@ -104,8 +129,44 @@ class ScanPlan {
   final List<String> targets;
   final bool isTruncated;
   final ScanMode mode;
+  final String rangeLabel;
 
-  String get rangeLabel => '${targets.first} – ${targets.last}';
+  static int? _usableGatewayAddress(
+    String? value, {
+    required int networkValue,
+    required int broadcastValue,
+    required int mask,
+    required int localAddress,
+  }) {
+    if (value == null) {
+      return null;
+    }
+    try {
+      final gateway = Ipv4Address.parse(value);
+      final isUsableHost = gateway > networkValue && gateway < broadcastValue;
+      return Ipv4Address.isPrivate(gateway) &&
+              (gateway & mask) == networkValue &&
+              gateway != localAddress &&
+              isUsableHost
+          ? gateway
+          : null;
+    } on FormatException {
+      return null;
+    }
+  }
+
+  static int _farthestTargetIndex(List<String> targets, int localAddress) {
+    var farthestIndex = 0;
+    var farthestDistance = -1;
+    for (var index = 0; index < targets.length; index++) {
+      final distance = (Ipv4Address.parse(targets[index]) - localAddress).abs();
+      if (distance > farthestDistance) {
+        farthestIndex = index;
+        farthestDistance = distance;
+      }
+    }
+    return farthestIndex;
+  }
 
   static int _parseLocalAddress(String value) {
     try {

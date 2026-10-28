@@ -85,7 +85,7 @@ jobs:
   windows-build:
     name: Build and smoke test Windows
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -114,11 +114,51 @@ jobs:
       - name: Run Windows native adapter tests
         run: .\build\windows\x64\runner\Debug\network_adapter_classifier_test.exe
 
-      - name: Upload Windows debug application
+      - name: Build self-contained Windows release package
+        run: .\tool\package_windows_release.ps1
+
+      - name: Upload Windows release package
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: spydevdet-windows-debug-${{ github.ref_name }}
-          path: build/windows/x64/runner/Debug/
+          name: spydevdet-windows-release-${{ github.ref_name }}
+          path: |
+            build/distributions/*.zip
+            build/distributions/*.sha256
           if-no-files-found: error
           retention-days: 14
+
+  android-17-smoke:
+    name: Smoke test Android 17 compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Enable KVM for Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run Android 17 platform-channel smoke test
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 37
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: flutter test integration_test/app_smoke_test.dart -d emulator-5554 --no-pub

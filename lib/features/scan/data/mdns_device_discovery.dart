@@ -6,6 +6,7 @@ import 'package:spy_dev_det/features/scan/domain/device_discovery.dart';
 import 'package:spy_dev_det/features/scan/domain/device_evidence.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation.dart';
 import 'package:spy_dev_det/features/scan/domain/device_observation_merger.dart';
+import 'package:spy_dev_det/features/scan/domain/network_text_sanitizer.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_cancellation_token.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_plan.dart';
 import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
@@ -305,11 +306,11 @@ class MdnsDeviceDiscovery implements DeviceDiscovery {
     final raw = domainName.endsWith(suffix)
         ? domainName.substring(0, domainName.length - suffix.length)
         : domainName;
-    final sanitized = raw.replaceAll(RegExp(r'[\x00-\x1F\x7F]'), '').trim();
+    final sanitized = NetworkTextSanitizer.sanitize(raw, maxRunes: 80);
     if (sanitized.isEmpty) {
       return 'mDNS cihazı';
     }
-    return sanitized.length <= 80 ? sanitized : sanitized.substring(0, 80);
+    return sanitized;
   }
 }
 
@@ -388,11 +389,9 @@ class MdnsTxtMetadata {
           continue;
         }
         final raw = line.substring(separator + 1);
-        final sanitized = raw.replaceAll(RegExp(r'[\x00-\x1F\x7F]'), '').trim();
+        final sanitized = NetworkTextSanitizer.sanitize(raw, maxRunes: 80);
         if (sanitized.isNotEmpty) {
-          values[key] = sanitized.length <= 80
-              ? sanitized
-              : sanitized.substring(0, 80);
+          values[key] = sanitized;
         }
       }
     }

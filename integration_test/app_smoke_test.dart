@@ -41,9 +41,11 @@ void main() {
   testWidgets('yerel ağ platform kanalı gerçek uygulamada yanıt verir', (
     tester,
   ) async {
+    Map<String, Object?>? networkSnapshot;
     try {
       final snapshot = await networkInfoChannel
           .invokeMapMethod<String, Object?>('getNetworkSnapshot');
+      networkSnapshot = snapshot;
       expect(snapshot, isNotNull);
       expect(snapshot, contains('localIpv4'));
       expect(snapshot, contains('prefixLength'));
@@ -85,5 +87,37 @@ void main() {
         ),
       ),
     );
+
+    final localIpv4 = networkSnapshot?['localIpv4'];
+    if (localIpv4 is String) {
+      final validRequestId =
+          'integration-valid-${DateTime.now().microsecondsSinceEpoch}';
+      final reachable = await networkInfoChannel.invokeListMethod<String>(
+        'discoverReachableHosts',
+        {
+          'requestId': validRequestId,
+          'sourceAddress': localIpv4,
+          'targets': <String>[localIpv4],
+          'timeoutMillis': 100,
+        },
+      );
+      expect(reachable, isNotNull);
+
+      final cancelRequestId =
+          'integration-cancel-${DateTime.now().microsecondsSinceEpoch}';
+      final pending = networkInfoChannel.invokeListMethod<String>(
+        'discoverReachableHosts',
+        {
+          'requestId': cancelRequestId,
+          'sourceAddress': localIpv4,
+          'targets': <String>[localIpv4],
+          'timeoutMillis': 1000,
+        },
+      );
+      await networkInfoChannel.invokeMethod<void>('cancelReachability', {
+        'requestId': cancelRequestId,
+      });
+      expect(await pending, isNotNull);
+    }
   });
 }

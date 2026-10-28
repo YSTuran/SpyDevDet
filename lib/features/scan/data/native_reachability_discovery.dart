@@ -12,12 +12,14 @@ import 'package:spy_dev_det/features/scan/domain/scan_report.dart';
 class NativeReachabilityDiscovery implements DeviceDiscovery {
   const NativeReachabilityDiscovery({
     this.timeout = const Duration(milliseconds: 500),
+    this.platformSupportedOverride,
   });
 
   static const _channel = MethodChannel('yusufs.turan.spydevdet/network_info');
   static int _requestSequence = 0;
 
   final Duration timeout;
+  final bool? platformSupportedOverride;
 
   @override
   Future<DeviceDiscoveryResult> discover(
@@ -30,7 +32,9 @@ class NativeReachabilityDiscovery implements DeviceDiscovery {
     if (cancellationToken.isCancelled) {
       return const DeviceDiscoveryResult.empty();
     }
-    if (!Platform.isAndroid && !Platform.isWindows) {
+    final isPlatformSupported =
+        platformSupportedOverride ?? (Platform.isAndroid || Platform.isWindows);
+    if (!isPlatformSupported) {
       throw const ReachabilityUnavailableException();
     }
 

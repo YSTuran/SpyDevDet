@@ -25,11 +25,12 @@ void main() {
       TxtResourceRecord(
         'Cihaz._http._tcp.local',
         0,
-        text: 'md=${'A' * 100}\u0000\n',
+        text: 'md=${'A' * 100}\u0000\u202E\n',
       ),
     ]);
 
     expect(metadata.values['md'], hasLength(80));
     expect(metadata.values['md'], isNot(contains('\u0000')));
+    expect(metadata.values['md'], isNot(contains('\u202E')));
   });
 }

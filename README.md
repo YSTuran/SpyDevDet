@@ -206,14 +206,23 @@ noktalarında bunlara ek olarak telefonda şu manuel kontroller yapılmalıdır:
 ## Sürekli entegrasyon
 
 `.github/workflows/quality.yml`, `main` dalına gönderimlerde ve pull request'lerde
-biçimlendirme, statik analiz, tüm testler, Android release APK ve Windows debug
-derlemesini doğrular. Android işi API 30 emülatöründe gerçek platform kanalını,
-Windows işi ise gerçek masaüstü hedefinde ana Tarama, Cihazlar, Ağlar ve Ayarlar
-bölümlerini gezen entegrasyon testini çalıştırır. İş akışı elle veya `v` ile
-başlayan bir etiket üzerinden çalıştırıldığında başarılı Android release APK
-ve Windows debug çıktıları 14 gün süreyle GitHub Actions artifact'i olarak
-saklanır. Telefon kontrol noktalarında aşağıdaki yerel release APK da
-kullanılabilir.
+biçimlendirme, statik analiz, tüm testler, Android release APK ve kendi çalışma
+zamanı dosyalarını içeren Windows release ZIP paketini doğrular. Android 11
+(API 30) emülatörü minimum sürümde, Android 17 (API 37) emülatörü ise güncel
+sürümde gerçek platform kanalını sınar. Windows işi gerçek masaüstü hedefinde
+ana Tarama, Cihazlar, Ağlar ve Ayarlar bölümlerini gezen entegrasyon testini
+çalıştırır. İş akışı elle veya `v` ile başlayan bir etiket üzerinden
+çalıştırıldığında başarılı Android release APK ile Windows release ZIP ve
+SHA-256 özeti 14 gün süreyle GitHub Actions artifact'i olarak saklanır. Telefon
+kontrol noktalarında aşağıdaki yerel release APK da kullanılabilir.
+
+Proje şu anda Android API 36'yı hedefler. Bu nedenle Android 17'de yerel ağ
+erişimi mevcut `INTERNET` izniyle çalışmaya devam eder. Hedef SDK API 37'ye
+yükseltilmeden önce `ACCESS_LOCAL_NETWORK` izni manifest'e eklenmeli, çalışma
+anında istenmeli ve reddedilme/sonradan kaldırılma yolları arayüz ve entegrasyon
+testleriyle ele alınmalıdır. İzin yalnız hedef SDK 37 geçişiyle birlikte
+eklenmelidir; mevcut hedefte erken eklemek desteklenen cihazlarda gereksiz bir
+izin akışı oluşturur.
 
 Android yapılandırması Flutter 3.47.8 ile doğrulanan AGP 9.0.1, Gradle 9.1.0 ve
 AGP'nin yerleşik Kotlin 2.3.20 çalışma zamanını kullanır. Uygulama modülü eski

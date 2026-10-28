@@ -29,4 +29,12 @@ void main() {
     );
     expect(SsdpResponse.tryParse(ascii.encode('HTTP/1.1 200 OK\r\n')), isNull);
   });
+
+  test('SSDP başlığındaki C1 kontrol karakterlerini kaldırır', () {
+    final response = SsdpResponse.tryParse(
+      latin1.encode('HTTP/1.1 200 OK\r\nSERVER: Güvenli\u0085sahte\r\n\r\n'),
+    );
+
+    expect(response?.server, 'Güvenlisahte');
+  });
 }

@@ -23,7 +23,7 @@ $checksumPath = "$archivePath.sha256"
 if (-not $SkipBuild) {
     Push-Location $projectRoot
     try {
-        & flutter build windows --release --no-pub
+        & flutter build windows --release
         if ($LASTEXITCODE -ne 0) {
             throw "Windows release derlemesi başarısız oldu: $LASTEXITCODE"
         }
@@ -35,6 +35,17 @@ if (-not $SkipBuild) {
 
 if (-not (Test-Path -LiteralPath $releaseDirectory -PathType Container)) {
     throw "Windows release klasörü bulunamadı: $releaseDirectory"
+}
+
+$requiredRuntimePaths = @(
+    (Join-Path $releaseDirectory 'spy_dev_det.exe'),
+    (Join-Path $releaseDirectory 'flutter_windows.dll'),
+    (Join-Path $releaseDirectory 'data\flutter_assets')
+)
+foreach ($requiredPath in $requiredRuntimePaths) {
+    if (-not (Test-Path -LiteralPath $requiredPath)) {
+        throw "Windows çalışma zamanı bileşeni bulunamadı: $requiredPath"
+    }
 }
 
 New-Item -ItemType Directory -Path $distributionDirectory -Force | Out-Null
