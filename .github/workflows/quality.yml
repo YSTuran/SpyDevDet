@@ -128,8 +128,8 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  android-17-smoke:
-    name: Smoke test Android 17 compatibility
+  android-latest-smoke:
+    name: Smoke test latest stable Android compatibility
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -154,10 +154,10 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Run Android 17 platform-channel smoke test
+      - name: Run Android 16 platform-channel smoke test
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
-          api-level: 37
+          api-level: 36
           target: google_apis
           arch: x86_64
           disable-animations: true

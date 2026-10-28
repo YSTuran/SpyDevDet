@@ -175,9 +175,8 @@ class ScanDiagnosticsScreen extends ConsumerWidget {
       final message = result == ReportFileResult.saved
           ? 'Tanılama paketi kaydedildi'
           : 'Tanılama paketi paylaşım için hazırlandı';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     } on Object {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

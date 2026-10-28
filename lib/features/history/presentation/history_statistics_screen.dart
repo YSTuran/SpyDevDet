@@ -283,9 +283,9 @@ class _DeviceCountTrendCard extends StatelessWidget {
                                   child: Text(
                                     '${point.deviceCount}',
                                     maxLines: 1,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.labelSmall,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall,
                                   ),
                                 ),
                                 const SizedBox(height: 4),

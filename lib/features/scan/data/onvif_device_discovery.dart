@@ -262,9 +262,10 @@ class OnvifProbeResponse {
         }
         final types = _words(_firstText(element, 'Types'));
         final scopes = _words(_firstText(element, 'Scopes'));
-        final xAddrs = _words(
-          _firstText(element, 'XAddrs'),
-        ).where(_isSafeAdvertisedAddress).take(8).toList(growable: false);
+        final xAddrs = _words(_firstText(element, 'XAddrs'))
+            .where(_isSafeAdvertisedAddress)
+            .take(8)
+            .toList(growable: false);
         matches.add(
           OnvifProbeMatch(
             endpointAddress: _sanitize(endpoint, 256),

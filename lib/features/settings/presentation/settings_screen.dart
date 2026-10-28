@@ -51,9 +51,8 @@ class SettingsScreen extends ConsumerWidget {
                         const SizedBox(height: 14),
                         LayoutBuilder(
                           builder: (context, constraints) {
-                            final textScale = MediaQuery.textScalerOf(
-                              context,
-                            ).scale(1);
+                            final textScale = MediaQuery.textScalerOf(context)
+                                .scale(1);
                             final useVerticalOptions =
                                 constraints.maxWidth < 440 && textScale > 1.3;
                             if (useVerticalOptions) {
@@ -360,9 +359,8 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   void _open(BuildContext context, Widget screen) {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (context) => screen));
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (context) => screen));
   }
 }
 

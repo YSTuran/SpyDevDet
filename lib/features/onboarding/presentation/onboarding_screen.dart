@@ -119,9 +119,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 decoration: BoxDecoration(
                                   color: index == _page
                                       ? Theme.of(context).colorScheme.primary
-                                      : Theme.of(
-                                          context,
-                                        ).colorScheme.surfaceContainerHighest,
+                                      : Theme.of(context)
+                                            .colorScheme
+                                            .surfaceContainerHighest,
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                               ),

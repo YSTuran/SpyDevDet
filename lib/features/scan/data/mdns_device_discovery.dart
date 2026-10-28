@@ -291,9 +291,8 @@ class MdnsDeviceDiscovery implements DeviceDiscovery {
   String? _normalizeServiceType(String value) {
     final normalized = value.trim().toLowerCase();
     if (normalized.length > 128 ||
-        !RegExp(
-          r'^_[a-z0-9-]+\._(?:tcp|udp)\.local\.?$',
-        ).hasMatch(normalized)) {
+        !RegExp(r'^_[a-z0-9-]+\._(?:tcp|udp)\.local\.?$')
+            .hasMatch(normalized)) {
       return null;
     }
     return normalized.endsWith('.')

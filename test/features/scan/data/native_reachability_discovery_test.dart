@@ -85,9 +85,8 @@ void main() {
       });
 
       await expectLater(
-        const NativeReachabilityDiscovery(
-          platformSupportedOverride: true,
-        ).discover(_plan(), ScanCancellationToken()),
+        const NativeReachabilityDiscovery(platformSupportedOverride: true)
+            .discover(_plan(), ScanCancellationToken()),
         throwsA(isA<ReachabilityUnavailableException>()),
       );
     },
